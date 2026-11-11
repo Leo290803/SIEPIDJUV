@@ -22,7 +22,10 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Áreas de demonstração separadas para secretaria e escola, com menus e ações próprios.
 - Seletor de escola para visualizar atletas e rascunhos específicos de cada escola.
 - Portal escolar com eventos abertos, dados da escola e prévia de inscrição com seleção de atletas.
-- Rascunhos de inscrição locais com seleção de atletas e comissão técnica, sem envio para análise, documentos ou validação de elegibilidade.
+- Configuração de modalidades e categorias em Gerenciar evento: participação individual ou por equipe, limites de atletas e disponibilidade.
+- Rascunhos separados por equipe ou participação individual, com seleção de categoria, atletas e comissão técnica.
+- Validação dos limites de integrantes; idade, documentos, elegibilidade e envio para análise permanecem fora desta etapa.
+- Rascunhos antigos são preservados e podem receber categoria ao serem editados.
 - Cadastro de comissão técnica por escola, com função, registro profissional informativo e contatos.
 - Busca, filtros, edição, arquivamento e reativação de profissionais; seleção dos ativos nos rascunhos escolares.
 - Painel da instituição com indicadores demonstrativos.
