@@ -25,12 +25,14 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Cadastro de escolas com nome, INEP, município, endereço e contatos.
 - Edição, busca sem acentos, arquivamento e reativação de escolas.
 - Verificação de INEP duplicado e persistência local dos cadastros.
-- Análise demonstrativa de solicitações de vínculo com escolas.
+- Cadastro local de responsáveis com seleção de escola ativa, cargo e contatos.
+- Aprovação, recusa, encerramento e reabertura de vínculos, com justificativa e histórico.
+- Busca e filtros de responsáveis; solicitações pendentes integradas ao painel inicial.
 - Abas Competições e Inscrições públicas com indicação “Em breve”.
 
 ## Limites atuais
 
-Este é um protótipo funcional de interface, sem backend. Os indicadores e cadastros iniciais são exemplos, não métricas calculadas de inscrições reais. A seleção de perfil serve para demonstração e não aplica controle de acesso. Aprovações de responsáveis duram apenas a sessão. Não inserir dados pessoais reais.
+Este é um protótipo funcional de interface, sem backend. Os indicadores e cadastros iniciais são exemplos, não métricas calculadas de inscrições reais. A seleção de perfil serve para demonstração e não aplica controle de acesso. Cadastros e decisões de vínculo dos responsáveis são persistidos neste navegador e não concedem acesso real. Não inserir dados pessoais reais.
 
 Autenticação por CPF, recuperação de acesso, separação segura entre instituições, cadastro de atletas, documentos, inscrições, análise e notificações ainda serão implementados no servidor. Eventos salvos no navegador não são publicados.
 
