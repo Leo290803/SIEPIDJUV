@@ -25,6 +25,8 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Cadastro de escolas com nome, INEP, município, endereço e contatos.
 - Edição, busca sem acentos, arquivamento e reativação de escolas.
 - Verificação de INEP duplicado e persistência local dos cadastros.
+- Cadastro de atletas por escola, com edição, busca, filtros, arquivamento e reativação.
+- CPF opcional com validação e bloqueio de duplicidade, inclusive em cadastros arquivados.
 - Cadastro local de responsáveis com seleção de escola ativa, cargo e contatos.
 - Aprovação, recusa, encerramento e reabertura de vínculos, com justificativa e histórico.
 - Busca e filtros de responsáveis; solicitações pendentes integradas ao painel inicial.
