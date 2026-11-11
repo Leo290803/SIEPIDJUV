@@ -35,7 +35,11 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Rascunho de cadastro permite pendências. Concluir cadastro verifica exigências e regras gerais de participação; não envia inscrição nem ocupa vaga em prova.
 - Portal escolar com eventos abertos, dados da escola e prévia de inscrição com seleção de atletas.
 - Menu Eventos expansível: cadastro de eventos, competições das modalidades, validações e funções.
-- Cadastro de categorias com classificação da modalidade, participação, limites de atletas e provas individuais ou revezamentos.
+- Modalidades organizadas em lista com busca e paginação; crie cada esporte uma vez e abra Configurar para gerenciar suas categorias.
+- Nome e classificação configurados na modalidade e compartilhados pelas categorias.
+- Categorias em tabela paginada, com edição individual em janela; cada prova é selecionada para edição sem empilhar formulários. Cada alteração é salva na própria modalidade ou categoria.
+- Categorias anteriores agrupadas automaticamente, preservando identificadores, anos, provas, regras e participações.
+- Cadastro de categorias com participação, limites de atletas e provas individuais ou revezamentos.
 - Ano inicial e final de nascimento configuráveis por categoria, com extremos inclusivos. O formulário filtra as modalidades/categorias conforme a data do atleta; o nome da categoria não define o intervalo.
 - Data obrigatória quando houver categorias com faixa; mudança de nascimento retira seleções incompatíveis com aviso. Faixas novas reavaliam cadastros completos e inscrições. Categorias antigas sem intervalo permanecem sem restrição até serem configuradas.
 - Catálogo completo de oito regras, sempre visível, com local de aplicação selecionado na configuração, prévia, engrenagem, ativação e remoção.
