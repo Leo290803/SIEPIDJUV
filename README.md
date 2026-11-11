@@ -22,6 +22,9 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Seleção dos dados solicitados aos atletas durante a criação do evento.
 - Persistência dos eventos em localStorage, por navegador.
 - Busca de eventos e exportação de resumo em CSV.
+- Cadastro de escolas com nome, INEP, município, endereço e contatos.
+- Edição, busca sem acentos, arquivamento e reativação de escolas.
+- Verificação de INEP duplicado e persistência local dos cadastros.
 - Análise demonstrativa de solicitações de vínculo com escolas.
 - Abas Competições e Inscrições públicas com indicação “Em breve”.
 
