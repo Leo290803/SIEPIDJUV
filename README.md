@@ -96,3 +96,7 @@ Na área Escola, escolha Trabalhar neste evento uma vez. O topo indica o evento 
 Os anexos ficam em IndexedDB e seus metadados em localStorage; limpar os dados do site remove esses arquivos. Uploads ainda não são enviados a nenhum servidor. A publicação da aplicação não transforma o armazenamento local em compartilhado.
 
 Cadastros antigos não são apagados quando faltar um dado obrigatório. Revise-os antes de utilizar em novas inscrições. Responsáveis podem ser editados para completar os dados e só podem receber aprovação com os quatro dados válidos. Profissionais incompletos são identificados e precisam ser corrigidos antes de serem selecionados em uma inscrição.
+
+## Estrutura Supabase
+
+A primeira migração do banco foi aplicada e verificada. Modelo, executor, testes, segurança e pendências: [supabase/README.md](supabase/README.md). A interface permanece em demonstração local, sem integração com o banco nesta etapa.

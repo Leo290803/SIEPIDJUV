@@ -2,6 +2,19 @@
 
 Atualizado em 11/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Atualização do banco — 11/11/2026
+
+Esta seção atualiza o estado descrito abaixo, preservado como histórico das decisões.
+
+- Checkout sincronizado por fast-forward com `origin/main` em `5a29b5d`, sem alterações locais sobrescritas.
+- Credencial existente reutilizada; acesso administrativo confirmado ao projeto `siep` (`oshzcmmbhxvmchjgxztp`). Não é necessário cadastrar outro token.
+- Inventário inicial: nenhuma tabela de aplicação em `public`, nenhuma política ou bucket; schemas gerenciados preservados.
+- Migração `20261111233000_siep_foundation` **aplicada e verificada**, após validação transacional com rollback: 18 tabelas, RLS, permissões de anon/authenticated revogadas e bucket privado de documentos.
+- Histórico com SHA-256 em `siep_migrations.applied`; executor e testes SQL versionados. Reexecução confirmou zero migrações pendentes.
+- Modelo, comandos e limites em [supabase/README.md](supabase/README.md). Não editar uma migração já aplicada.
+- Nenhuma tela foi conectada ao banco, nenhum dado local foi importado e nenhum arquivo foi enviado ao Storage. A demonstração continua local.
+- Próxima entrega: tabelas de inscrições/vagas/comissão e histórico, validadores transacionais de regras/concorrência, políticas por usuário e camada de repositórios. Não afirmar que as regras já são executadas no servidor nem que o portal já está autorizado a acessar os dados.
+
 ## 1. Objetivo atual e autorização
 
 O usuário quer começar a estruturar o banco de dados agora, antes de ampliar a aplicação. Criou um projeto Supabase e quer que o agente tenha acesso direto para criar as tabelas e configurações necessárias, com migrações versionadas no GitHub.
