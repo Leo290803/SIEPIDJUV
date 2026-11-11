@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {validateParticipation} from '../src/participationRules.js';
+const event={id:1,categories:[{id:'athletics',modality:'Atletismo',name:'Sub-17',classification:'Individual',proofs:[{id:'100',type:'Individual'},{id:'jump',type:'Individual'},{id:'200',type:'Individual'},{id:'relay',type:'Revezamento'},{id:'relay2',type:'Revezamento'}]},{id:'badminton',modality:'Badminton',classification:'Individual'},{id:'futsal',modality:'Futsal',classification:'Coletiva'},{id:'basket',modality:'Basquete',classification:'Coletiva'},{id:'athletics2',modality:' ATLETISMO ',classification:'Individual'}],validationRules:[{id:'m',kind:'modalities',total:2,individual:1,collective:1},{id:'p',kind:'proofs',categoryId:'athletics',individual:2,relay:1}]};
+const draft=(id,categoryId,proofIds=[])=>({id,eventId:1,categoryId,athleteIds:['a'],proofIds});
+test('duas provas individuais + um revezamento e futsal são permitidos',()=>{assert.deepEqual(validateParticipation(event,[draft('f','futsal')],draft('a','athletics',['100','jump','relay'])),[])});
+test('atletismo e badminton excedem modalidades individuais',()=>{assert.match(validateParticipation(event,[draft('a','athletics')],draft('b','badminton')).join(),/modalidades individuais/)});
+test('basquete e futsal excedem modalidades coletivas',()=>{assert.match(validateParticipation(event,[draft('f','futsal')],draft('b','basket')).join(),/modalidades coletivas/)});
+test('terceira prova individual e segundo revezamento são detectados',()=>{const issues=validateParticipation(event,[],draft('a','athletics',['100','jump','200','relay','relay2']));assert.equal(issues.length,2)});
+test('edição não conta o mesmo rascunho novamente; provas são únicas',()=>{const d=draft('a','athletics',['100','jump','relay']);assert.deepEqual(validateParticipation(event,[d],d),[]);assert.deepEqual(validateParticipation(event,[draft('b','athletics',['100'])],d),[])});
+test('modalidades são normalizadas e categorias não duplicam modalidade',()=>{assert.deepEqual(validateParticipation(event,[draft('a','athletics')],draft('b','athletics2')),[])});
+test('outros eventos, atletas e inscrições canceladas não contam',()=>{assert.deepEqual(validateParticipation(event,[{...draft('x','badminton'),eventId:2},{...draft('y','badminton'),athleteIds:['other']},{...draft('z','badminton'),status:'Cancelada'}],draft('a','athletics')),[])});
+test('regras desativadas e limites não configurados não restringem',()=>{assert.deepEqual(validateParticipation({...event,validationRules:[{kind:'modalities',enabled:false,total:0}]},[draft('b','badminton')],draft('a','athletics')),[])});
+test('zero bloqueia; vazio não limita',()=>{assert.ok(validateParticipation({...event,validationRules:[{kind:'modalities',individual:0,total:null}]},[],draft('a','athletics')).length)});
+test('regra de prova específica conta inscrições diferentes',()=>{assert.match(validateParticipation({...event,validationRules:[{kind:'proofEntries',categoryId:'athletics',proofId:'100',max:1}]},[draft('a','athletics',['100'])],draft('b','athletics',['100'])).join(),/mesma prova/)});
+test('provas de rascunhos diferentes se somam e regras são específicas da categoria',()=>{assert.match(validateParticipation(event,[draft('a','athletics',['100','jump'])],draft('b','athletics',['200'])).join(),/provas individuais/);assert.deepEqual(validateParticipation(event,[],draft('b','badminton',['200'])),[])});
+
+test('prova com limite vazio permite repetição',()=>{assert.deepEqual(validateParticipation({...event,validationRules:[{kind:'proofEntries',categoryId:'athletics',proofId:'100',max:null}]},[draft('a','athletics',['100'])],draft('b','athletics',['100'])),[])});
