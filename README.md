@@ -17,6 +17,8 @@ Use o checkout existente. Não é necessário criar um worktree.
 
 ## Funcionalidades desta versão
 
+- Interface administrativa com cabeçalho azul, tabelas de eventos, busca, filtros e paginação.
+- Indicadores da secretaria calculados a partir dos cadastros locais.
 - Áreas de demonstração separadas para secretaria e escola, com menus e ações próprios.
 - Seletor de escola para visualizar atletas e rascunhos específicos de cada escola.
 - Portal escolar com eventos abertos, dados da escola e prévia de inscrição com seleção de atletas.
