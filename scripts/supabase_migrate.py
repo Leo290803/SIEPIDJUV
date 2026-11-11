@@ -47,7 +47,11 @@ def main():
         'create table if not exists siep_migrations.applied (version text primary key, checksum text not null, applied_at timestamptz not null default now());',
         'revoke all on siep_migrations.applied from public, anon, authenticated;']
     pending = []
-    for file in sorted((ROOT/'supabase/migrations').glob('*.sql')):
+    files = sorted((ROOT/'supabase/migrations').glob('*.sql'))
+    known = {file.stem for file in files}
+    if set(applied) - known:
+        raise SystemExit('Banco contém migrações ausentes no checkout; atualize o repositório.')
+    for file in files:
         content = file.read_text()
         checksum = hashlib.sha256(content.encode()).hexdigest()
         version = file.stem
@@ -56,9 +60,23 @@ def main():
                 raise SystemExit('Checksum divergente: '+version+'. Não edite migrações aplicadas.')
             continue
         pending.append(version)
-        statements.extend([content, f'insert into siep_migrations.applied(version,checksum) values ({literal(version)},{literal(checksum)});'])
+        # A leitura anterior é apenas planejamento. Revalida sob a trava para
+        # dois executores concorrentes nunca reaplicarem a mesma migração.
+        tag = 'migration_' + checksum[:16]
+        statements.append(f'''do ${tag}$
+begin
+ if exists(select 1 from siep_migrations.applied where version={literal(version)}) then
+  if not exists(select 1 from siep_migrations.applied where version={literal(version)} and checksum={literal(checksum)}) then
+   raise exception 'Checksum divergente sob trava: {version}';
+  end if;
+ else
+  execute $sql_{tag}${content}$sql_{tag}$;
+  insert into siep_migrations.applied(version,checksum) values ({literal(version)},{literal(checksum)});
+ end if;
+end ${tag}$;''')
     # Revalida invariantes inclusive após uma execução sem migrações pendentes.
-    statements.append((ROOT/'supabase/tests/foundation.sql').read_text())
+    for test in sorted((ROOT/'supabase/tests').glob('*.sql')):
+        statements.append(test.read_text())
     statements.append('commit;' if args.apply else 'rollback;')
     query('\n'.join(statements))
     print(json.dumps({'project':project['name'], 'ref':args.project_ref,

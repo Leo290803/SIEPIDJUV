@@ -99,4 +99,4 @@ Cadastros antigos não são apagados quando faltar um dado obrigatório. Revise-
 
 ## Estrutura Supabase
 
-A primeira migração do banco foi aplicada e verificada. Modelo, executor, testes, segurança e pendências: [supabase/README.md](supabase/README.md). A interface permanece em demonstração local, sem integração com o banco nesta etapa.
+O banco tem oito migrações aplicadas e verificadas, 29 tabelas com RLS, validações no servidor e fluxos de inscrição/análise documentados. Modelo, executor, testes, segurança e integrações pendentes: [supabase/README.md](supabase/README.md). A interface permanece em demonstração local, sem integração com o banco nesta etapa.

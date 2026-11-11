@@ -2,18 +2,24 @@
 
 Atualizado em 11/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
-## Atualização do banco — 11/11/2026
+## Estado atual do banco — prioridade desta continuação
 
-Esta seção atualiza o estado descrito abaixo, preservado como histórico das decisões.
+O usuário pediu concentrar a estruturação no banco antes de continuar as telas. Esta seção substitui o estado de implementação dos itens antigos abaixo, que preservam as decisões do produto. Não repetir o planejamento nem recriar a base.
 
-- Checkout sincronizado por fast-forward com `origin/main` em `5a29b5d`, sem alterações locais sobrescritas.
-- Credencial existente reutilizada; acesso administrativo confirmado ao projeto `siep` (`oshzcmmbhxvmchjgxztp`). Não é necessário cadastrar outro token.
-- Inventário inicial: nenhuma tabela de aplicação em `public`, nenhuma política ou bucket; schemas gerenciados preservados.
-- Migração `20261111233000_siep_foundation` **aplicada e verificada**, após validação transacional com rollback: 18 tabelas, RLS, permissões de anon/authenticated revogadas e bucket privado de documentos.
-- Histórico com SHA-256 em `siep_migrations.applied`; executor e testes SQL versionados. Reexecução confirmou zero migrações pendentes.
-- Modelo, comandos e limites em [supabase/README.md](supabase/README.md). Não editar uma migração já aplicada.
-- Nenhuma tela foi conectada ao banco, nenhum dado local foi importado e nenhum arquivo foi enviado ao Storage. A demonstração continua local.
-- Próxima entrega: tabelas de inscrições/vagas/comissão e histórico, validadores transacionais de regras/concorrência, políticas por usuário e camada de repositórios. Não afirmar que as regras já são executadas no servidor nem que o portal já está autorizado a acessar os dados.
+- Projeto autorizado `siep` (`oshzcmmbhxvmchjgxztp`), acesso administrativo confirmado com a credencial segura existente. Não pedir outro token.
+- **Oito migrações aplicadas e verificadas:** `20261111233000_siep_foundation` e os sete incrementos `20261112000100` até `20261112000700`. Arquivos em `supabase/migrations`; não editar os aplicados.
+- **29 tabelas públicas com RLS**: instituições, escolas, pessoas reutilizáveis, papéis/vínculos, configuração completa por edição, participações/documentos, inscrições por categoria/prova, vagas numeradas, comissão, versões/decisões, auditoria, transferências, notificações, contexto de evento ativo e mapeamento de IDs legados.
+- RPCs e políticas autorizam secretaria e responsáveis aprovados. Vínculo pendente não libera acesso; anon não lê dados nem executa as funções do SIEP. Primeiro cliente/admin ainda precisa ser provisionado administrativamente após existir uma conta real no Auth.
+- As oito regras, sexo/nascimento, exigências, comissão e capacidade são reavaliados no servidor ao enviar/aprovar. Rascunhos podem guardar pendências esportivas. Concluir cadastro não cria inscrição. Vagas/atletas duplicados têm índices únicos; profissional de outra escola é recusado já no rascunho para não expor identidade em snapshots; revisões e travas protegem concorrência.
+- Fluxo de envio, devolução com prazo, reenvio, aprovação/indeferimento e cancelamento com justificativa está implementado no banco. Snapshots preservam identidade, escola, documentos e configuração da revisão.
+- Storage privado tem preparação, autorização de upload e finalização por objeto/MIME/tamanho, com versões imutáveis por caminho. Não houve envio de bytes de arquivos; os testes SQL de metadados foram desfeitos.
+- Duplicação remapeia IDs sem copiar pessoas/inscrições/arquivos. Transferência exige análise e preserva edições anteriores. Fila de notificações está preparada; nenhum e-mail foi enviado e um worker externo ainda precisa ser integrado.
+- Quatro suítes SQL passaram no PostgreSQL 17 descartável e no Supabase real (validação com rollback, aplicação e reexecução sem pendências). Três testes com conexões simultâneas passaram: mesma vaga, mesmo atleta em vagas diferentes e mesma revisão de edição.
+- As tabelas anteriores, os schemas gerenciados e a configuração do bucket foram preservados. Fixtures são revertidas; nenhum usuário, instituição, pessoa ou inscrição real foi cadastrado nesta entrega.
+- **Nenhuma tela foi conectada ao banco ainda.** localStorage/IndexedDB continuam nos navegadores. Login/recuperação, upload real, consumidor de e-mail, integração das telas e exportação/importação dos dados locais são integrações pendentes, não motivos para redesenhar as entidades principais. Competições e inscrições públicas seguem adiadas.
+- Modelo, operação e limites em [supabase/README.md](supabase/README.md); assinaturas, payloads, permissões e erros em [supabase/API.md](supabase/API.md).
+- Validação/aplicação: `python scripts/supabase_migrate.py --project-ref oshzcmmbhxvmchjgxztp` (rollback) ou com `--apply`. Testes locais, incluindo concorrência: `python scripts/test_database.py`. `supabase/local/bootstrap.sql` é exclusivo do container descartável e nunca deve ser executado no Supabase.
+- Histórico SHA-256 em `siep_migrations.applied` é próprio do executor, separado do Supabase CLI. O runner recusa checksums divergentes/checkout atrasado e serializa aplicações. Não resetar, sobrescrever ou reaplicar rascunhos anteriores.
 
 ## 1. Objetivo atual e autorização
 
