@@ -56,6 +56,8 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Cadastro de comissão técnica por escola, com função, registro profissional informativo e contatos.
 - Busca, filtros, edição, arquivamento e reativação de profissionais; seleção dos ativos nos rascunhos escolares.
 - Eventos de exemplo e criação de eventos em rascunho.
+- Duplicação pela lista de eventos: nome e edição próprios, novas datas opcionais, cópia de modalidades, categorias, provas, regras, formulário, exigências de documentos e funções.
+- Cópias começam em rascunho, com contadores zerados e identificadores independentes; não copiam atletas, inscrições ou arquivos enviados. Revise anos de nascimento e datas de referência de idade para cada nova edição.
 - Seleção dos dados solicitados aos atletas durante a criação do evento.
 - Persistência dos eventos em localStorage, por navegador.
 - Busca de eventos e exportação de resumo em CSV.
