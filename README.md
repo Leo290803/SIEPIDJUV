@@ -29,10 +29,11 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Seletor de escola para visualizar atletas e rascunhos específicos de cada escola.
 - Evento ativo persistido por escola: escolha uma vez e use Trocar evento quando necessário. O contexto é reutilizado nos cadastros e inscrições.
 - Cadastro do atleta em uma tela com dados configuráveis, seleção de modalidades/categorias e documentos por edição.
-- Menu Eventos → Formulário e documentos: dados não solicitados, opcionais ou obrigatórios; anexos opcionais/obrigatórios, com opção de aceitar somente imagem.
+- Nome completo, data de nascimento, CPF válido e sexo são obrigatórios em todos os cadastros de pessoas (atletas, responsáveis e comissão técnica), inclusive rascunhos de novos cadastros.
+- Menu Eventos → Formulário e documentos: os quatro campos fixos não podem ser ocultados ou dispensados; os demais dados e anexos são opcionais, obrigatórios ou não solicitados conforme a pré-configuração.
 - Arquivos reais armazenados em IndexedDB no navegador, com upload/download e limite de 5 MB por documento (PDF, PNG ou JPEG).
 - Dados pessoais reutilizáveis e participações/documentos separados por evento. Cadastros completos são reavaliados quando surgem novas exigências.
-- Rascunho de cadastro permite pendências. Concluir cadastro verifica exigências e regras gerais de participação; não envia inscrição nem ocupa vaga em prova.
+- Rascunho de cadastro permite pendências de modalidade e documentos, mas exige os quatro dados pessoais fixos. Concluir cadastro verifica exigências e regras gerais de participação; não envia inscrição nem ocupa vaga em prova.
 - Portal escolar com eventos abertos, dados da escola e prévia de inscrição com seleção de atletas.
 - Menu Eventos expansível: cadastro de eventos, competições das modalidades, validações e funções.
 - Modalidades organizadas em lista com busca e paginação; crie cada esporte uma vez e abra Configurar para gerenciar suas categorias.
@@ -41,7 +42,7 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Categorias anteriores agrupadas automaticamente, preservando identificadores, anos, provas, regras e participações.
 - Cadastro de categorias com participação, limites de atletas e provas individuais ou revezamentos.
 - Ano inicial e final de nascimento configuráveis por categoria, com extremos inclusivos. O formulário filtra as modalidades/categorias conforme a data do atleta; o nome da categoria não define o intervalo.
-- Data obrigatória quando houver categorias com faixa; mudança de nascimento retira seleções incompatíveis com aviso. Faixas novas reavaliam cadastros completos e inscrições. Categorias antigas sem intervalo permanecem sem restrição até serem configuradas.
+- Data obrigatória em todos os cadastros; mudança de nascimento retira seleções incompatíveis com aviso. Faixas novas reavaliam cadastros completos e inscrições. Categorias antigas sem intervalo permanecem sem restrição até serem configuradas.
 - Catálogo completo de oito regras, sempre visível, com local de aplicação selecionado na configuração, prévia, engrenagem, ativação e remoção.
 - Regras adicionais: categorias por atleta no mesmo esporte, atletas por inscrição, inscrições por escola, faixa etária e comissão técnica por inscrição.
 - Idade calculada por data de referência configurável; nascimento ausente ou inválido gera pendência. Regras específicas de prova só se aplicam quando a prova é selecionada.
@@ -65,7 +66,7 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Edição, busca sem acentos, arquivamento e reativação de escolas.
 - Verificação de INEP duplicado e persistência local dos cadastros.
 - Cadastro de atletas por escola, com edição, busca, filtros, arquivamento e reativação.
-- CPF opcional com validação e bloqueio de duplicidade, inclusive em cadastros arquivados.
+- CPF obrigatório, com validação e bloqueio de duplicidade, inclusive em cadastros arquivados.
 - Cadastro local de responsáveis com seleção de escola ativa, cargo e contatos.
 - Aprovação, recusa, encerramento e reabertura de vínculos, com justificativa e histórico.
 - Busca e filtros de responsáveis; solicitações pendentes integradas ao painel inicial.
@@ -90,3 +91,5 @@ Exemplo: evento com total 2, individuais 1 e coletivas 1; categoria de atletismo
 Na área Escola, escolha Trabalhar neste evento uma vez. O topo indica o evento ativo, mantido ao navegar e recarregar. Em Atletas, cadastre ou edite um atleta para preencher a participação dessa edição, incluindo modalidades e anexos. Documentos não são reutilizados automaticamente entre edições. Use Trocar evento para trabalhar em outra edição. Ao montar inscrições, somente atletas com cadastro completo e participação na categoria escolhida ficam disponíveis. Cadastros anteriores sem participação por evento são preservados e precisam ser revisados.
 
 Os anexos ficam em IndexedDB e seus metadados em localStorage; limpar os dados do site remove esses arquivos. Uploads ainda não são enviados a nenhum servidor. A publicação da aplicação não transforma o armazenamento local em compartilhado.
+
+Cadastros antigos não são apagados quando faltar um dado obrigatório. Revise-os antes de utilizar em novas inscrições. Responsáveis podem ser editados para completar os dados e só podem receber aprovação com os quatro dados válidos. Profissionais incompletos são identificados e precisam ser corrigidos antes de serem selecionados em uma inscrição.

@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {normalizeCpf,personDataIssues,validCpf} from '../src/personData.js';
+import {requirementsFor,athleteEventPending} from '../src/eventRequirements.js';
+const complete={name:'Nome Completo',cpf:'529.982.247-25',birth:'2012-02-29',gender:'Feminino'};
+test('os quatro dados são obrigatórios para qualquer pessoa',()=>{assert.equal(personDataIssues({}).length,4);for(const field of ['name','cpf','birth','gender'])assert.ok(personDataIssues({...complete,[field]:''}).length);assert.deepEqual(personDataIssues(complete),[])});
+test('CPF aceita pontuação mas rejeita dígitos inválidos e repetidos',()=>{assert.equal(normalizeCpf(complete.cpf),'52998224725');assert.equal(validCpf(complete.cpf),true);assert.equal(validCpf('11111111111'),false);assert.equal(validCpf('52998224726'),false);assert.equal(validCpf('123'),false)});
+test('nascimento rejeita datas impossíveis, futuras e anteriores ao limite',()=>{for(const birth of ['2012-02-30','2011-02-29','2100-01-01','1899-12-31','2012'])assert.ok(personDataIssues({...complete,birth}).length);assert.equal(personDataIssues({...complete,gender:'valor inválido'}).length,1)});
+test('exigências fixas prevalecem sobre configuração antiga sem alterar o original',()=>{const event={requirements:{data:{cpf:'hidden',birth:'optional',gender:'hidden',phone:'required'},documents:[]}};const snapshot=JSON.stringify(event);const effective=requirementsFor(event);assert.equal(effective.data.cpf,'required');assert.equal(effective.data.birth,'required');assert.equal(effective.data.gender,'required');assert.equal(effective.data.phone,'required');assert.equal(JSON.stringify(event),snapshot)});
+test('cadastro antigo marcado completo precisa completar os quatro dados',()=>{const event={id:1,categories:[{id:'c'}],requirements:{data:{},documents:[]}};const old={name:'Atleta',eventProfiles:{'1':{status:'complete',categoryIds:['c']}}};const pending=athleteEventPending(old,event);assert.equal(pending.length,3);assert.match(pending.join(),/CPF/);assert.match(pending.join(),/sexo/)});

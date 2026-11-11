@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {requirementsFor,athleteEventPending} from '../src/eventRequirements.js';
-test('exigências antigas são aproveitadas sem adicionar anexos não solicitados',()=>{const r=requirementsFor({fields:['CPF','Foto']});assert.equal(r.data.cpf,'required');assert.equal(r.data.birth,'optional');assert.deepEqual(r.documents.map(d=>d.name),['Foto']);assert.equal(r.documents[0].imageOnly,true)});
-test('configuração explícita permite evento sem anexo e sem CPF',()=>{const r=requirementsFor({fields:['CPF','Foto'],requirements:{data:{cpf:'hidden'},documents:[]}});assert.equal(r.data.cpf,'hidden');assert.deepEqual(r.documents,[])});
+test('exigências antigas são aproveitadas sem adicionar anexos não solicitados',()=>{const r=requirementsFor({fields:['CPF','Foto']});assert.equal(r.data.cpf,'required');assert.equal(r.data.birth,'required');assert.deepEqual(r.documents.map(d=>d.name),['Foto']);assert.equal(r.documents[0].imageOnly,true)});
+test('configuração antiga não pode dispensar CPF, nascimento e sexo; anexos continuam configuráveis',()=>{const r=requirementsFor({fields:['CPF','Foto'],requirements:{data:{cpf:'hidden'},documents:[]}});assert.equal(r.data.cpf,'required');assert.equal(r.data.birth,'required');assert.equal(r.data.gender,'required');assert.deepEqual(r.documents,[])});
 const event={id:1,categories:[{id:'c',enabled:true}],requirements:{data:{birth:'required'},documents:[{id:'doc',name:'Matrícula',required:true},{id:'opt',name:'Autorização',required:false}]}};
-const athlete={name:'Atleta A',birth:'2012-01-01',eventProfiles:{'1':{status:'complete',categoryIds:['c'],documents:{doc:{id:'file'}}}}};
+const athlete={name:'Atleta A',cpf:'52998224725',gender:'Masculino',birth:'2012-01-01',eventProfiles:{'1':{status:'complete',categoryIds:['c'],documents:{doc:{id:'file'}}}}};
 test('cadastro completo não exige anexos opcionais e não vale para outro evento',()=>{assert.deepEqual(athleteEventPending(athlete,event),[]);assert.deepEqual(athleteEventPending(athlete,{...event,id:2}),['Cadastro no evento'])});
 test('nova exigência faz cadastro completo voltar a apresentar pendência',()=>{const changed={...event,requirements:{...event.requirements,documents:[...event.requirements.documents,{id:'new',name:'Atestado',required:true}]}};assert.deepEqual(athleteEventPending(athlete,changed),['Atestado'])});
-test('categoria desativada e dado obrigatório ausente são reavaliados',()=>{assert.deepEqual(athleteEventPending({...athlete,birth:''},{...event,categories:[{id:'c',enabled:false}]}),['Data de nascimento','Modalidade e categoria'])});
+test('categoria desativada e dado obrigatório ausente são reavaliados',()=>{assert.deepEqual(athleteEventPending({...athlete,birth:''},{...event,categories:[{id:'c',enabled:false}]}),['Informe data de nascimento.','Modalidade e categoria'])});

@@ -1,3 +1,5 @@
+import PersonIdentityFields from './PersonIdentityFields.jsx';
+import {personDataIssues,normalizeCpf} from './personData.js';
 import React, {useState} from 'react';
 import {Plus, Search, Check, X, Pencil, Archive, RotateCcw} from 'lucide-react';
 import {initialSchools} from './Schools.jsx';
@@ -33,6 +35,9 @@ export default function TechnicalStaff({schoolId}) {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     for (const key of Object.keys(data)) data[key] = data[key].trim();
+    data.cpf=normalizeCpf(data.cpf);
+    const coreIssues=personDataIssues(data);if(coreIssues.length){setError(coreIssues.join(' '));return;}
+    if(records.some(r=>r.id!==editing.id&&r.schoolId===data.schoolId&&r.cpf===data.cpf)){setError('Este CPF já está cadastrado na comissão técnica desta escola.');return;}
     const school = schools.find(s => s.id === data.schoolId);
     if (!data.name || !data.position) { setError('Informe o nome e a função do profissional.'); return; }
     if (!school || (school.archived && editing.schoolId !== school.id) || (schoolId && data.schoolId !== schoolId)) {
@@ -59,11 +64,12 @@ export default function TechnicalStaff({schoolId}) {
       <select aria-label="Escola dos profissionais" disabled={!!schoolId} value={schoolFilter} onChange={e => setSchoolFilter(e.target.value)}><option value="">Todas as escolas</option>{schools.filter(s => !schoolId || s.id === schoolId).map(s => <option key={s.id} value={s.id}>{s.name}{s.archived ? ' (arquivada)' : ''}</option>)}</select>
       <select aria-label="Situação dos profissionais" value={filter} onChange={e => setFilter(e.target.value)}><option value="active">Ativos</option><option value="archived">Arquivados</option><option value="all">Todos</option></select>
     </div></div><div className="table-scroll"><table><thead><tr><th>Profissional</th>{!schoolId&&<th>Escola</th>}<th>Função</th><th>Registro</th><th>Contato</th><th>Situação</th><th>Ações</th></tr></thead><tbody>
-      {shown.map(r => <tr key={r.id}><td><strong>{r.name}</strong></td>{!schoolId&&<td>{schoolName(r)}</td>}<td>{r.position}</td><td>{r.registration || '—'}</td><td>{r.email || '—'}{r.phone && <div>{r.phone}</div>}</td><td><span className={'tag ' + (r.archived ? 'draft' : 'live')}>{r.archived ? 'Arquivado' : 'Ativo'}</span></td><td><div className="staff-actions"><button className="secondary" aria-label={`Editar ${r.name}`} onClick={() => open(r)}><Pencil size={14}/>Editar</button><button className="secondary" aria-label={`${r.archived ? 'Reativar' : 'Arquivar'} ${r.name}`} onClick={() => {setArchiving(r); setError('');}}>{r.archived ? <RotateCcw size={14}/> : <Archive size={14}/>} {r.archived ? 'Reativar' : 'Arquivar'}</button></div></td></tr>)}
+      {shown.map(r => <tr key={r.id}><td><strong>{r.name}</strong></td>{!schoolId&&<td>{schoolName(r)}</td>}<td>{r.position}</td><td>{r.registration || '—'}</td><td>{r.email || '—'}{r.phone && <div>{r.phone}</div>}</td><td><span className={'tag ' + (r.archived ? 'draft' : personDataIssues(r).length?'warning':'live')}>{r.archived ? 'Arquivado' : personDataIssues(r).length?'Completar dados':'Ativo'}</span></td><td><div className="staff-actions"><button className="secondary" aria-label={`Editar ${r.name}`} onClick={() => open(r)}><Pencil size={14}/>Editar</button><button className="secondary" aria-label={`${r.archived ? 'Reativar' : 'Arquivar'} ${r.name}`} onClick={() => {setArchiving(r); setError('');}}>{r.archived ? <RotateCcw size={14}/> : <Archive size={14}/>} {r.archived ? 'Reativar' : 'Arquivar'}</button></div></td></tr>)}
       {!shown.length && <tr><td colSpan={schoolId?6:7} className="table-empty">Nenhum profissional encontrado. Cadastre um profissional ou altere os filtros.</td></tr>}
     </tbody></table></div></div>
     {editing && <div className="modal-backdrop"><div className="modal" role="dialog" aria-modal="true" aria-labelledby="staff-title"><button className="close" aria-label="Fechar cadastro" onClick={() => setEditing(null)}><X/></button><h2 id="staff-title">{editing.id ? 'Editar profissional' : 'Cadastrar profissional'}</h2><p>Campos com * são obrigatórios.</p><form onSubmit={save}>
       <label>Nome completo *<input autoFocus name="name" required maxLength={150} defaultValue={editing.name || ''}/></label>
+      <PersonIdentityFields person={editing}/>
       <label>Escola *<select name="schoolId" required defaultValue={editing.schoolId || ''}><option value="" disabled>Selecione uma escola</option>{schools.filter(s => (!schoolId || s.id === schoolId) && (!s.archived || s.id === editing.schoolId)).map(s => <option key={s.id} value={s.id}>{s.name}{s.archived ? ' (arquivada)' : ''}</option>)}</select></label>
       <div className="form-row"><label>Função *<select name="position" required defaultValue={editing.position || ''}><option value="" disabled>Selecione a função</option>{functions.map(f => <option key={f}>{f}</option>)}</select></label><label>Registro profissional (opcional)<small className="field-help">Informativo, sem verificação automática.</small><input name="registration" maxLength={60} defaultValue={editing.registration || ''} placeholder="Ex.: CREF / UF"/></label></div>
       <div className="form-row"><label>E-mail (opcional)<input name="email" type="email" maxLength={150} defaultValue={editing.email || ''}/></label><label>Telefone (opcional)<input name="phone" type="tel" maxLength={25} defaultValue={editing.phone || ''}/></label></div>

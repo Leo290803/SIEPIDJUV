@@ -1,0 +1,3 @@
+import React from 'react';
+import {todayDate} from './personData.js';
+export default function PersonIdentityFields({person={},includeName=false}){return <>{includeName&&<label>Nome completo *<input name="name" required maxLength={150} defaultValue={person.name||''}/></label>}<div className="form-row"><label>CPF *<input name="cpf" required inputMode="numeric" maxLength={14} defaultValue={person.cpf||''}/></label><label>Data de nascimento *<input name="birth" type="date" required min="1900-01-01" max={todayDate()} defaultValue={person.birth||''}/></label></div><label>Sexo *<select name="gender" required defaultValue={person.gender||''}><option value="" disabled>Selecione</option><option>Masculino</option><option>Feminino</option></select></label></>}
