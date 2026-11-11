@@ -20,6 +20,10 @@ Use o checkout existente. Não é necessário criar um worktree.
 ## Funcionalidades desta versão
 
 - Interface administrativa com cabeçalho azul, tabelas de eventos, busca, filtros e paginação.
+- Navegação simplificada: seletor único de área, escola no menu lateral e evento em uma linha de contexto.
+- Cadastros com uma única barra de ações e filtros, sem cartões repetindo o título da página.
+- Ajuda e exemplos em Como funciona, recolhidos por padrão.
+- Configurações de modalidades e documentos centralizadas em suas telas próprias; detalhes do evento oferecem atalhos para o evento correto.
 - Indicadores da secretaria calculados a partir dos cadastros locais.
 - Áreas de demonstração separadas para secretaria e escola, com menus e ações próprios.
 - Seletor de escola para visualizar atletas e rascunhos específicos de cada escola.
