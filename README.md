@@ -26,14 +26,16 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Portal escolar com eventos abertos, dados da escola e prévia de inscrição com seleção de atletas.
 - Menu Eventos expansível: cadastro de eventos, competições das modalidades, validações e funções.
 - Cadastro de categorias com classificação da modalidade, participação, limites de atletas e provas individuais ou revezamentos.
-- Validações configuráveis por evento, categoria e prova, com catálogo, engrenagem de configuração, ativação e remoção.
+- Catálogo completo de oito regras, sempre visível, com local de aplicação selecionado na configuração, prévia, engrenagem, ativação e remoção.
+- Regras adicionais: categorias por atleta no mesmo esporte, atletas por inscrição, inscrições por escola, faixa etária e comissão técnica por inscrição.
+- Idade calculada por data de referência configurável; nascimento ausente ou inválido gera pendência. Regras específicas de prova só se aplicam quando a prova é selecionada.
 - Orientações na própria interface: passo a passo, exemplo completo, definições dos campos, resumo de regras em linguagem comum e atalhos por categoria.
 - Limites de modalidades gerais, individuais e coletivas por atleta; limites de provas individuais e revezamentos por categoria.
 - Regras gerais e específicas se acumulam, sem etapas; revezamento não consome uma modalidade coletiva.
 - Pendências de participação visíveis durante a seleção e nos rascunhos. Rascunhos conflitantes podem ser salvos para correção.
 - Seleção de funções da comissão técnica permitidas por evento.
 - Rascunhos por participação individual ou coletiva, com seleção de categoria, atletas e comissão técnica. A escola representante é identificada automaticamente nos dois casos; não há nome de equipe manual.
-- Validação dos limites de integrantes; idade, documentos, elegibilidade e envio para análise permanecem fora desta etapa.
+- Validação dos limites de integrantes e idade, quando as regras correspondentes estiverem ativas. Documentos e envio para análise permanecem fora desta etapa.
 - Rascunhos antigos são preservados e podem receber categoria ao serem editados.
 - Cadastro de comissão técnica por escola, com função, registro profissional informativo e contatos.
 - Busca, filtros, edição, arquivamento e reativação de profissionais; seleção dos ativos nos rascunhos escolares.
@@ -61,6 +63,6 @@ A interface utiliza fontes locais do sistema operacional. O logotipo oficial for
 
 ## Configurar regras de participação
 
-Na área Secretaria, abra Eventos → Cadastro de competições das modalidades e selecione o evento. Cadastre as categorias e suas provas. Em Gerenciamento de validações, escolha Evento inteiro para limitar modalidades, uma categoria para limitar provas, ou uma prova específica para limitar inscrições repetidas. Clique em Adicionar e configurar, informe os limites e salve. Vazio significa sem limite; zero impede aquele tipo de participação. As regras começam a valer após salvar e são reavaliadas ao abrir os rascunhos.
+Na área Secretaria, abra Eventos → Cadastro de competições das modalidades e selecione o evento. Cadastre as categorias e suas provas. Em Gerenciamento de validações, o catálogo exibe todas as regras. Clique em Adicionar e configurar na regra desejada, escolha a categoria e a prova quando necessário, informe os limites e salve. Os filtros da página alteram apenas a lista de regras salvas. Não ocultam o catálogo. Vazio significa sem limite; zero impede aquele tipo de participação. As regras começam a valer após salvar e são reavaliadas ao abrir os rascunhos.
 
 Exemplo: evento com total 2, individuais 1 e coletivas 1; categoria de atletismo com provas individuais 2 e revezamentos 1. O atleta pode selecionar 100 m, salto, revezamento e também futsal. Badminton junto do atletismo gera pendência. Não há isolamento de segurança, envio definitivo ou aprovação de inscrições nesta versão local.
