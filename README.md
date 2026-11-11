@@ -17,6 +17,10 @@ Use o checkout existente. Não é necessário criar um worktree.
 
 ## Funcionalidades desta versão
 
+- Áreas de demonstração separadas para secretaria e escola, com menus e ações próprios.
+- Seletor de escola para visualizar atletas e rascunhos específicos de cada escola.
+- Portal escolar com eventos abertos, dados da escola e prévia de inscrição com seleção de atletas.
+- Rascunhos de inscrição locais, sem envio para análise, documentos ou validação de elegibilidade.
 - Painel da instituição com indicadores demonstrativos.
 - Eventos de exemplo e criação de eventos em rascunho.
 - Seleção dos dados solicitados aos atletas durante a criação do evento.
@@ -34,7 +38,7 @@ Use o checkout existente. Não é necessário criar um worktree.
 
 ## Limites atuais
 
-Este é um protótipo funcional de interface, sem backend. Os indicadores e cadastros iniciais são exemplos, não métricas calculadas de inscrições reais. A seleção de perfil serve para demonstração e não aplica controle de acesso. Cadastros e decisões de vínculo dos responsáveis são persistidos neste navegador e não concedem acesso real. Não inserir dados pessoais reais.
+Este é um protótipo funcional de interface, sem backend. Os indicadores e cadastros iniciais são exemplos, não métricas calculadas de inscrições reais. A seleção de área serve para demonstração e não aplica controle de acesso. Os filtros de escola são apenas de interface, sem isolamento de segurança; todos os dados permanecem no mesmo navegador. Cadastros e decisões de vínculo dos responsáveis são persistidos neste navegador e não concedem acesso real. Não inserir dados pessoais reais.
 
 Autenticação por CPF, recuperação de acesso, separação segura entre instituições, cadastro de atletas, documentos, inscrições, análise e notificações ainda serão implementados no servidor. Eventos salvos no navegador não são publicados.
 
