@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {birthYearFromDate,categoryAcceptsBirth,hasBirthYearRange} from '../src/categoryEligibility.js';
+import {athleteEventPending} from '../src/eventRequirements.js';
+import {validateParticipation} from '../src/participationRules.js';
+const category={id:'c',modality:'Futsal',name:'12 a 14 anos',birthYearStart:2011,birthYearEnd:2014};
+test('faixa aceita os dois extremos e todos os anos intermediários',()=>{for(const year of [2011,2012,2013,2014])assert.equal(categoryAcceptsBirth(category,`${year}-12-31`),true);for(const year of [2010,2015])assert.equal(categoryAcceptsBirth(category,`${year}-01-01`),false)});
+test('filtragem usa ano de nascimento e não o texto do nome da categoria',()=>{assert.equal(categoryAcceptsBirth({...category,name:'Nome livre'},'2012-02-29'),true);assert.equal(categoryAcceptsBirth({...category,name:'12 a 14 anos'},'2015-01-01'),false)});
+test('datas ausentes ou impossíveis não são aceitas em faixa configurada',()=>{for(const birth of ['',undefined,'2012','2012-02-30','2011-02-29','texto']){assert.equal(birthYearFromDate(birth),null);assert.equal(categoryAcceptsBirth(category,birth),false)}});
+test('categorias antigas sem faixa continuam disponíveis',()=>{assert.equal(hasBirthYearRange({}),false);assert.equal(categoryAcceptsBirth({},''),true);assert.equal(categoryAcceptsBirth({birthYearStart:null,birthYearEnd:null},'2012-01-01'),true)});
+test('faixa com um único ano ou valores numéricos em texto',()=>{assert.equal(categoryAcceptsBirth({birthYearStart:'2012',birthYearEnd:'2012'},'2012-01-01'),true);assert.equal(categoryAcceptsBirth({birthYearStart:2012,birthYearEnd:2012},'2011-01-01'),false)});
+test('mudança de faixa reavalia cadastros previamente completos',()=>{const event={id:1,categories:[category],requirements:{data:{},documents:[]}};const athlete={name:'A',birth:'2012-01-01',eventProfiles:{'1':{status:'complete',categoryIds:['c']}}};assert.deepEqual(athleteEventPending(athlete,event),[]);assert.match(athleteEventPending({...athlete,birth:'2015-01-01'},event).join(),/Ano de nascimento incompatível/)});
+test('verificação de inscrição detecta atleta fora da faixa mesmo sem regra de idade adicional',()=>{const event={id:1,categories:[category]};const draft={id:'d',eventId:1,categoryId:'c',athleteIds:['a']};assert.deepEqual(validateParticipation(event,[],draft,{athletes:[{id:'a',birth:'2012-01-01'}]}),[]);assert.match(validateParticipation(event,[],draft,{athletes:[{id:'a',birth:'2015-01-01'}]}).join(),/2011 a 2014/)});

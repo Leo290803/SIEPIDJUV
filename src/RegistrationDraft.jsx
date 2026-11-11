@@ -1,11 +1,12 @@
 import React,{useState} from 'react';
 import {X,Check} from 'lucide-react';
+import {categoryAcceptsBirth} from './categoryEligibility.js';
 import {validateParticipation} from './participationRules.js';
 export default function RegistrationDraft({event,school,athletes,staff,draft,drafts=[],onSave,onClose,onAthletes}) {
  const [categoryId,setCategoryId]=useState(draft?.categoryId||''),[selected,setSelected]=useState(draft?.athleteIds||[]),[selectedStaff,setSelectedStaff]=useState(draft?.staffIds||[]),[error,setError]=useState(''),[proofIds,setProofIds]=useState(draft?.proofIds||[]);
  const categories=(event.categories||[]).filter(c=>c.enabled!==false);
  const category=categories.find(c=>c.id===categoryId);
- const eligibleAthletes=athletes.filter(a=>a.eventProfiles?.[String(event.id)]?.categoryIds?.includes(categoryId));
+ const eligibleAthletes=athletes.filter(a=>a.eventProfiles?.[String(event.id)]?.categoryIds?.includes(categoryId)&&category&&categoryAcceptsBirth(category,a.birth));
  const candidate={...draft,id:draft?.id||'preview',eventId:event.id,schoolId:school.id,categoryId,athleteIds:selected,staffIds:selectedStaff,proofIds};
  const issues=category?validateParticipation(event,drafts,candidate,{athletes}):[];
  const describeIssue=issue=>{const [id,...parts]=issue.split('|');return parts.length?`${athletes.find(a=>a.id===id)?.name||'Atleta'}: ${parts.join('|')}`:issue};

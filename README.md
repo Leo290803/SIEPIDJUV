@@ -36,6 +36,8 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Portal escolar com eventos abertos, dados da escola e prévia de inscrição com seleção de atletas.
 - Menu Eventos expansível: cadastro de eventos, competições das modalidades, validações e funções.
 - Cadastro de categorias com classificação da modalidade, participação, limites de atletas e provas individuais ou revezamentos.
+- Ano inicial e final de nascimento configuráveis por categoria, com extremos inclusivos. O formulário filtra as modalidades/categorias conforme a data do atleta; o nome da categoria não define o intervalo.
+- Data obrigatória quando houver categorias com faixa; mudança de nascimento retira seleções incompatíveis com aviso. Faixas novas reavaliam cadastros completos e inscrições. Categorias antigas sem intervalo permanecem sem restrição até serem configuradas.
 - Catálogo completo de oito regras, sempre visível, com local de aplicação selecionado na configuração, prévia, engrenagem, ativação e remoção.
 - Regras adicionais: categorias por atleta no mesmo esporte, atletas por inscrição, inscrições por escola, faixa etária e comissão técnica por inscrição.
 - Idade calculada por data de referência configurável; nascimento ausente ou inválido gera pendência. Regras específicas de prova só se aplicam quando a prova é selecionada.

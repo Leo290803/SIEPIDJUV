@@ -1,3 +1,4 @@
+import {categoryAcceptsBirth,hasBirthYearRange} from './categoryEligibility.js';
 export const modalityKey = value => String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 export const classification = category => category.classification || (category.type === 'Equipe' ? 'Coletiva' : 'Individual');
 // A relay is a proof within its modality; it never changes modality classification.
@@ -22,6 +23,7 @@ export function validateParticipation(event, drafts, candidate, {athletes = []} 
     }
   }
   for (const athleteId of candidate.athleteIds || []) {
+    if(hasBirthYearRange(current)&&!categoryAcceptsBirth(current,athletes.find(a=>a.id===athleteId)?.birth))issues.push(`${athleteId}|A categoria ${current.modality} / ${current.name} aceita nascidos de ${current.birthYearStart} a ${current.birthYearEnd}. Confira a data de nascimento.`);
     const own = entries.filter(d => (d.athleteIds || []).includes(athleteId));
     const modalities = new Map();
     for (const d of own) {
