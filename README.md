@@ -27,6 +27,7 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Menu Eventos expansível: cadastro de eventos, competições das modalidades, validações e funções.
 - Cadastro de categorias com classificação da modalidade, participação, limites de atletas e provas individuais ou revezamentos.
 - Validações configuráveis por evento, categoria e prova, com catálogo, engrenagem de configuração, ativação e remoção.
+- Orientações na própria interface: passo a passo, exemplo completo, definições dos campos, resumo de regras em linguagem comum e atalhos por categoria.
 - Limites de modalidades gerais, individuais e coletivas por atleta; limites de provas individuais e revezamentos por categoria.
 - Regras gerais e específicas se acumulam, sem etapas; revezamento não consome uma modalidade coletiva.
 - Pendências de participação visíveis durante a seleção e nos rascunhos. Rascunhos conflitantes podem ser salvos para correção.
