@@ -23,19 +23,20 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Navegação simplificada: seletor único de área, escola no menu lateral e evento em uma linha de contexto.
 - Cadastros com uma única barra de ações e filtros, sem cartões repetindo o título da página.
 - Ajuda e exemplos em Como funciona, recolhidos por padrão.
-- Configurações de modalidades e documentos centralizadas em suas telas próprias; detalhes do evento oferecem atalhos para o evento correto.
+- Configurações centralizadas nas abas de Gerenciar evento, sempre vinculadas ao evento aberto na lista.
 - Indicadores da secretaria calculados a partir dos cadastros locais.
 - Áreas de demonstração separadas para secretaria e escola, com menus e ações próprios.
 - Seletor de escola para visualizar atletas e rascunhos específicos de cada escola.
 - Evento ativo persistido por escola: escolha uma vez e use Trocar evento quando necessário. O contexto é reutilizado nos cadastros e inscrições.
 - Cadastro do atleta em uma tela com dados configuráveis, seleção de modalidades/categorias e documentos por edição.
 - Nome completo, data de nascimento, CPF válido e sexo são obrigatórios em todos os cadastros de pessoas (atletas, responsáveis e comissão técnica), inclusive rascunhos de novos cadastros.
-- Menu Eventos → Formulário e documentos: os quatro campos fixos não podem ser ocultados ou dispensados; os demais dados e anexos são opcionais, obrigatórios ou não solicitados conforme a pré-configuração.
+- Gerenciar evento → Formulário e documentos: os quatro campos fixos não podem ser ocultados ou dispensados; os demais dados e anexos são opcionais, obrigatórios ou não solicitados conforme a pré-configuração.
 - Arquivos reais armazenados em IndexedDB no navegador, com upload/download e limite de 5 MB por documento (PDF, PNG ou JPEG).
 - Dados pessoais reutilizáveis e participações/documentos separados por evento. Cadastros completos são reavaliados quando surgem novas exigências.
 - Rascunho de cadastro permite pendências de modalidade e documentos, mas exige os quatro dados pessoais fixos. Concluir cadastro verifica exigências e regras gerais de participação; não envia inscrição nem ocupa vaga em prova.
 - Portal escolar com eventos abertos, dados da escola e prévia de inscrição com seleção de atletas.
-- Menu Eventos expansível: cadastro de eventos, competições das modalidades, validações e funções.
+- Menu lateral com um único item Eventos. Na lista, Gerenciar abre uma página própria do evento com abas: Visão geral, Modalidades e categorias, Regras e limites, Formulário e documentos e Funções.
+- Evento fixo dentro do gerenciamento, sem seletor duplicado. Alternar abas preserva o preenchimento em andamento; cada seção é salva pelo seu próprio botão.
 - Modalidades organizadas em lista com busca e paginação; crie cada esporte uma vez e abra Configurar para gerenciar suas categorias.
 - Nome e classificação configurados na modalidade e compartilhados pelas categorias.
 - Categorias em tabela paginada, com edição individual em janela; cada prova é selecionada para edição sem empilhar formulários. Cada alteração é salva na própria modalidade ou categoria.
@@ -82,7 +83,7 @@ A interface utiliza fontes locais do sistema operacional. O logotipo oficial for
 
 ## Configurar regras de participação
 
-Na área Secretaria, abra Eventos → Cadastro de competições das modalidades e selecione o evento. Cadastre as categorias e suas provas. Em Gerenciamento de validações, o catálogo exibe todas as regras. Clique em Adicionar e configurar na regra desejada, escolha a categoria e a prova quando necessário, informe os limites e salve. Os filtros da página alteram apenas a lista de regras salvas. Não ocultam o catálogo. Vazio significa sem limite; zero impede aquele tipo de participação. As regras começam a valer após salvar e são reavaliadas ao abrir os rascunhos.
+Na área Secretaria, abra Eventos, clique em Gerenciar no evento desejado e abra Modalidades e categorias. Cadastre as categorias e suas provas. Na aba Regras e limites, o catálogo exibe todas as regras. Clique em Adicionar e configurar na regra desejada, escolha a categoria e a prova quando necessário, informe os limites e salve. Os filtros da página alteram apenas a lista de regras salvas. Não ocultam o catálogo. Vazio significa sem limite; zero impede aquele tipo de participação. As regras começam a valer após salvar e são reavaliadas ao abrir os rascunhos.
 
 Exemplo: evento com total 2, individuais 1 e coletivas 1; categoria de atletismo com provas individuais 2 e revezamentos 1. O atleta pode selecionar 100 m, salto, revezamento e também futsal. Badminton junto do atletismo gera pendência. Não há isolamento de segurança, envio definitivo ou aprovação de inscrições nesta versão local.
 
