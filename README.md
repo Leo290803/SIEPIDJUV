@@ -44,4 +44,4 @@ Este é um protótipo funcional de interface, sem backend. Os indicadores e cada
 
 Autenticação por CPF, recuperação de acesso, separação segura entre instituições, cadastro de atletas, documentos, inscrições, análise e notificações ainda serão implementados no servidor. Eventos salvos no navegador não são publicados.
 
-As fontes web são opcionais; há fontes locais de fallback. O logotipo exibido é uma marca provisória em texto e CSS, não a imagem oficial fornecida na conversa.
+As fontes web são opcionais; há fontes locais de fallback. O logotipo oficial fornecido no repositório é exibido no menu lateral, preservando o arquivo original.
