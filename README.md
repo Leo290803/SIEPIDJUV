@@ -2,6 +2,8 @@
 
 Primeira versão navegável em React e Vite, em português, com layout responsivo.
 
+Para continuar o trabalho em outro chat, leia [CONTINUIDADE.md](CONTINUIDADE.md): decisões do produto, estado implementado, pendências e próximos passos do Supabase.
+
 ## Executar
 
 Requer Node.js 22 ou superior e npm.
@@ -60,7 +62,7 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Eventos de exemplo e criação de eventos em rascunho.
 - Duplicação pela lista de eventos: nome e edição próprios, novas datas opcionais, cópia de modalidades, categorias, provas, regras, formulário, exigências de documentos e funções.
 - Cópias começam em rascunho, com contadores zerados e identificadores independentes; não copiam atletas, inscrições ou arquivos enviados. Revise anos de nascimento e datas de referência de idade para cada nova edição.
-- Seleção dos dados solicitados aos atletas durante a criação do evento.
+- Configuração dos dados adicionais e anexos na aba Formulário e documentos de Gerenciar evento.
 - Persistência dos eventos em localStorage, por navegador.
 - Busca de eventos e exportação de resumo em CSV.
 - Cadastro de escolas com nome, INEP, município, endereço e contatos.
