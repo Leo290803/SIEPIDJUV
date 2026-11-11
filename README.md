@@ -32,7 +32,7 @@ Use o checkout existente. Não é necessário criar um worktree.
 - Regras gerais e específicas se acumulam, sem etapas; revezamento não consome uma modalidade coletiva.
 - Pendências de participação visíveis durante a seleção e nos rascunhos. Rascunhos conflitantes podem ser salvos para correção.
 - Seleção de funções da comissão técnica permitidas por evento.
-- Rascunhos separados por equipe ou participação individual, com seleção de categoria, atletas e comissão técnica.
+- Rascunhos por participação individual ou coletiva, com seleção de categoria, atletas e comissão técnica. A escola representante é identificada automaticamente nos dois casos; não há nome de equipe manual.
 - Validação dos limites de integrantes; idade, documentos, elegibilidade e envio para análise permanecem fora desta etapa.
 - Rascunhos antigos são preservados e podem receber categoria ao serem editados.
 - Cadastro de comissão técnica por escola, com função, registro profissional informativo e contatos.
