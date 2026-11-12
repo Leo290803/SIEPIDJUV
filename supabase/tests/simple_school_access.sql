@@ -8,9 +8,12 @@ begin
   insert into public.institution_memberships(institution_id,user_id,role,status) values(tenant,admin_user,'admin','approved');
   perform set_config('request.jwt.claim.sub',actor::text,true);
   execute 'set local role authenticated';
+  execute 'reset role';
   begin perform public.siep_request_school_access(school_a,' ');raise exception 'Nome vazio aceito';exception when check_violation then null;end;
   link_id:=public.siep_request_school_access(school_a,'Responsável sem dados civis');
+  execute 'set local role authenticated';
   if public.siep_my_access()<>'[]'::jsonb then raise exception 'Pedido pendente liberou acesso';end if;
+  execute 'reset role';
   begin perform public.siep_request_school_access(school_a,'Outro nome');raise exception 'Pedido duplicado aceito';exception when check_violation then null;end;
   other_link:=public.siep_request_school_access(school_b,'Responsável sem dados civis');
   execute 'reset role';

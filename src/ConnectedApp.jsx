@@ -24,13 +24,18 @@ export default function ConnectedApp({ session }) {
     navigate = useNavigate();
   const [access, setAccess] = useState([]),
     [ready, setReady] = useState(false),
+    [needsPasswordChange, setNeedsPasswordChange] = useState(false),
     [error, setError] = useState(""),
     [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
     setError("");
-    supabase
-      .rpc("siep_my_access")
+    supabase.rpc("siep_password_change_required").then(({ data, error }) => {
+      if (error) throw error;
+      if (active) setNeedsPasswordChange(data === true);
+      if (data === true) return { data: [], error: null };
+      return supabase.rpc("siep_my_access");
+    })
       .then(({ data, error }) => {
         if (!active) return;
         if (error) throw error;
@@ -82,6 +87,7 @@ export default function ConnectedApp({ session }) {
         </div>
       </div>
     );
+  if (needsPasswordChange) return <Navigate to="/redefinir-senha?primeiro=1" replace />;
   const path = location.pathname,
     route = resolveRoute(path);
   if (path === "/acesso-pendente")

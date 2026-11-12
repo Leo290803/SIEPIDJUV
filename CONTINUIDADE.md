@@ -2,6 +2,21 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Acesso escolar gerado pela Secretaria — decisão atual (substitui solicitações abertas)
+
+O usuário retirou a inscrição pública de contas e definiu acesso sem e-mail. A Secretaria cadastra o responsável, CPF, nascimento e escola, salva e usa **Gerar acesso**. O botão pede confirmação do responsável/escola. Usuário = CPF com 11 dígitos (preserva zeros iniciais); senha inicial = ano de nascimento + quatro últimos dígitos do CPF. Exemplo fornecido pelo usuário: CPF `04182530217`, nascimento `2003-08-29`, senha inicial `20030217`.
+
+- A senha inicial é previsível e foi explicitamente escolhida pelo usuário. **Troca obrigatória no primeiro acesso**: a marca é metadado administrativo do Auth, conferido no servidor; RLS bloqueia dados escolares até mudar a senha. O gatilho do Auth remove a marca ao atualizar o hash. Nova senha tem mínimo de 10 caracteres na interface.
+- Cadastro público removido da interface, URLs antigas redirecionam para login e `disable_signup=true` no Supabase Auth. As RPCs de solicitação/diretório aberto perderam EXECUTE de anon/authenticated. Históricos e vínculos anteriores foram preservados; contas existentes por e-mail continuam entrando.
+- Duas Edge Functions ativas: `provision-school-access` verifica sessão, autorização da Secretaria e o vínculo antes de criar uma conta Auth; `cpf-login` resolve a conta sem expor o endereço interno e autentica a senha no Auth. O endereço interno `CPF@cpf.siep.invalid` serve somente ao provedor; não exige e-mail do responsável e não recebe mensagens.
+- A senha inicial só volta na resposta de criação e aparece temporariamente no painel da Secretaria, junto da escola. Não é armazenada em tabela, localStorage, logs ou código do cliente. O Auth guarda o hash. Gerar acesso de uma conta existente preserva a senha atual e não retorna senha anterior.
+- Login CPF tem limite de 10 tentativas em 15 minutos por CPF no backend e resposta genérica. Contas ambíguas ou sem vínculo aprovado não entram. CPF não é tratado como número.
+- Migração `20261112170000_secretariat_managed_school_access` aplicada; total de **16 migrações**, 29 tabelas públicas com RLS e nove suítes SQL. A tabela de controle de tentativas é privada. Funções de autorização/resolução reservadas a service_role; chave administrativa apenas no runtime do Supabase.
+- Validação: 69 testes JS, nove suítes SQL, três cenários concorrentes PostgreSQL, testes de endpoints com HTTP simulado e Chromium (fluxo geral + Secretaria gera acesso, login CPF, troca obrigatória e escola correta). SQL verificado no Supabase real com fixtures desfeitas. Endpoints confirmados ACTIVE pela API administrativa; HTTP real de Auth/Edge no domínio do projeto continua bloqueado no executor. Não afirmar teste real de criação de conta/login por CPF nem entrega de mensagens.
+- Nenhuma conta real foi criada pelo agente para teste, nenhum e-mail foi enviado e nenhuma senha existente foi redefinida. A publicação do ambiente não foi executada.
+- Comandos: `npm run test:access-browser`; reimplantação dos endpoints com `python scripts/deploy_school_access.py --project-ref REF`. O script usa a credencial segura existente e não imprime seu valor. Vínculos legados continuam disponíveis para revisão da Secretaria.
+- Recuperação de conta por CPF sem e-mail deve passar pela Secretaria; esta entrega preserva recuperação por e-mail de contas legadas e não implementa redefinição administrativa de senhas existentes. Não redefinir contas globais ao vincular a outra escola.
+
 ## Solicitação simplificada com confirmação da escola — atualização mais recente
 
 - Escolas do IDJUV são carregadas automaticamente; não há campo para digitar o código da instituição. O responsável informa somente nome (pré-preenchido do `display_name` da conta quando disponível) e escolhe explicitamente uma escola, sem seleção automática.

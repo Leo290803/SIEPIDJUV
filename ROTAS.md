@@ -8,9 +8,9 @@ O registro central fica em `src/routing/routes.js`. IDs nas URLs nunca concedem 
 | --- | --- |
 | `/`, `/entrar` | Entrada geral; sessão válida segue ao primeiro vínculo autorizado |
 | `/secretaria/entrar`, `/escola/entrar` | Login específico da área |
-| `/cadastro`, `/secretaria/cadastro`, `/escola/cadastro` | Criação de conta; confirmação não concede vínculo por si só |
+| `/cadastro`, `/secretaria/cadastro`, `/escola/cadastro` | Cadastro público encerrado; redireciona ao login |
 | `/recuperar-senha`, `/redefinir-senha` | Recuperação e definição da nova senha |
-| `/acesso-pendente` | Solicitação de vínculo/aguardo de aprovação |
+| `/acesso-pendente` | Orientação para procurar a Secretaria; não permite solicitar vínculo |
 | `/acesso-negado` | Acesso recusado |
 | `/demonstracao` | Demonstração local explícita |
 
@@ -42,3 +42,7 @@ Na Escola e no acompanhamento, os sufixos são `painel`, `eventos`, `atletas`, `
 `Usuários da Secretaria` usa `siep_staff_accounts` e `siep_set_staff_account`, exclusivos de admin. A conta de destino deve existir no Auth com e-mail confirmado. Manager não pode promover usuários nem alterar a instituição. O último administrador aprovado não pode ser removido.
 
 Metadados editáveis do Auth não concedem papel. A revogação é aplicada no servidor na próxima operação; o frontend atualiza a navegação ao recuperar foco ou após até um minuto. Erro na consulta de acesso bloqueia o portal e oferece nova tentativa. Nenhuma chave administrativa faz parte do cliente.
+
+## Credenciais escolares geradas pela Secretaria
+
+Cadastro/CPF/nascimento/escola são conferidos em Responsáveis. **Gerar acesso** cria a conta sem e-mail: usuário CPF e senha inicial ano + últimos quatro dígitos. O primeiro login por CPF é encaminhado a `/redefinir-senha?primeiro=1`; o banco bloqueia os dados da escola até a troca. Login por e-mail de contas anteriores continua válido. Recuperação por CPF exige atendimento da Secretaria.

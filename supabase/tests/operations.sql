@@ -23,9 +23,12 @@ begin
 
   perform set_config('request.jwt.claim.sub',applicant::text,true);
   execute 'set local role authenticated';
+  -- Contratos legados mantidos somente para fixtures administrativas.
+  execute 'reset role';
   if (select count(*) from public.siep_school_directory('ops-'||tenant))<>2 then raise exception 'Diretório de escolas falhou'; end if;
   begin perform public.siep_request_school_link(school,'{"cpf":"52998224725"}'); raise exception 'Solicitação sem dados fixos aceita'; exception when check_violation then null; end;
   link:=public.siep_request_school_link(school,identity_data);
+  execute 'set local role authenticated';
   if exists(select 1 from public.people where id=responsible) then raise exception 'Pendente acessou pessoa existente pelo CPF'; end if;
   if not exists(select 1 from public.school_link_requests where school_person_id=link and user_id=applicant and requested_identity=identity_data) then raise exception 'Dados da solicitação não preservados'; end if;
   begin perform public.siep_decide_school_link(link,'approved','Autoaprovar'); raise exception 'Autoaprovação permitida'; exception when insufficient_privilege then null; end;

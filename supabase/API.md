@@ -161,3 +161,13 @@ O cliente conectado faz: gravação composta → remoções lógicas → prepara
 CPF, nascimento e sexo podem estar todos ausentes na identidade inicial do responsável; preenchimento parcial é recusado. Pessoas com vínculo de atleta/profissional ou participação exigem identidade completa, inclusive contra alterações diretas. A RPC antiga com quatro dados permanece compatível. Não são gravados dados civis fictícios.
 
 O portal do IDJUV usa o código `idjuv` automaticamente. Outras instituições podem compartilhar `/acesso-pendente?instituicao=SEU-CODIGO` com contas conectadas; o código apenas consulta o diretório e nunca concede permissão.
+
+## Acesso gerenciado pela Secretaria (substitui solicitação aberta)
+
+`disable_signup=true` no Auth. `siep_request_school_access`, `siep_request_school_link` e `siep_school_directory` não podem mais ser executadas por anon/authenticated. Permanecem para preservar contratos históricos e fixtures administrativas.
+
+- Edge `provision-school-access`: corpo `{link_id}`; exige JWT real, consulta `siep_school_access_context` com a sessão e cria conta com Auth Admin **sem enviar e-mail**. A senha inicial segue a decisão do usuário: ano de nascimento + quatro últimos dígitos do CPF. A autorização final usa `siep_authorize_school_account`, exclusiva do backend e revalida funcionário/escola/pessoa. Resposta de criação inclui usuário/senha inicial; conta existente mantém senha. Resposta tem `Cache-Control: no-store`.
+- Edge `cpf-login`: corpo `{cpf,password}`; normaliza CPF como string, usa `siep_cpf_login_account` exclusivamente via backend, limita tentativas e autentica a senha no Auth. Retorna apenas access_token/refresh_token. E-mail interno nunca é resposta pública do endpoint.
+- `siep_password_change_required()`: própria conta. `siep_initial_password` fica em `raw_app_meta_data`, não em metadado editável pelo usuário. Troca do hash no Auth remove a marca. `is_staff`/`can_school` negam os dados antes da troca.
+
+As funções usam `SUPABASE_SERVICE_ROLE_KEY` somente no servidor. `verify_jwt=false` no gateway permite CPF sem sessão; o endpoint de provisionamento valida o JWT com `/auth/v1/user` e revalida a permissão no banco. As funções têm origens CORS explícitas e não registram credenciais. Deployment: `scripts/deploy_school_access.py`.

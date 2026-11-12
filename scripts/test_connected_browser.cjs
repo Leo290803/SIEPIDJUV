@@ -378,6 +378,7 @@ try {
         return response(route, r);
       }
 
+      if (table === "siep_password_change_required") return response(route, false);
       if (table === "siep_my_access")
         return response(route, [
           {
@@ -482,7 +483,7 @@ try {
     .getByRole("button", { name: "Sair da demonstração e acessar minha conta" })
     .click();
   await page.getByRole("button", { name: "Esqueci minha senha" }).click();
-  await page.getByLabel("E-mail", { exact: true }).fill(user.email);
+  await page.getByLabel(/^(E-mail|CPF ou e-mail)$/).fill(user.email);
   await page.getByRole("button", { name: "Enviar instruções" }).click();
   await page
     .getByText(
@@ -491,7 +492,7 @@ try {
     .waitFor();
   assert.equal(resetRedirect, "http://localhost:5173/?recovery=1");
   await page.getByRole("button", { name: "Voltar ao acesso" }).click();
-  await page.getByLabel("E-mail", { exact: true }).fill(user.email);
+  await page.getByLabel(/^(E-mail|CPF ou e-mail)$/).fill(user.email);
   await page.getByLabel("Senha", { exact: true }).fill("senha-de-teste-longa");
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
   await page
@@ -761,7 +762,7 @@ try {
   await page.getByRole("heading", { name: "Acesso da Secretaria" }).waitFor();
   isAdmin = false;
   user.user_metadata = { role: "admin", is_admin: true };
-  await page.getByLabel("E-mail", { exact: true }).fill(user.email);
+  await page.getByLabel(/^(E-mail|CPF ou e-mail)$/).fill(user.email);
   await page.getByLabel("Senha", { exact: true }).fill("senha-de-teste-longa");
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
   await page
@@ -861,7 +862,7 @@ try {
     new URL(page.url()).searchParams.get("retorno"),
     "/secretaria/" + tenant + "/atletas",
   );
-  await page.getByLabel("E-mail", { exact: true }).fill(user.email);
+  await page.getByLabel(/^(E-mail|CPF ou e-mail)$/).fill(user.email);
   await page.getByLabel("Senha", { exact: true }).fill("senha-incorreta");
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
   await page.getByText("E-mail ou senha inválidos.", { exact: true }).waitFor();
@@ -882,7 +883,7 @@ try {
     )
     .waitFor();
   await page.goto('http://localhost:5173/escola/entrar');
-  await page.getByLabel('E-mail',{exact:true}).fill(user.email);
+  await page.getByLabel(/^(E-mail|CPF ou e-mail)$/).fill(user.email);
   await page.getByLabel('Senha',{exact:true}).fill('senha-de-teste-longa');
   await page.getByRole('button',{name:'Entrar',exact:true}).click();
   await page.getByRole('button',{name:'Abrir menu',exact:true}).waitFor();

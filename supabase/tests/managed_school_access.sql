@@ -1,0 +1,47 @@
+do $$
+declare tenant uuid:=gen_random_uuid();other_tenant uuid:=gen_random_uuid();school uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();stranger uuid:=gen_random_uuid();account uuid:=gen_random_uuid();person uuid:=gen_random_uuid();link uuid:=gen_random_uuid();context jsonb;resolved text;
+begin
+ begin
+  insert into auth.users(id,email,email_confirmed_at,raw_app_meta_data,encrypted_password) values(admin_user,'managed-admin-'||admin_user||'@example.invalid',now(),'{}','hash-a'),(stranger,'stranger-'||stranger||'@example.invalid',now(),'{}','hash-b'),(account,'52998224725@cpf.siep.invalid',now(),'{"siep_initial_password":true}','hash-initial');
+  insert into public.institutions(id,name,slug) values(tenant,'Managed','managed-'||tenant),(other_tenant,'Other','managed-'||other_tenant);
+  insert into public.schools(id,institution_id,name) values(school,tenant,'Escola autorizada');
+  insert into public.institution_memberships(institution_id,user_id,role,status) values(tenant,admin_user,'admin','approved');
+  insert into public.people(id,institution_id,full_name,cpf,birth_date,gender) values(person,tenant,'Responsável cadastrado','52998224725','2003-08-29','Feminino');
+  insert into public.school_people(id,institution_id,school_id,person_id,role,status) values(link,tenant,school,person,'responsible','pending');
+  perform set_config('request.jwt.claim.sub',stranger::text,true);
+  execute 'set local role authenticated';
+  begin perform public.siep_request_school_access(school,'Pessoa');raise exception 'Pedido aberto ainda disponível';exception when insufficient_privilege then null;end;
+  begin perform public.siep_request_school_link(school,'{}');raise exception 'Pedido legado disponível';exception when insufficient_privilege then null;end;
+  begin perform public.siep_school_access_context(link);raise exception 'Outra conta consultou contexto';exception when insufficient_privilege then null;end;
+  begin perform public.siep_authorize_school_account(link,admin_user,account,'52998224725');raise exception 'Cliente executou backend';exception when insufficient_privilege then null;end;
+  begin perform public.siep_cpf_login_account('52998224725');raise exception 'Cliente enumerou CPF';exception when insufficient_privilege then null;end;
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub',admin_user::text,true);
+  execute 'set local role authenticated';
+  context:=public.siep_school_access_context(link);
+  if context->>'cpf'<>'52998224725' or context->>'school'<>'Escola autorizada' then raise exception 'Contexto de acesso incorreto';end if;
+  execute 'reset role';
+  execute 'set local role service_role';
+  begin perform public.siep_authorize_school_account(link,stranger,account,'52998224725');raise exception 'Funcionário inválido liberou acesso';exception when insufficient_privilege then null;end;
+  perform public.siep_authorize_school_account(link,admin_user,account,'52998224725');
+  resolved:=public.siep_cpf_login_account('52998224725');
+  if resolved is distinct from '52998224725@cpf.siep.invalid' then raise exception 'CPF não resolveu a conta autorizada';end if;
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub',account::text,true);
+  execute 'set local role authenticated';
+  if not public.siep_password_change_required() or public.siep_my_access()<>'[]'::jsonb or exists(select 1 from public.schools where id=school) then raise exception 'Senha inicial liberou dados antes da troca';end if;
+  execute 'reset role';
+  update auth.users set raw_user_meta_data='{"siep_initial_password":false}' where id=account;
+  if not siep_private.password_change_required() then raise exception 'Metadado público removeu troca obrigatória';end if;
+  update auth.users set encrypted_password='hash-changed' where id=account;
+  execute 'set local role authenticated';
+  if public.siep_password_change_required() or public.siep_my_access()->0->'schools'->0->>'id'<>school::text then raise exception 'Troca de senha não liberou somente a escola correta';end if;
+  execute 'reset role';
+  execute 'set local role service_role';
+  for i in 1..9 loop perform public.siep_cpf_login_account('52998224725');end loop;
+  if public.siep_cpf_login_account('52998224725') is not null then raise exception 'Limite de tentativas não aplicado';end if;
+  execute 'reset role';
+  raise exception 'rollback_managed_access' using errcode='ZX001';
+ exception when sqlstate 'ZX001' then null;
+ end;
+end $$;

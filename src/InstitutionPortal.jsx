@@ -827,6 +827,16 @@ export default function InstitutionPortal({
                         onCloseRecord={() => go("Responsáveis")}
                         schools={schools}
                         onPersist={(entry) => savePerson("responsible", entry)}
+                        onProvision={async (record) => {
+                          const { data: result, error } = await supabase.functions.invoke("provision-school-access", { body: { link_id: record.id } });
+                          if (error || result?.error) {
+                            let message = result?.error;
+                            if (!message && error?.context?.json) message = (await error.context.json().catch(() => ({}))).error;
+                            throw Error(message || readableError(error));
+                          }
+                          await refresh();
+                          return result;
+                        }}
                         onDecide={async (record, status, reason) => {
                           setBusy(true);
                           try {
@@ -841,7 +851,7 @@ export default function InstitutionPortal({
                       />
                       <details className="panel">
                         <summary>
-                          Dados declarados nas solicitações de acesso
+                          Histórico de solicitações anteriores
                         </summary>
                         <AccessRequests tenant={tenant} schools={schools} />
                       </details>

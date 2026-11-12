@@ -18,9 +18,7 @@ export default function AccountGate({ Demo }) {
         ? new URLSearchParams(routeLocation.search).get("area")
         : "";
   const entryPath = entryArea ? "/" + entryArea + "/entrar" : "/entrar";
-  const authMode = routeLocation.pathname.endsWith("/cadastro")
-    ? "signup"
-    : routeLocation.pathname === "/recuperar-senha"
+  const authMode = routeLocation.pathname === "/recuperar-senha"
       ? "reset"
       : routeLocation.pathname === "/redefinir-senha"
         ? "password"
@@ -102,21 +100,13 @@ export default function AccountGate({ Demo }) {
       password = String(form.get("password") || "");
     try {
       let response;
-      if (mode === "login")
-        response = await supabase.auth.signInWithPassword({ email, password });
-      if (mode === "signup") {
-        response = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: location.origin + "/",
-            data: { display_name: form.get("name") },
-          },
-        });
-        if (!response.error)
-          setMessage(
-            "Confira seu e-mail para confirmar a conta. O acesso à instituição depende de vínculo aprovado.",
-          );
+      if (mode === "login") {
+        if (email.includes("@")) response = await supabase.auth.signInWithPassword({ email, password });
+        else {
+          const { data, error } = await supabase.functions.invoke("cpf-login", { body: { cpf: email, password } });
+          if (error || data?.error) throw Error(data?.error || "CPF ou senha inválidos, ou limite de tentativas atingido. Tente novamente mais tarde.");
+          response = await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+        }
       }
       if (mode === "reset") {
         response = await supabase.auth.resetPasswordForEmail(email, {
@@ -142,6 +132,7 @@ export default function AccountGate({ Demo }) {
       setBusy(false);
     }
   }
+  if (routeLocation.pathname.endsWith("/cadastro")) return <Navigate to={entryPath} replace />;
   if (routeLocation.pathname.length > 1 && routeLocation.pathname.endsWith("/"))
     return (
       <Navigate
@@ -214,7 +205,6 @@ export default function AccountGate({ Demo }) {
       : routeLocation.pathname.startsWith("/escola")
         ? "Acesso da Escola"
         : "Acessar o SIEP",
-    signup: "Criar minha conta",
     reset: "Recuperar acesso",
     password: "Definir nova senha",
   };
@@ -233,27 +223,19 @@ export default function AccountGate({ Demo }) {
               <Link to="/escola/entrar">Acesso da Escola</Link>
             </div>
           )}
+        {mode === "login" && <p className="form-note">O acesso é cadastrado pela Secretaria. Entre com seu CPF e a senha inicial entregue pela equipe. Contas existentes por e-mail continuam funcionando.</p>}
+        {mode === "password" && new URLSearchParams(routeLocation.search).has("primeiro") && <p className="form-note">Este é seu primeiro acesso. Defina uma nova senha com pelo menos 10 caracteres para continuar.</p>}
+        {mode === "reset" && <p className="form-note">Acesso por CPF: procure a Secretaria para obter ajuda. Esta recuperação por e-mail atende contas que já usam e-mail.</p>}
         <form onSubmit={submit}>
           <fieldset disabled={busy}>
-            {mode === "signup" && (
-              <label>
-                Nome completo
-                <input
-                  name="name"
-                  required
-                  autoComplete="name"
-                  maxLength={160}
-                />
-              </label>
-            )}
             {mode !== "password" && (
               <label>
-                E-mail
+                {mode === "login" ? "CPF ou e-mail" : "E-mail"}
                 <input
                   name="email"
-                  type="email"
+                  type={mode === "login" ? "text" : "email"}
                   required
-                  autoComplete="email"
+                  autoComplete={mode === "login" ? "username" : "email"}
                 />
               </label>
             )}
@@ -272,12 +254,6 @@ export default function AccountGate({ Demo }) {
                 />
               </label>
             )}
-            {mode === "signup" && (
-              <p className="form-note">
-                Use ao menos 10 caracteres. Confirme o endereço pelo link
-                enviado ao seu e-mail.
-              </p>
-            )}
             {error && (
               <p className="school-error" role="alert">
                 {error}
@@ -295,9 +271,7 @@ export default function AccountGate({ Demo }) {
                   ? "Enviar instruções"
                   : mode === "password"
                     ? "Salvar senha"
-                    : mode === "signup"
-                      ? "Criar conta"
-                      : "Entrar"}
+                    : "Entrar"}
             </button>
           </fieldset>
         </form>
@@ -316,20 +290,6 @@ export default function AccountGate({ Demo }) {
                 }}
               >
                 Esqueci minha senha
-              </button>
-              <button
-                className="text-btn"
-                onClick={() => {
-                  navigate(
-                    entryArea === "secretaria"
-                      ? "/secretaria/cadastro"
-                      : "/escola/cadastro",
-                  );
-                  setError("");
-                  setMessage("");
-                }}
-              >
-                Criar conta
               </button>
             </>
           ) : (

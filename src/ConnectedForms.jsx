@@ -1,88 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { supabase, readableError } from "./data/client.js";
-export function PendingAccess({ onRefresh, institutionSlug = "idjuv" }) {
-  const [schools, setSchools] = useState([]),
-    [selectedId, setSelectedId] = useState(""),
-    [confirmed, setConfirmed] = useState(false),
-    [name, setName] = useState(""),
-    [error, setError] = useState(""),
-    [sentSchool, setSentSchool] = useState(null),
-    [busy, setBusy] = useState(false),
-    [loading, setLoading] = useState(true);
-  const selectedSchool = schools.find(s => s.id === selectedId);
-  async function loadSchools() {
-    setLoading(true);
-    setError("");
-    try {
-      const { data, error } = await supabase.rpc("siep_school_directory", { p_institution_slug: institutionSlug });
-      if (error) throw error;
-      setSchools(data || []);
-    } catch (error) { setError(readableError(error)); }
-    finally { setLoading(false); }
-  }
-  useEffect(() => {
-    loadSchools();
-    supabase.auth.getUser().then(({ data }) => {
-      setName(current => current || data.user?.user_metadata?.display_name || "");
-    }).catch(() => {});
-  }, [institutionSlug]);
-  async function request(e) {
-    e.preventDefault();
-    if (busy || !selectedSchool || !confirmed) return;
-    const target = selectedSchool;
-    setBusy(true);
-    setError("");
-    try {
-      const { error } = await supabase.rpc("siep_request_school_access", { p_school_id: target.id, p_full_name: name.trim() });
-      if (error) throw error;
-      setSentSchool(target);
-    } catch (error) { setError(readableError(error)); }
-    finally { setBusy(false); }
-  }
-  function schoolSummary(school) {
-    return <div className="school-access-selected"><span>ESCOLA ESCOLHIDA</span><strong>{school.name}</strong><small>Instituição: {institutionSlug.toUpperCase()}{school.inep ? " · INEP: " + school.inep : ""}</small></div>;
-  }
-  return (
-    <section className="school-access-card" aria-labelledby="school-access-title">
-      <div className="school-access-heading">
-        <span className="school-access-eyebrow">SIEP · ACESSO DA ESCOLA</span>
-        <h1 id="school-access-title">{sentSchool ? "Aguarde a aprovação" : "Solicite acesso à sua escola"}</h1>
-        <p>{sentSchool ? "Seu pedido foi enviado à Secretaria para análise." : "Escolha sua escola e confira o nome antes de solicitar. O acesso depende da aprovação da Secretaria."}</p>
-      </div>
-      {sentSchool ? (
-        <div className="school-access-confirmation" role="status">
-          <span className="school-access-status">Solicitação enviada</span>
-          {schoolSummary(sentSchool)}
-          <p>Você solicitou acesso como responsável por esta escola. Depois da aprovação, clique em <strong>Atualizar meu acesso</strong>.</p>
-        </div>
-      ) : (
-        <div className="school-access-step">
-          {loading ? <p role="status">Carregando escolas…</p> : schools.length ? (
-            <form onSubmit={request}>
-              <fieldset disabled={busy} className="school-access-fields">
-                <legend className="sr-only">Solicitação de acesso escolar</legend>
-                <label className="school-access-wide" htmlFor="access-school">Qual é a sua escola?</label>
-                <select className="school-access-wide" id="access-school" name="school" required value={selectedId} onChange={e => { setSelectedId(e.target.value); setConfirmed(false); setError(""); }}>
-                  <option value="" disabled>Selecione a escola em que você atua</option>
-                  {schools.map(s => <option key={s.id} value={s.id}>{s.name}{s.inep ? " · INEP " + s.inep : ""}</option>)}
-                </select>
-                <label className="school-access-wide">Nome completo do responsável<input name="name" required autoComplete="name" maxLength={160} value={name} onChange={e => setName(e.target.value)} /></label>
-                {selectedSchool && <div className="school-access-wide" aria-live="polite">
-                  {schoolSummary(selectedSchool)}
-                  <label className="school-access-check"><input type="checkbox" required checked={confirmed} onChange={e => setConfirmed(e.target.checked)} /><span>Confirmo que esta é a escola correta e quero solicitar acesso como responsável.</span></label>
-                </div>}
-                <div className="school-access-submit school-access-wide"><p>Confira a escola destacada antes de enviar.</p><button className="primary" disabled={busy || !selectedSchool || !confirmed}>{busy ? "Enviando…" : "Solicitar acesso à escola"}</button></div>
-              </fieldset>
-            </form>
-          ) : <p className="school-access-empty">Nenhuma escola disponível para {institutionSlug.toUpperCase()}. Peça à Secretaria para verificar o cadastro da escola.</p>}
-          {!loading && !schools.length && <button className="secondary" onClick={loadSchools}>Tentar carregar escolas novamente</button>}
-        </div>
-      )}
-      {error && <p className="school-error school-access-error" role="alert">{error}</p>}
-      <footer className="school-access-footer"><div><strong>Já teve seu vínculo aprovado?</strong><p>Atualize para verificar a liberação do acesso.</p></div><button className="secondary" onClick={onRefresh} disabled={busy}>Atualizar meu acesso</button></footer>
-      <details className="school-access-help"><summary>Preciso de acesso à Secretaria</summary><p>Peça a um administrador da instituição para vincular sua conta confirmada à equipe da Secretaria.</p></details>
-    </section>
-  );
+export function PendingAccess({ onRefresh }) {
+  return <section className="school-access-card" aria-labelledby="school-access-title">
+    <div className="school-access-heading"><span className="school-access-eyebrow">SIEP · ACESSO RESTRITO</span><h1 id="school-access-title">Acesso cadastrado pela Secretaria</h1><p>Sua conta está conectada, mas ainda não possui um vínculo aprovado. Procure a Secretaria para cadastrar ou conferir seu acesso à escola.</p></div>
+    <div className="school-access-step"><h2>Informe à Secretaria</h2><p>Seu nome completo, CPF e a escola que você representa. A equipe confere os dados e libera o acesso correto.</p><p>Você não precisa criar outra conta ou solicitar vínculo pelo sistema.</p></div>
+    <footer className="school-access-footer"><div><strong>A Secretaria já liberou seu acesso?</strong><p>Atualize para verificar a autorização.</p></div><button className="secondary" onClick={onRefresh}>Atualizar meu acesso</button></footer>
+  </section>;
 }
 export function InstitutionForm({ institution, onSave }) {
   const [error, setError] = useState(""),

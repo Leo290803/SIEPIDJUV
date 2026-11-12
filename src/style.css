@@ -64,3 +64,7 @@
 .school-access-card .school-access-check { flex-direction:row; align-items:flex-start; gap:12px; font-weight:400; line-height:1.6; }
 .school-access-check input { width:18px; min-height:18px; height:18px; flex:0 0 18px; margin:2px 0 0; accent-color:#224f80; }
 .school-access-confirmation .school-access-selected { margin-top:20px; }
+
+.access-credentials { border:2px solid #739ac5; background:#f3f7fc; margin-bottom:20px; overflow-wrap:anywhere; }
+.access-credentials>.text-btn { float:right; }.access-credentials h2 { font-size:18px; line-height:1.5; color:#173f70; }.access-credentials p { line-height:1.7; }.access-credentials p>strong { font-family:monospace; font-size:18px; letter-spacing:1px; }.access-credentials .eyebrow { display:block; margin-top:8px; }
+@media(max-width:600px){.access-credentials>.text-btn{float:none;display:block;margin:0 0 12px auto}}

@@ -33,6 +33,7 @@ export default function Responsibles({
   schools: providedSchools,
   onPersist,
   onDecide,
+  onProvision,
   connected = false,
   routeAction,
   routeRecordId,
@@ -45,7 +46,7 @@ export default function Responsibles({
     [action, setAction] = useState(null),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false), [accessResult, setAccessResult] = useState(null);
   let schools;
   try {
     const saved = JSON.parse(localStorage.getItem("siep-schools"));
@@ -160,7 +161,7 @@ export default function Responsibles({
       setMessage(
         form.id
           ? "Dados do responsável atualizados."
-          : "Responsável cadastrado. O vínculo aguarda análise.",
+          : connected ? "Responsável cadastrado. Confira a escola e use Gerar acesso." : "Responsável cadastrado. O vínculo aguarda análise.",
       );
     }
     setBusy(false);
@@ -172,7 +173,7 @@ export default function Responsibles({
     const school = schools.find((s) => s.id === action.record.schoolId);
     if (connected && action.status === "Aprovado" && !action.record.userId) {
       setError(
-        "A conta ainda não está vinculada. O titular precisa criar a conta e solicitar vínculo com esta escola.",
+        "A conta ainda não está vinculada. Use Gerar acesso para cadastrar a conta deste responsável.",
       );
       return;
     }
@@ -235,7 +236,7 @@ export default function Responsibles({
   const shown = records.filter(
     (r) =>
       (filter === "Todos" || r.status === filter) &&
-      normalize([r.name, r.email, schoolName(r)].join(" ")).includes(
+      normalize([r.name, r.cpf, r.email, schoolName(r)].join(" ")).includes(
         normalize(query),
       ),
   );
@@ -247,6 +248,13 @@ export default function Responsibles({
           {message}
         </div>
       )}
+      {accessResult && <div className="panel access-credentials" role="status">
+        <button className="text-btn" onClick={() => setAccessResult(null)}>Fechar dados do acesso</button>
+        <span className="eyebrow">ACESSO DO RESPONSÁVEL</span>
+        <h2>{accessResult.school}</h2>
+        <p>Usuário (CPF): <strong>{accessResult.username}</strong></p>
+        {accessResult.created ? <><p>Senha inicial: <strong>{accessResult.initial_password}</strong></p><p>Entregue estes dados diretamente ao responsável. A troca de senha será exigida no primeiro acesso. Nenhum e-mail foi enviado.</p></> : <p>A conta já existia. A senha atual foi preservada.</p>}
+      </div>}
       <div className="panel">
         <div className="section-title">
           <span className="record-count">
@@ -270,7 +278,7 @@ export default function Responsibles({
                 aria-label="Buscar responsáveis"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Nome, e-mail ou escola"
+                placeholder="Nome, CPF, e-mail ou escola"
               />
             </label>
             <select
@@ -343,9 +351,16 @@ export default function Responsibles({
               >
                 Editar
               </button>
+              {connected && onProvision && ["Pendente", "Aprovado"].includes(r.status) && !r.userId && <button className="primary" disabled={busy || !r.cpf || !r.birth} onClick={async () => {
+                if (!window.confirm(`Gerar acesso de ${r.name}, CPF ${r.cpf}, à escola ${schoolName(r)}? A senha inicial será o ano de nascimento + os 4 últimos dígitos do CPF, com troca no primeiro acesso.`)) return;
+                setBusy(true); setError(""); setMessage(""); setAccessResult(null);
+                try { const result = await onProvision(r); setAccessResult(result); setMessage(`Acesso liberado para ${result.school}.`); }
+                catch (error) { setError(error.message); }
+                finally { setBusy(false); }
+              }}>Gerar acesso</button>}
               {(r.status === "Pendente"
                 ? [
-                    ["Aprovar", "Aprovado"],
+                    ...(!connected || r.userId ? [["Aprovar", "Aprovado"]] : []),
                     ["Recusar", "Recusado"],
                   ]
                 : r.status === "Aprovado"
