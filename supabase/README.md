@@ -1,6 +1,6 @@
 # Banco SIEP
 
-Projeto: `siep` (`oshzcmmbhxvmchjgxztp`). Onze migrações versionadas, aplicadas e verificadas: a base inicial e dez incrementos para os fluxos previstos em CONTINUIDADE.md. O acesso conectado já usa instituições, escolas, eventos/configurações e vínculos de responsáveis; os demais módulos continuam na demonstração local.
+Projeto: `siep` (`oshzcmmbhxvmchjgxztp`). Treze migrações versionadas, aplicadas e verificadas: a base inicial e doze incrementos para os fluxos previstos em CONTINUIDADE.md. O portal conectado usa a navegação completa, com pessoas, participações, arquivos privados, inscrições/análise, relatórios, notificações e área da escola. A demonstração anterior continua separada, sem importação automática.
 
 ## Operação e histórico
 
@@ -36,6 +36,8 @@ Esse histórico não é o do Supabase CLI. Não executar os mesmos arquivos dire
 | `20261112130000` | Configuração atômica por seção e exigências desativadas preservadas |
 | `20261112131000` | Reserva privada do primeiro administrador, ativada apenas após confirmar e-mail |
 | `20261112132000` | Duplicação preserva exigências de documentos desativadas |
+| `20261112140000` | Pessoas/participações conectadas, versão/arquivo por perfil e remoção lógica de documento |
+| `20261112141000` | Elenco de revezamento com preservação dos limites explícitos de categorias de equipe |
 
 Os nomes são identificadores de ordenação UTC, não datas de inscrição.
 
@@ -113,17 +115,25 @@ Versões de inscrições preservam a identidade, escola, categoria/prova, docume
 - Duplicação gera novos IDs para modalidades, categorias, provas, regras, exigências, campos e funções; preserva opções desativadas e remapeia referências. Começa em rascunho, sem inscrições/pessoas/arquivos/datas antigas. Anos e datas de referência continuam exigindo revisão na nova edição.
 - Transferência solicita análise, impede mudança com participação não arquivada em edição em curso e não reescreve a escola das inscrições históricas.
 - Evento ativo é persistido por escola. Arquivar cadastro não apaga a pessoa nem permite abandonar inscrições ativas sem revisão.
-- Notificações de decisões são registradas com deduplicação e outbox transacional. A fila tem reserva concorrente, token e tentativas limitadas. Nenhum e-mail foi enviado; um worker externo ainda precisa consumir a fila.
+- Notificações de decisões são registradas com deduplicação e outbox transacional. A fila tem reserva concorrente, token e tentativas limitadas. Nenhum e-mail de notificação foi enviado pelo agente; um worker externo ainda precisa consumir a fila.
 - Mapeamentos de IDs legados têm origem/tipo e validam alvo da mesma instituição. Exportação/importação dos navegadores requer cliente específico e validação de conflitos; não foi executada importação.
 
 ## Validação e limites da entrega
 
-Cinco suítes SQL (`foundation`, `operations`, `security`, `workflow`, `connected_configuration`) cobrem RLS com papéis reais, anon, escopo por escola/cliente, solicitação/aprovação de vínculo, parâmetros das oito regras, exemplo esportivo aprovado, faixa/sexo, documentos, envio/correção/aprovação, duplicação, transferência, histórico e outbox. Fixtures são sempre revertidas.
+Seis suítes SQL (`foundation`, `operations`, `security`, `workflow`, `connected_configuration`, `full_portal`) cobrem RLS com papéis reais, anon, escopo por escola/cliente, solicitação/aprovação de vínculo, parâmetros das oito regras, exemplo esportivo aprovado, faixa/sexo, documentos, envio/correção/aprovação, duplicação, transferência, histórico e outbox. Fixtures são sempre revertidas.
 
 Reexecução após aplicar confirmou zero migrações pendentes, 29 tabelas protegidas, contagens anteriores e bucket preservados e nenhum fixture persistido.
 
 Três testes com conexões PostgreSQL simultâneas cobrem disputa da mesma vaga, disputa da mesma pessoa em vagas diferentes e edição com revisão desatualizada. Esses testes usam somente o PostgreSQL descartável local.
 
-A integração inicial já usa instituições, escolas, eventos/configurações e vínculos; pessoas/participações/inscrições/uploads ainda aguardam integração das telas. Os dados de localStorage/IndexedDB não estão disponíveis no executor e continuam nos navegadores. Worker de e-mail, upload real, relatórios visuais e importação serão ligados a estes contratos sem refazer o modelo principal. Competições e inscrições públicas continuam fora do escopo, conforme decisão anterior.
+As telas existentes estão integradas, inclusive pessoas, participações, arquivos, inscrições, análise, relatórios e notificações internas. Os dados de localStorage/IndexedDB não estão disponíveis no executor e continuam nos navegadores. Worker de e-mail e importação explícita ainda precisam ser ligados a estes contratos sem refazer o modelo principal. Competições e inscrições públicas continuam fora do escopo, conforme decisão anterior.
 
 Contratos e exemplos: [API.md](API.md).
+
+## Perfis e arquivos no portal completo
+
+`school_people.archived` arquiva somente o vínculo/papel naquela escola; `people.archived` continua como estado administrativo da identidade. `version`/`updated_at` do vínculo e timestamp da identidade permitem recusar edição desatualizada. `siep_save_connected_person` grava pessoa, perfil e rascunho da participação em uma transação, sem transformar isso em inscrição. A escola existente não pode ser trocada por edição do vínculo; transferência continua exigindo análise.
+
+Uploads seguem o protocolo de preparação/Storage/finalização já previsto. A gravação do arquivo não pode participar da mesma transação PostgreSQL; falha parcial mantém o cadastro em rascunho e o cliente informa isso explicitamente. `siep_remove_document` remove logicamente a referência atual, preservando o objeto/versões para histórico.
+
+Um revezamento em categoria individual usa seu mínimo próprio em vez do elenco unitário da categoria individual. Categorias de equipe e regras explícitas de elenco continuam aplicando seus limites cumulativamente. Testes cobrem um revezamento real de quatro pessoas e a rejeição quando um limite explícito de equipe é excedido.

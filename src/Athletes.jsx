@@ -1,24 +1,509 @@
-import PersonIdentityFields from './PersonIdentityFields.jsx';
-import {personDataIssues,validCpf} from './personData.js';
-import React, {useState} from 'react';
-import {Users,Plus,Search,Check,X,Pencil,Archive,RotateCcw} from 'lucide-react';
-import {athleteEventPending} from './eventRequirements.js';
-import EventAthleteForm from './EventAthleteForm.jsx';
-import {initialSchools} from './Schools.jsx';
-const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
-export default function Athletes({schoolId,event}){
- const [records,setRecords]=useState(()=>{try{const saved=JSON.parse(localStorage.getItem('siep-athletes'));return Array.isArray(saved)?saved:[]}catch{return []}}),[query,setQuery]=useState(''),[schoolFilter,setSchoolFilter]=useState(schoolId||''),[status,setStatus]=useState('active'),[editing,setEditing]=useState(null),[archive,setArchive]=useState(null),[error,setError]=useState(''),[message,setMessage]=useState('');
- let schools;try{const saved=JSON.parse(localStorage.getItem('siep-schools'));schools=Array.isArray(saved)?saved:initialSchools}catch{schools=initialSchools}
- const schoolName=r=>schools.find(s=>s.id===r.schoolId)?.name||r.school;
- const persist=next=>{try{localStorage.setItem('siep-athletes',JSON.stringify(next));setRecords(next);setError('');return true}catch{setError('Não foi possível salvar no navegador. Verifique o espaço disponível e tente novamente.');return false}};
- const open=r=>{setEditing(r);setError('');setMessage('')};
- const save=e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget));for(const k of Object.keys(data))data[k]=data[k].trim();if(schoolId)data.schoolId=schoolId;data.cpf=data.cpf.replace(/\D/g,'');if(!data.name){setError('Informe o nome do atleta.');return}const coreIssues=personDataIssues(data);if(coreIssues.length){setError(coreIssues.join(' '));return}const school=schools.find(s=>s.id===data.schoolId);if(!school||(school.archived&&editing.schoolId!==school.id)){setError('Selecione uma escola ativa.');return}if(data.cpf&&!validCpf(data.cpf)){setError('Informe um CPF válido ou deixe o campo vazio.');return}if(data.cpf&&records.some(r=>r.id!==editing.id&&r.cpf===data.cpf)){setError('Este CPF já está cadastrado. Consulte também os atletas de outras escolas e os arquivados.');return}if(data.birth&&(!/^\d{4}-\d{2}-\d{2}$/.test(data.birth)||data.birth>today()||data.birth<'1900-01-01')){setError('Informe uma data de nascimento válida, entre 1900 e hoje.');return}if(schoolId&&data.schoolId!==schoolId){setError('Selecione a escola desta área.');return}const entry={...editing,...data,id:editing.id||crypto.randomUUID(),school:school.name,archived:editing.archived||false,updatedAt:new Date().toISOString()};if(persist(editing.id?records.map(r=>r.id===editing.id?entry:r):[...records,entry])){setEditing(null);setMessage('Atleta salvo neste navegador.')}};
- const toggle=()=>{if(persist(records.map(r=>r.id===archive.id?{...r,archived:!r.archived}:r))){setMessage(archive.archived?'Atleta reativado.':'Atleta arquivado. O cadastro foi preservado.');setArchive(null)}};
- const scoped=records.filter(r=>!schoolId||r.schoolId===schoolId);
- const shown=scoped.filter(r=>(!schoolFilter||r.schoolId===schoolFilter)&&(status==='all'||(status==='archived'?r.archived:!r.archived))&&normalize([r.name,r.cpf,schoolName(r)].join(' ').replace(/[.\-]/g,'')).includes(normalize(query.replace(/[.\-]/g,''))));
- return <section>{message&&<div className="school-success" role="status"><Check size={16}/>{message}</div>}{error&&!editing&&<p className="school-error" role="alert">{error}</p>}<div className="panel"><div className="section-title"><span className="record-count">{shown.length} {shown.length===1?'atleta':'atletas'}</span><div className="school-tools"><button className="primary" onClick={()=>open(schoolId?{schoolId}:{})}><Plus size={17}/>Cadastrar atleta</button><label className="search"><Search size={16}/><input aria-label="Buscar atletas" value={query} onChange={e=>setQuery(e.target.value)} placeholder={schoolId?'Nome ou CPF':'Nome, CPF ou escola'}/></label>{!schoolId&&<select disabled={!!schoolId} aria-label="Filtrar por escola" value={schoolFilter} onChange={e=>setSchoolFilter(e.target.value)}><option value="">Todas as escolas</option>{schools.filter(s=>!schoolId||s.id===schoolId).map(s=><option key={s.id} value={s.id}>{s.name}{s.archived?' (arquivada)':''}</option>)}</select>}<select aria-label="Situação dos atletas" value={status} onChange={e=>setStatus(e.target.value)}><option value="active">Ativos</option><option value="archived">Arquivados</option><option value="all">Todos</option></select></div></div>{shown.map(r=><article className="school-row" key={r.id}><span className="avatar pastel">{r.name.split(' ').filter(Boolean).map(n=>n[0]).slice(0,2).join('')}</span><div className="school-info"><h3>{r.name}</h3>{!schoolId&&<p>{schoolName(r)}</p>}<small>{r.birth?`Nascimento: ${r.birth.split('-').reverse().join('/')}`:'Nascimento não informado'}{r.cpf&&` · CPF: ***.***.***-${r.cpf.slice(-2)}`}</small></div><span className={'tag '+(r.archived?'draft':event?!r.eventProfiles?.[String(event.id)]?'draft':r.eventProfiles[String(event.id)].status==='complete'&&!athleteEventPending(r,event).length?'live':'warning':'live')}>{r.archived?'Arquivado':event?!r.eventProfiles?.[String(event.id)]?'Não cadastrado neste evento':r.eventProfiles[String(event.id)].status==='complete'&&!athleteEventPending(r,event).length?'Cadastro completo':'Cadastro em rascunho':'Ativo'}</span><div className="school-actions"><button className="secondary" aria-label={`Editar ${r.name}`} onClick={()=>open(r)}><Pencil size={14}/>Editar</button><button className="secondary" aria-label={`${r.archived?'Reativar':'Arquivar'} ${r.name}`} onClick={()=>{setArchive(r);setError('')}}>{r.archived?<RotateCcw size={14}/>:<Archive size={14}/>} {r.archived?'Reativar':'Arquivar'}</button></div></article>)}{!shown.length&&<div className="empty"><Users size={32}/><h3>{scoped.length?'Nenhum atleta encontrado':'Nenhum atleta cadastrado'}</h3><p>{scoped.length?'Altere os filtros ou faça um novo cadastro.':schoolId?'Cadastre o primeiro atleta neste evento.':'Cadastre o primeiro atleta e selecione a escola.'}</p></div>}</div>
-{editing&&event&&<EventAthleteForm event={event} schoolId={schoolId} schoolName={schools.find(s=>s.id===schoolId)?.name||''} athlete={editing} records={records} onClose={()=>setEditing(null)} onSave={entry=>{if(!persist(editing.id?records.map(r=>r.id===editing.id?entry:r):[...records,entry]))return false;setEditing(null);setMessage('Cadastro salvo para '+event.name);return true}}/>}
-{editing&&!event&&<div className="modal-backdrop"><div className="modal" role="dialog" aria-modal="true" aria-labelledby="athlete-title"><button className="close" aria-label="Fechar cadastro" onClick={()=>setEditing(null)}><X/></button><span className="eyebrow">CADASTRO DE ATLETAS</span><h2 id="athlete-title">{editing.id?'Editar atleta':'Cadastrar atleta'}</h2><p>Dados básicos reutilizáveis. Documentos e demais exigências serão solicitados na inscrição de cada evento.</p><form onSubmit={save}><label>Nome completo *<input autoFocus required name="name" maxLength={150} defaultValue={editing.name||''}/></label>{schoolId?<div className="info-box"><div><strong>Escola: {schools.find(s=>s.id===schoolId)?.name||'Escola indisponível'}</strong><br/>O atleta será vinculado automaticamente à escola desta área.</div></div>:<label>Escola *<select name="schoolId" required defaultValue={editing.schoolId||''}><option value="" disabled>Selecione uma escola</option>{schools.filter(s=>(!schoolId||s.id===schoolId)&&(!s.archived||s.id===editing.schoolId)).map(s=><option key={s.id} value={s.id}>{s.name}{s.archived?' (arquivada)':''}</option>)}</select></label>}{!schools.some(s=>!s.archived)&&!editing.id&&<p className="school-error">Cadastre ou reative uma escola antes de cadastrar atletas.</p>}<PersonIdentityFields person={editing}/>{error&&<p className="school-error" role="alert">{error}</p>}<div className="school-form-footer"><button type="button" className="secondary" onClick={()=>setEditing(null)}>Cancelar</button><button className="primary" type="submit"><Check size={16}/>Salvar atleta</button></div></form></div></div>}
-{archive&&<div className="modal-backdrop"><div className="modal" role="dialog" aria-modal="true" aria-labelledby="archive-athlete-title"><h2 id="archive-athlete-title">{archive.archived?'Reativar':'Arquivar'} atleta?</h2><p>{archive.name} · {schoolName(archive)}</p><div className="info-box">O cadastro será preservado. Nesta etapa, esta ação não altera inscrições em eventos.</div>{error&&<p className="school-error" role="alert">{error}</p>}<div className="school-form-footer"><button className="secondary" onClick={()=>setArchive(null)}>Cancelar</button><button className="primary" onClick={toggle}>Confirmar {archive.archived?'reativação':'arquivamento'}</button></div></div></div>}</section>
+import PersonIdentityFields from "./PersonIdentityFields.jsx";
+import { personDataIssues, validCpf } from "./personData.js";
+import React, { useState } from "react";
+import {
+  Users,
+  Plus,
+  Search,
+  Check,
+  X,
+  Pencil,
+  Archive,
+  RotateCcw,
+} from "lucide-react";
+import { athleteEventPending } from "./eventRequirements.js";
+import EventAthleteForm from "./EventAthleteForm.jsx";
+import { initialSchools } from "./Schools.jsx";
+const normalize = (s) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+export default function Athletes({
+  schoolId,
+  event,
+  records: providedRecords,
+  schools: providedSchools,
+  onPersist,
+  onDocumentDownload,
+  connected = false,
+}) {
+  const [localRecords, setRecords] = useState(() => {
+      if (providedRecords) return [];
+      try {
+        const saved = JSON.parse(localStorage.getItem("siep-athletes"));
+        return Array.isArray(saved) ? saved : [];
+      } catch {
+        return [];
+      }
+    }),
+    [query, setQuery] = useState(""),
+    [schoolFilter, setSchoolFilter] = useState(schoolId || ""),
+    [status, setStatus] = useState("active"),
+    [editing, setEditing] = useState(null),
+    [archive, setArchive] = useState(null),
+    [error, setError] = useState(""),
+    [message, setMessage] = useState("");
+  const records = providedRecords || localRecords;
+  const [busy, setBusy] = useState(false);
+  let schools;
+  try {
+    const saved = JSON.parse(localStorage.getItem("siep-schools"));
+    schools =
+      providedSchools || (Array.isArray(saved) ? saved : initialSchools);
+  } catch {
+    schools = providedSchools || initialSchools;
+  }
+  const schoolName = (r) =>
+    schools.find((s) => s.id === r.schoolId)?.name || r.school;
+  const persist = async (next, entry, options) => {
+    try {
+      if (onPersist) await onPersist(entry, options);
+      else localStorage.setItem("siep-athletes", JSON.stringify(next));
+      setRecords(next);
+      setError("");
+      return true;
+    } catch (error) {
+      setError(
+        onPersist
+          ? error.message
+          : "Não foi possível salvar no navegador. Verifique o espaço disponível e tente novamente.",
+      );
+      return false;
+    }
+  };
+  const open = (r) => {
+    setEditing(r);
+    setError("");
+    setMessage("");
+  };
+  const save = async (e) => {
+    e.preventDefault();
+    if (busy) return;
+    const data = Object.fromEntries(new FormData(e.currentTarget));
+    for (const k of Object.keys(data)) data[k] = data[k].trim();
+    if (schoolId) data.schoolId = schoolId;
+    data.cpf = data.cpf.replace(/\D/g, "");
+    if (!data.name) {
+      setError("Informe o nome do atleta.");
+      return;
+    }
+    const coreIssues = personDataIssues(data);
+    if (coreIssues.length) {
+      setError(coreIssues.join(" "));
+      return;
+    }
+    const school = schools.find((s) => s.id === data.schoolId);
+    if (!school || (school.archived && editing.schoolId !== school.id)) {
+      setError("Selecione uma escola ativa.");
+      return;
+    }
+    if (data.cpf && !validCpf(data.cpf)) {
+      setError("Informe um CPF válido ou deixe o campo vazio.");
+      return;
+    }
+    if (
+      data.cpf &&
+      records.some(
+        (r) =>
+          r.id !== editing.id &&
+          (!connected || r.personId !== editing.personId) &&
+          r.cpf === data.cpf,
+      )
+    ) {
+      setError(
+        "Este CPF já está cadastrado. Consulte também os atletas de outras escolas e os arquivados.",
+      );
+      return;
+    }
+    if (
+      data.birth &&
+      (!/^\d{4}-\d{2}-\d{2}$/.test(data.birth) ||
+        data.birth > today() ||
+        data.birth < "1900-01-01")
+    ) {
+      setError("Informe uma data de nascimento válida, entre 1900 e hoje.");
+      return;
+    }
+    if (schoolId && data.schoolId !== schoolId) {
+      setError("Selecione a escola desta área.");
+      return;
+    }
+    const entry = {
+      ...editing,
+      ...data,
+      id: editing.id || crypto.randomUUID(),
+      school: school.name,
+      archived: editing.archived || false,
+      updatedAt: new Date().toISOString(),
+    };
+    setBusy(true);
+    if (
+      await persist(
+        editing.id
+          ? records.map((r) => (r.id === editing.id ? entry : r))
+          : [...records, entry],
+        entry,
+      )
+    ) {
+      setEditing(null);
+      setMessage(
+        connected ? "Atleta salvo no banco." : "Atleta salvo neste navegador.",
+      );
+    }
+    setBusy(false);
+  };
+  const toggle = async () => {
+    if (busy) return;
+    setBusy(true);
+    const entry = { ...archive, archived: !archive.archived };
+    if (
+      await persist(
+        records.map((r) => (r.id === archive.id ? entry : r)),
+        entry,
+      )
+    ) {
+      setMessage(
+        archive.archived
+          ? "Atleta reativado."
+          : "Atleta arquivado. O cadastro foi preservado.",
+      );
+      setArchive(null);
+    }
+    setBusy(false);
+  };
+  const scoped = records.filter((r) => !schoolId || r.schoolId === schoolId);
+  const shown = scoped.filter(
+    (r) =>
+      (!schoolFilter || r.schoolId === schoolFilter) &&
+      (status === "all" ||
+        (status === "archived" ? r.archived : !r.archived)) &&
+      normalize(
+        [r.name, r.cpf, schoolName(r)].join(" ").replace(/[.\-]/g, ""),
+      ).includes(normalize(query.replace(/[.\-]/g, ""))),
+  );
+  return (
+    <section>
+      {message && (
+        <div className="school-success" role="status">
+          <Check size={16} />
+          {message}
+        </div>
+      )}
+      {error && !editing && (
+        <p className="school-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="panel">
+        <div className="section-title">
+          <span className="record-count">
+            {shown.length} {shown.length === 1 ? "atleta" : "atletas"}
+          </span>
+          <div className="school-tools">
+            <button
+              className="primary"
+              onClick={() => open(schoolId ? { schoolId } : {})}
+            >
+              <Plus size={17} />
+              Cadastrar atleta
+            </button>
+            <label className="search">
+              <Search size={16} />
+              <input
+                aria-label="Buscar atletas"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={schoolId ? "Nome ou CPF" : "Nome, CPF ou escola"}
+              />
+            </label>
+            {!schoolId && (
+              <select
+                disabled={!!schoolId}
+                aria-label="Filtrar por escola"
+                value={schoolFilter}
+                onChange={(e) => setSchoolFilter(e.target.value)}
+              >
+                <option value="">Todas as escolas</option>
+                {schools
+                  .filter((s) => !schoolId || s.id === schoolId)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                      {s.archived ? " (arquivada)" : ""}
+                    </option>
+                  ))}
+              </select>
+            )}
+            <select
+              aria-label="Situação dos atletas"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="active">Ativos</option>
+              <option value="archived">Arquivados</option>
+              <option value="all">Todos</option>
+            </select>
+          </div>
+        </div>
+        {shown.map((r) => (
+          <article className="school-row" key={r.id}>
+            <span className="avatar pastel">
+              {r.name
+                .split(" ")
+                .filter(Boolean)
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join("")}
+            </span>
+            <div className="school-info">
+              <h3>{r.name}</h3>
+              {!schoolId && <p>{schoolName(r)}</p>}
+              <small>
+                {r.birth
+                  ? `Nascimento: ${r.birth.split("-").reverse().join("/")}`
+                  : "Nascimento não informado"}
+                {r.cpf && ` · CPF: ***.***.***-${r.cpf.slice(-2)}`}
+              </small>
+            </div>
+            <span
+              className={
+                "tag " +
+                (r.archived
+                  ? "draft"
+                  : event
+                    ? !r.eventProfiles?.[String(event.id)]
+                      ? "draft"
+                      : r.eventProfiles[String(event.id)].status ===
+                            "complete" && !athleteEventPending(r, event).length
+                        ? "live"
+                        : "warning"
+                    : "live")
+              }
+            >
+              {r.archived
+                ? "Arquivado"
+                : event
+                  ? !r.eventProfiles?.[String(event.id)]
+                    ? "Não cadastrado neste evento"
+                    : r.eventProfiles[String(event.id)].status === "complete" &&
+                        !athleteEventPending(r, event).length
+                      ? "Cadastro completo"
+                      : "Cadastro em rascunho"
+                  : "Ativo"}
+            </span>
+            <div className="school-actions">
+              <button
+                className="secondary"
+                aria-label={`Editar ${r.name}`}
+                onClick={() => open(r)}
+              >
+                <Pencil size={14} />
+                Editar
+              </button>
+              <button
+                className="secondary"
+                aria-label={`${r.archived ? "Reativar" : "Arquivar"} ${r.name}`}
+                onClick={() => {
+                  setArchive(r);
+                  setError("");
+                }}
+              >
+                {r.archived ? <RotateCcw size={14} /> : <Archive size={14} />}{" "}
+                {r.archived ? "Reativar" : "Arquivar"}
+              </button>
+            </div>
+          </article>
+        ))}
+        {!shown.length && (
+          <div className="empty">
+            <Users size={32} />
+            <h3>
+              {scoped.length
+                ? "Nenhum atleta encontrado"
+                : "Nenhum atleta cadastrado"}
+            </h3>
+            <p>
+              {scoped.length
+                ? "Altere os filtros ou faça um novo cadastro."
+                : schoolId
+                  ? "Cadastre o primeiro atleta neste evento."
+                  : "Cadastre o primeiro atleta e selecione a escola."}
+            </p>
+          </div>
+        )}
+      </div>
+      {editing && event && (
+        <EventAthleteForm
+          connected={connected}
+          onDocumentDownload={onDocumentDownload}
+          event={event}
+          schoolId={schoolId}
+          schoolName={schools.find((s) => s.id === schoolId)?.name || ""}
+          athlete={editing}
+          records={records}
+          onClose={() => setEditing(null)}
+          onSave={async (entry, options) => {
+            if (connected) {
+              await onPersist(entry, options);
+              setEditing(null);
+              setMessage("Cadastro salvo para " + event.name);
+              return true;
+            }
+            if (
+              !(await persist(
+                editing.id
+                  ? records.map((r) => (r.id === editing.id ? entry : r))
+                  : [...records, entry],
+                entry,
+                options,
+              ))
+            )
+              return false;
+            setEditing(null);
+            setMessage("Cadastro salvo para " + event.name);
+            return true;
+          }}
+        />
+      )}
+      {editing && !event && (
+        <div className="modal-backdrop">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="athlete-title"
+          >
+            <button
+              className="close"
+              aria-label="Fechar cadastro"
+              onClick={() => setEditing(null)}
+            >
+              <X />
+            </button>
+            <span className="eyebrow">CADASTRO DE ATLETAS</span>
+            <h2 id="athlete-title">
+              {editing.id ? "Editar atleta" : "Cadastrar atleta"}
+            </h2>
+            <p>
+              Dados básicos reutilizáveis. Documentos e demais exigências serão
+              solicitados na inscrição de cada evento.
+            </p>
+            <form onSubmit={save}>
+              <label>
+                Nome completo *
+                <input
+                  autoFocus
+                  required
+                  name="name"
+                  maxLength={150}
+                  defaultValue={editing.name || ""}
+                />
+              </label>
+              {schoolId ? (
+                <div className="info-box">
+                  <div>
+                    <strong>
+                      Escola:{" "}
+                      {schools.find((s) => s.id === schoolId)?.name ||
+                        "Escola indisponível"}
+                    </strong>
+                    <br />O atleta será vinculado automaticamente à escola desta
+                    área.
+                  </div>
+                </div>
+              ) : (
+                <label>
+                  Escola *
+                  <select
+                    name="schoolId"
+                    required
+                    defaultValue={editing.schoolId || ""}
+                  >
+                    <option value="" disabled>
+                      Selecione uma escola
+                    </option>
+                    {schools
+                      .filter(
+                        (s) =>
+                          (!schoolId || s.id === schoolId) &&
+                          (!s.archived || s.id === editing.schoolId),
+                      )
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                          {s.archived ? " (arquivada)" : ""}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
+              {!schools.some((s) => !s.archived) && !editing.id && (
+                <p className="school-error">
+                  Cadastre ou reative uma escola antes de cadastrar atletas.
+                </p>
+              )}
+              <PersonIdentityFields person={editing} />
+              {error && (
+                <p className="school-error" role="alert">
+                  {error}
+                </p>
+              )}
+              <div className="school-form-footer">
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setEditing(null)}
+                >
+                  Cancelar
+                </button>
+                <button className="primary" type="submit" disabled={busy}>
+                  <Check size={16} />
+                  Salvar atleta
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {archive && (
+        <div className="modal-backdrop">
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="archive-athlete-title"
+          >
+            <h2 id="archive-athlete-title">
+              {archive.archived ? "Reativar" : "Arquivar"} atleta?
+            </h2>
+            <p>
+              {archive.name} · {schoolName(archive)}
+            </p>
+            <div className="info-box">
+              O cadastro será preservado. Nesta etapa, esta ação não altera
+              inscrições em eventos.
+            </div>
+            {error && (
+              <p className="school-error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="school-form-footer">
+              <button className="secondary" onClick={() => setArchive(null)}>
+                Cancelar
+              </button>
+              <button className="primary" disabled={busy} onClick={toggle}>
+                Confirmar {archive.archived ? "reativação" : "arquivamento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }

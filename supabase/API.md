@@ -1,6 +1,6 @@
 # Contratos de acesso do SIEP
 
-Estas funções existem no banco; a interface ainda precisa ser ligada a elas. Chamadas do portal usam uma sessão real de Supabase Auth. Não usar o token administrativo do ambiente no cliente. Usuário sem vínculo aprovado pode somente solicitar/acompanhá-lo e consultar o diretório mínimo de escolas.
+O portal conectado já consome os contratos de cadastro, arquivos, inscrições e análise descritos aqui. Chamadas do portal usam uma sessão real de Supabase Auth. Não usar o token administrativo do ambiente no cliente. Usuário sem vínculo aprovado pode somente solicitar/acompanhá-lo e consultar o diretório mínimo de escolas.
 
 ## Leitura e configuração
 
@@ -138,3 +138,16 @@ Campos ausentes, datas/tipos inválidos também podem gerar os códigos padrão 
 `python scripts/provision_institution.py --project-ref oshzcmmbhxvmchjgxztp --email 'titular@exemplo.com'` prepara um cliente/admin. O script é administrativo, não é endpoint do portal. Reserva o endereço em `siep_private.bootstrap_administrators`, sem senha ou envio de mensagem; se já houver conta confirmada, ativa o vínculo. Caso contrário, um trigger do Auth só o ativa após `email_confirmed_at` ser preenchido para o endereço exato reservado. Reserva diferente ou admin preexistente são recusados para impedir substituição acidental.
 
 A autenticação real usa e-mail/senha e PKCE; recuperação volta à raiz com `?recovery=1`. A chave versionada em `publicConfig.js` é somente `anon`, com RLS; o token administrativo permanece no ambiente. Testes de navegador simulam HTTP do provedor e não substituem verificação real do e-mail.
+
+## Portal completo: gravação composta e documentos
+
+`siep_save_connected_person(p_institution_id,p_school_id,p_role,p_data,p_link_id=null,p_create_id=null,p_expected_version=null,p_event_id=null,p_category_ids=null,p_additional_data={},p_expected_person_updated_at=null)` retorna `{person_id,link_id,version,participation}`. Papéis: `athlete`, `staff`, `responsible` (este exige secretaria). `p_data` tem os campos do cadastro de pessoa e do perfil; `archived` é do papel naquela escola, não da identidade global. IDs da pessoa e do vínculo são diferentes.
+
+- Novo cadastro pode enviar UUID estável em `p_create_id`. CPF já existente só é reutilizado se a identidade for autorizada e os dados fixos coincidirem. Não se expõe a identidade de outra escola por CPF.
+- Edição usa `p_link_id` e `p_expected_version`; alteração dos dados reutilizáveis também usa `p_expected_person_updated_at`. O vínculo não pode mudar de escola por esse formulário.
+- `p_event_id` opcional cria/atualiza a participação **em rascunho**, dentro da mesma transação. Campos adicionais da edição não sobrescrevem o contato reutilizável. Completar usa `siep_save_participation` após os arquivos serem finalizados.
+- Perfil arquivado/encerrado não entra em novas inscrições. Arquivar um atleta não arquiva seu papel profissional. Inscrições enviadas/aprovadas exigem correção antes de alterar identidade ou arquivar integrantes.
+
+`siep_remove_document(p_document_id)` autoriza pela participação/escola, impede mudança em cadastro enviado/aprovado, marca a versão como superseded e devolve a participação a rascunho. Não apaga objeto/arquivo.
+
+O cliente conectado faz: gravação composta → remoções lógicas → preparar/enviar/finalizar arquivos → concluir participação, quando solicitado. Uma falha de arquivo é reportada como rascunho preservado para revisão, sem sucesso falso. RLS permanece obrigatória em todas as leituras e no Storage.

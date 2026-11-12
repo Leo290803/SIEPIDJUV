@@ -6,9 +6,9 @@ Para continuar o trabalho em outro chat, leia [CONTINUIDADE.md](CONTINUIDADE.md)
 
 ## Acesso conectado
 
-A tela inicial agora oferece login por e-mail/senha, criação de conta e recuperação de senha via Supabase Auth. Instituições, escolas, eventos e suas configurações usam o banco com RLS; vínculos de responsáveis são solicitados e analisados pelo portal conectado.
+A tela inicial agora oferece login por e-mail/senha, criação de conta e recuperação de senha via Supabase Auth. A navegação completa está conectada ao banco com RLS: painel, instituições, escolas, responsáveis, atletas, comissão técnica, eventos/configurações, inscrições, relatórios e notificações. A área da escola mantém o evento ativo por escola, documentos privados e envio de inscrições para análise.
 
-A demonstração anterior continua no botão **Abrir demonstração local**. Os dados de localStorage/IndexedDB foram preservados, não foram enviados ao banco nem são misturados com os registros conectados. Atletas, comissão, inscrições e uploads ainda permanecem na demonstração até a próxima integração.
+A demonstração anterior continua no botão **Abrir demonstração local**. Os dados de localStorage/IndexedDB foram preservados, não foram enviados ao banco nem são misturados com os registros conectados. Atletas, comissão, participações, documentos e inscrições do portal conectado usam o Supabase; os registros locais anteriores continuam preservados na demonstração, sem importação automática.
 
 O IDJUV já foi provisionado. O endereço do primeiro administrador foi reservado em tabela privada: o titular deve usar **Criar conta**, escolher a própria senha e confirmar o e-mail. A confirmação libera automaticamente o vínculo administrativo preparado; não há senha padrão nem token administrativo no site.
 
@@ -105,19 +105,27 @@ Exemplo: evento com total 2, individuais 1 e coletivas 1; categoria de atletismo
 
 Na área Escola, escolha Trabalhar neste evento uma vez. O topo indica o evento ativo, mantido ao navegar e recarregar. Em Atletas, cadastre ou edite um atleta para preencher a participação dessa edição, incluindo modalidades e anexos. Documentos não são reutilizados automaticamente entre edições. Use Trocar evento para trabalhar em outra edição. Ao montar inscrições, somente atletas com cadastro completo e participação na categoria escolhida ficam disponíveis. Cadastros anteriores sem participação por evento são preservados e precisam ser revisados.
 
-Os anexos ficam em IndexedDB e seus metadados em localStorage; limpar os dados do site remove esses arquivos. Uploads ainda não são enviados a nenhum servidor. A publicação da aplicação não transforma o armazenamento local em compartilhado.
+Na demonstração local, os anexos ficam em IndexedDB e seus metadados em localStorage; limpar os dados do site remove esses arquivos. Somente nesse modo os uploads permanecem no navegador. No portal conectado, o envio e o download usam Storage privado e os metadados da edição. A publicação da aplicação não transforma o armazenamento local em compartilhado.
 
 Cadastros antigos não são apagados quando faltar um dado obrigatório. Revise-os antes de utilizar em novas inscrições. Responsáveis podem ser editados para completar os dados e só podem receber aprovação com os quatro dados válidos. Profissionais incompletos são identificados e precisam ser corrigidos antes de serem selecionados em uma inscrição.
 
 ## Estrutura Supabase
 
-O banco tem onze migrações aplicadas e verificadas, 29 tabelas com RLS, validações no servidor e fluxos de inscrição/análise documentados. Modelo, executor, testes, segurança e integrações pendentes: [supabase/README.md](supabase/README.md). O portal conectado usa instituições, escolas, eventos/configurações e vínculos de responsáveis; os demais módulos e os dados anteriores permanecem na demonstração.
+O banco tem treze migrações aplicadas e verificadas, 29 tabelas com RLS, validações no servidor e fluxos de inscrição/análise documentados. Modelo, executor, testes, segurança e integrações pendentes: [supabase/README.md](supabase/README.md). O portal conectado usa os módulos já construídos; competições e inscrições públicas continuam Em breve. Os dados anteriores dos navegadores permanecem na demonstração.
 
 ## Testar a integração
 
 - `npm test`: regras do produto e mapeamento relacional dos eventos.
 - `npm run build`: aplicação de produção, com demonstração carregada separadamente.
-- `npm run test:database`: PostgreSQL descartável, cinco suítes SQL e três cenários de concorrência.
+- `npm run test:database`: PostgreSQL descartável, seis suítes SQL e três cenários de concorrência.
 - Com `npm run dev` em execução, `npm run test:browser`: Chromium + API simulada, sem criar contas ou enviar mensagens. Requer Chromium do sistema ou `npx playwright install chromium`; `CHROMIUM_PATH` permite outro executável.
 
-O teste de navegador cobre acesso, recuperação, persistência remota simulada, falhas sem falso sucesso, preservação da demonstração, recarga, permissões visuais e layout móvel. Ele não comprova entrega de e-mail nem autenticação real com o provedor.
+O teste de navegador cobre acesso, recuperação, navegação completa, persistência remota simulada, falhas sem falso sucesso, atleta/profissional sem duplicação de pessoa, upload e cadastro na edição, inscrição/envio/aprovação, relatórios/notificações, preservação da demonstração, recarga, permissões visuais e layout móvel. Ele não comprova entrega de e-mail nem autenticação real com o provedor.
+
+## Usar as áreas conectadas
+
+A secretaria tem o menu completo. Para trabalhar no contexto de uma escola, escolha **Escola** na área de trabalho e selecione uma escola autorizada. Escolha **Trabalhar neste evento** uma vez; o banco mantém esse contexto ao navegar/recarregar. O responsável escolar recebe somente a área e as escolas autorizadas pelo vínculo aprovado.
+
+Cadastre ou reutilize o atleta, complete a participação/documentos do evento e monte a inscrição por categoria/prova. Vagas já selecionadas em outras inscrições ficam indisponíveis; rascunhos preservam pendências, e o envio as bloqueia. A secretaria analisa com justificativa, pode devolver com prazo de correção e preserva versões anteriores.
+
+O upload tem etapas: dados/cadastro em rascunho, arquivo no Storage e finalização. Se falhar no meio, a mensagem informa o rascunho preservado para reabrir/revisar. Arquivar um perfil não apaga inscrições históricas nem arquiva outros papéis da mesma pessoa.

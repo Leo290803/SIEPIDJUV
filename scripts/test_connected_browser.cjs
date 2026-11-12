@@ -1,6 +1,7 @@
 // Navegador real + API simulada: não cria contas nem envia e-mails.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const { randomUUID } = require("node:crypto");
 let chromium;
 try {
   ({ chromium } = require("playwright"));
@@ -66,7 +67,20 @@ try {
     event_staff_roles: [],
     school_link_requests: [],
     school_people: [],
+    people: [],
+    event_participations: [],
+    participation_categories: [],
+    participant_documents: [],
+    membership_decisions: [],
+    registrations: [],
+    registration_athletes: [],
+    registration_staff: [],
+    school_event_contexts: [],
+    notifications: [],
+    registration_versions: [],
+    registration_decisions: [],
   };
+  const uploadedPaths = new Set();
   const response = (route, data, status = 200) =>
     route.fulfill({
       status,
@@ -83,7 +97,9 @@ try {
     async (route) => {
       const req = route.request(),
         url = new URL(req.url()),
-        body = req.postDataJSON(),
+        body = req.headers()["content-type"]?.includes("application/json")
+          ? req.postDataJSON()
+          : null,
         method = req.method();
       if (method === "OPTIONS")
         return route.fulfill({
@@ -131,7 +147,222 @@ try {
           return route.fulfill({ status: 204 });
         if (url.pathname.endsWith("/user")) return response(route, user);
       }
+      if (url.pathname.startsWith("/storage/v1/object/")) {
+        const path = url.pathname.split("/siep-documents/")[1];
+        if (method === "POST") {
+          uploadedPaths.add(path);
+          return response(route, {
+            Key: "siep-documents/" + path,
+            Id: randomUUID(),
+          });
+        }
+        return route.fulfill({
+          status: 200,
+          body: Buffer.from("test-image"),
+          contentType: "image/png",
+        });
+      }
       const table = url.pathname.split("/").at(-1);
+      if (table === "siep_save_connected_person") {
+        let link = tables.school_people.find((l) => l.id === body.p_link_id);
+        let person = link
+          ? tables.people.find((p) => p.id === link.person_id)
+          : tables.people.find((p) => p.cpf === body.p_data.cpf);
+        if (!person) {
+          person = {
+            id: body.p_create_id || randomUUID(),
+            institution_id: tenant,
+            full_name: body.p_data.full_name,
+            birth_date: body.p_data.birth_date,
+            cpf: body.p_data.cpf,
+            gender: body.p_data.gender,
+            contact: body.p_data.contact,
+            archived: false,
+            updated_at: new Date().toISOString(),
+          };
+          tables.people.push(person);
+        }
+        if (!link) {
+          link = {
+            id: randomUUID(),
+            institution_id: tenant,
+            school_id: body.p_school_id,
+            person_id: person.id,
+            role: body.p_role,
+            status: body.p_role === "responsible" ? "pending" : "approved",
+            version: 1,
+          };
+          tables.school_people.push(link);
+        }
+        Object.assign(link, {
+          archived: body.p_data.archived,
+          position: body.p_data.position,
+          professional_registration: body.p_data.professional_registration,
+        });
+        link.version++;
+        let part = null;
+        if (body.p_event_id) {
+          part = tables.event_participations.find(
+            (p) => p.person_id === person.id && p.event_id === body.p_event_id,
+          );
+          if (!part) {
+            part = {
+              id: randomUUID(),
+              institution_id: tenant,
+              school_id: body.p_school_id,
+              person_id: person.id,
+              event_id: body.p_event_id,
+            };
+            tables.event_participations.push(part);
+          }
+          Object.assign(part, {
+            status: "draft",
+            additional_data: body.p_additional_data,
+          });
+          tables.participation_categories =
+            tables.participation_categories.filter(
+              (c) => c.participation_id !== part.id,
+            );
+          for (const id of body.p_category_ids || [])
+            tables.participation_categories.push({
+              id: randomUUID(),
+              institution_id: tenant,
+              event_id: body.p_event_id,
+              participation_id: part.id,
+              category_id: id,
+            });
+        }
+        return response(route, {
+          person_id: person.id,
+          link_id: link.id,
+          version: link.version,
+          participation: part,
+        });
+      }
+      if (table === "siep_set_active_event") {
+        tables.school_event_contexts = [
+          {
+            id: randomUUID(),
+            institution_id: tenant,
+            school_id: body.p_school_id,
+            event_id: body.p_event_id,
+          },
+        ];
+        return response(route, null);
+      }
+      if (table === "siep_save_participation") {
+        const part = tables.event_participations.find(
+          (p) =>
+            p.person_id === body.p_person_id && p.event_id === body.p_event_id,
+        );
+        part.status = body.p_complete ? "complete" : "draft";
+        return response(route, {
+          id: part.id,
+          status: part.status,
+          issues: [],
+        });
+      }
+      if (table === "siep_prepare_document") {
+        const part = tables.event_participations.find(
+          (p) => p.id === body.p_participation_id,
+        );
+        const id = randomUUID(),
+          path =
+            tenant + "/" + part.event_id + "/" + part.id + "/" + id + ".png";
+        const d = {
+          id,
+          institution_id: tenant,
+          event_id: part.event_id,
+          participation_id: part.id,
+          requirement_id: body.p_requirement_id,
+          bucket_id: "siep-documents",
+          object_path: path,
+          mime_type: body.p_mime_type,
+          size_bytes: body.p_size_bytes,
+          original_name: body.p_name,
+          status: "pending",
+        };
+        tables.participant_documents.push(d);
+        return response(route, { id, bucket: "siep-documents", path });
+      }
+      if (table === "siep_finalize_document") {
+        const d = tables.participant_documents.find(
+          (d) => d.id === body.p_document_id,
+        );
+        assert.ok(uploadedPaths.has(d.object_path));
+        d.status = "uploaded";
+        return response(route, null);
+      }
+      if (table === "siep_eligible_athletes")
+        return response(
+          route,
+          tables.event_participations
+            .filter((p) => p.status === "complete")
+            .map((p) => ({
+              participation_id: p.id,
+              person_id: p.person_id,
+              full_name: tables.people.find(
+                (person) => person.id === p.person_id,
+              ).full_name,
+            })),
+        );
+      if (table === "siep_preview_registration")
+        return response(route, { issues: [] });
+      if (table === "siep_save_registration") {
+        let r = tables.registrations.find(
+          (r) => r.id === body.p_registration_id,
+        );
+        if (!r) {
+          r = {
+            id: randomUUID(),
+            institution_id: tenant,
+            event_id: body.p_event_id,
+            school_id: body.p_school_id,
+            category_id: body.p_category_id,
+            proof_id: body.p_proof_id,
+            status: "draft",
+            revision: 1,
+          };
+          tables.registrations.push(r);
+        } else r.revision++;
+        tables.registration_athletes = body.p_athletes.map((a) => ({
+          id: randomUUID(),
+          institution_id: tenant,
+          event_id: r.event_id,
+          school_id: r.school_id,
+          registration_id: r.id,
+          participation_id: a.participation_id,
+          person_id: tables.event_participations.find(
+            (p) => p.id === a.participation_id,
+          ).person_id,
+          proof_id: r.proof_id,
+          slot_number: a.slot_number,
+          active: true,
+        }));
+        tables.registration_staff = body.p_staff.map((s) => ({
+          ...s,
+          id: randomUUID(),
+          institution_id: tenant,
+          event_id: r.event_id,
+          school_id: r.school_id,
+          registration_id: r.id,
+        }));
+        return response(route, {
+          id: r.id,
+          status: r.status,
+          revision: r.revision,
+          issues: [],
+        });
+      }
+      if (table === "siep_transition_registration") {
+        const r = tables.registrations.find(
+          (r) => r.id === body.p_registration_id,
+        );
+        r.status = body.p_status;
+        r.revision++;
+        return response(route, r);
+      }
+
       if (table === "siep_save_event_configuration") {
         const ev = tables.events.find((e) => e.id === body.p_event_id);
         if (body.p_expected_version !== ev.configuration_version)
@@ -173,6 +404,7 @@ try {
         const row = {
           ...body,
           configuration_version: 1,
+          updated_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
         };
         tables[table].push(row);
@@ -182,6 +414,7 @@ try {
         const id = url.searchParams.get("id")?.replace("eq.", "");
         const row = tables[table].find((r) => r.id === id);
         Object.assign(row, body);
+        if (table === "events") row.configuration_version++;
         return response(route, row);
       }
       return response(route, { message: "Unexpected method" }, 400);
@@ -289,6 +522,165 @@ try {
     .click();
   await page.getByText("12 a 14 anos", { exact: true }).waitFor();
   assert.equal(tables.event_categories.length, 1);
+  await page
+    .getByRole("tab", { name: "Formulário e documentos", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Adicionar documento", exact: true })
+    .click();
+  await page.getByLabel("Documento 1", { exact: true }).fill("Foto");
+  await page
+    .getByRole("button", {
+      name: "Salvar formulário e documentos",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByText("Configuração salva no banco.", { exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Editar informações do evento", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .locator('select[name="status"]')
+    .selectOption("Inscrições abertas");
+  await page
+    .getByRole("button", { name: "Salvar evento", exact: true })
+    .click();
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  for (const name of [
+    "Visão geral",
+    "Atletas",
+    "Comissão técnica",
+    "Inscrições",
+    "Relatórios",
+    "Notificações",
+  ])
+    assert.equal(
+      await page.getByRole("button", { name, exact: true }).count(),
+      1,
+      "Menu ausente: " + name,
+    );
+  await page.getByRole("button", { name: "Atletas", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Cadastrar atleta", exact: true })
+    .click();
+  await page
+    .getByLabel("Nome completo *", { exact: true })
+    .fill("Atleta conectado");
+  await page.getByLabel("CPF *", { exact: true }).fill("52998224725");
+  await page
+    .getByLabel("Data de nascimento *", { exact: true })
+    .fill("2012-01-01");
+  await page.locator('select[name="gender"]').selectOption("Feminino");
+  await page
+    .getByRole("dialog")
+    .locator('select[name="schoolId"]')
+    .selectOption(tables.schools[0].id);
+  await page
+    .getByRole("button", { name: "Salvar atleta", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Atleta conectado", exact: true })
+    .waitFor();
+  assert.equal(tables.people.length, 1);
+  await page
+    .getByRole("button", { name: "Comissão técnica", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Cadastrar profissional", exact: true })
+    .click();
+  await page
+    .getByLabel("Nome completo *", { exact: true })
+    .fill("Atleta conectado");
+  await page.getByLabel("CPF *", { exact: true }).fill("52998224725");
+  await page
+    .getByLabel("Data de nascimento *", { exact: true })
+    .fill("2012-01-01");
+  await page.locator('select[name="gender"]').selectOption("Feminino");
+  await page
+    .getByRole("dialog")
+    .locator('select[name="schoolId"]')
+    .selectOption(tables.schools[0].id);
+  await page.locator('select[name="position"]').selectOption("Técnico");
+  await page
+    .getByRole("button", { name: "Salvar profissional", exact: true })
+    .click();
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  assert.equal(tables.people.length, 1, "Profissão duplicou pessoa");
+  await page.getByRole("button", { name: "Escola", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Trabalhar neste evento", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Trocar evento", exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "Atletas", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Editar Atleta conectado", exact: true })
+    .click();
+  await page.getByRole("checkbox", { name: /Futsal · 12 a 14 anos/ }).check();
+  await page
+    .getByLabel("Anexar Foto", { exact: true })
+    .setInputFiles({
+      name: "foto.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("fake-image"),
+    });
+  await page
+    .getByRole("button", { name: "Concluir cadastro", exact: true })
+    .click();
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  await page.getByText("Cadastro completo", { exact: true }).waitFor();
+  assert.equal(
+    tables.participant_documents.filter((d) => d.status === "uploaded").length,
+    1,
+  );
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem("siep-athletes")),
+    null,
+  );
+  await page
+    .getByRole("button", { name: "Minhas inscrições", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Nova inscrição neste evento", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("combobox")
+    .first()
+    .selectOption(tables.event_categories[0].id);
+  await page
+    .getByLabel("Atleta 1", { exact: true })
+    .selectOption(tables.event_participations[0].id);
+  await page
+    .getByRole("button", { name: "Salvar rascunho no banco", exact: true })
+    .click();
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  assert.equal(tables.registrations.length, 1);
+  await page
+    .getByRole("button", { name: "Enviar para análise", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Confirmar", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  await page.getByRole("cell", { name: "Enviada", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Secretaria", exact: true }).click();
+  await page.getByRole("button", { name: "Inscrições", exact: true }).click();
+  await page.getByRole("button", { name: "Aprovar", exact: true }).click();
+  await page.getByLabel("Justificativa *", { exact: true }).fill("Conferido");
+  await page.getByRole("button", { name: "Confirmar", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "detached" });
+  await page.getByRole("cell", { name: "Aprovada", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Relatórios", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Exportar inscrições em CSV", exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "Notificações", exact: true }).click();
+  await page
+    .getByText("Nenhuma notificação recebida.", { exact: true })
+    .waitFor();
   await page.reload();
   await page
     .getByRole("button", { name: "Novo evento", exact: true })
@@ -315,12 +707,14 @@ try {
     false,
     "Overflow mobile",
   );
+  await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await page.getByRole("button", { name: "Sair da conta" }).click();
   await page.getByRole("heading", { name: "Acessar o SIEP" }).waitFor();
   isAdmin = false;
   await page.getByLabel("E-mail", { exact: true }).fill(user.email);
   await page.getByLabel("Senha", { exact: true }).fill("senha-de-teste-longa");
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
+  await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await page
     .getByRole("button", { name: "Dados da escola", exact: true })
     .waitFor();
@@ -341,7 +735,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: login, recuperação, demo preservada, escolas assíncronas sem falso sucesso, eventos/configuração, recarga, logout, permissões visuais e mobile; API simulada, sem e-mails reais.",
+    "PASS: navegação completa, login/recuperação, escola, atleta/profissional sem duplicação, documento privado, cadastro na edição, inscrição, envio, aprovação, relatórios, notificações, recarga, permissões, mobile e demo preservada; API simulada.",
   );
   await browser.close();
 })().catch((error) => {

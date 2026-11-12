@@ -2,6 +2,23 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Navegação completa conectada — estado mais recente
+
+O usuário apontou que as telas já construídas haviam desaparecido ao entrar com login e autorizou integrá-las. Esta seção substitui a limitação da entrega anterior: o portal conectado agora mantém a navegação completa.
+
+- Secretaria: Visão geral, Eventos, Escolas, Responsáveis, Atletas, Comissão técnica, Inscrições, Relatórios, Notificações e Instituição. Competições e Inscrições públicas continuam visíveis como Em breve, conforme decisão anterior.
+- Área da escola: Visão geral, Eventos disponíveis, Atletas, Comissão técnica, Minhas inscrições, Notificações e Dados da escola. Responsáveis veem apenas escolas autorizadas pelo banco. Secretaria pode trabalhar nessa área com as próprias permissões administrativas; o seletor não concede direitos.
+- `ConnectedApp.jsx` carrega identidade/acesso; `InstitutionPortal.jsx` coordena o painel e os módulos; `ConnectedForms.jsx` guarda os formulários já conectados; `ConnectedRegistrations.jsx` implementa elenco, posições numeradas, comissão, prévia, envio/correção/aprovação/cancelamento e histórico. O layout administrativo e a navegação móvel foram mantidos.
+- Atletas, comissão técnica e responsáveis reaproveitam os componentes existentes com registros e callbacks assíncronos. O caminho conectado não grava em localStorage/IndexedDB. Uma pessoa pode ter vários papéis/escolas sem duplicar CPF; IDs do vínculo são separados dos IDs da identidade.
+- `portalRepository.js`/`peopleMapping.js` carregam o escopo permitido por RLS. O cadastro reutilizável é separado dos dados adicionais/documentos da edição. O evento ativo é salvo por escola no banco e reutilizado nos formulários.
+- Arquivos são enviados pelo cliente ao Storage privado, após preparar metadados; finalização verifica objeto, MIME e tamanho. O download usa a sessão autorizada. Se uma etapa de upload falhar, o cadastro já gravado fica explicitamente em rascunho para revisão, sem falso sucesso e sem apagar arquivos anteriores.
+- Envio e análise de inscrições usam revisão esperada e RPCs existentes. Rascunhos podem guardar pendências e exibem aviso; envio/aprovação revalidam. Relatórios exportam dados reais da instituição em CSV, com proteção de fórmulas. Notificações internas são da própria conta e podem ser marcadas como lidas; o worker externo de e-mail continua separado.
+- **Treze migrações aplicadas e verificadas**, sem pendências. Novas: `20261112140000_connected_people_and_documents` e `20261112141000_relay_category_limits`. Acrescentam arquivamento/versão por perfil, gravação de identidade+participação em transação, remoção lógica de documento e tratamento do elenco de revezamento. Categorias de equipe continuam acumulando seus limites explícitos.
+- Arquivar atleta não arquiva seu papel de profissional nem a identidade compartilhada. Vínculo encerrado por transferência exige análise; cadastro em inscrição enviada/aprovada exige correção antes de editar/arquivar. Alterações concorrentes de identidade/vínculo são recusadas.
+- Validação: 55 testes JS, build, seis suítes SQL e três cenários com conexões concorrentes; Chromium cobriu painel completo, escola, atleta/profissional com a mesma identidade, cadastro na edição, arquivo, inscrição, envio, aprovação, relatórios/notificações, recarga e permissões/móvel. HTTP do Supabase no teste de navegador é simulado; SQL/RLS são verificados no Supabase real com rollback.
+- Nenhum dado local foi apagado ou importado automaticamente. Os registros de exemplo/localStorage pertencem à demonstração; o banco mostra os registros reais. As contagens anteriores do banco foram preservadas e os fixtures foram desfeitos.
+- Continuam fora desta entrega: importação explícita dos navegadores, worker de e-mail, competições/resultados e inscrições públicas. Não redesenhar nem esconder as telas existentes numa próxima etapa.
+
 ## Integração atual — acesso e primeiras telas conectadas
 
 O usuário autorizou conectar o login e iniciar a integração de instituições, escolas e eventos. Esta atualização substitui as afirmações históricas de que nenhuma tela usa o banco.
