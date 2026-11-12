@@ -2,6 +2,10 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Notificações no cabeçalho
+
+O acesso às notificações foi movido do menu lateral e das abas de acompanhamento para um sino junto de Conta conectada no cabeçalho dos dois portais. O botão indica a quantidade não lida (limite visual 99+), tem rótulo acessível/tooltip e abre a mesma rota de notificações da conta. Em celular, o texto de status é ocultado para manter o sino acessível. Leitura e permissões existentes foram preservadas.
+
 ## Configurações junto do perfil
 
 A tela Instituição saiu da lista principal e é acessada pela engrenagem ao lado do nome/papel do usuário no rodapé da barra lateral. O botão tem rótulo acessível, tooltip e estado ativo. Visível somente ao administrador no portal da Secretaria; a rota e a autorização de administrador foram mantidas.

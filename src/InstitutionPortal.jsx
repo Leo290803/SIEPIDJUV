@@ -246,7 +246,6 @@ export default function InstitutionPortal({
           [Users, "Atletas"],
           [Users, "Comissão técnica"],
           [ClipboardList, "Minhas inscrições"],
-          [Bell, "Notificações"],
           [School, "Dados da escola"],
         ]
       : [
@@ -258,7 +257,6 @@ export default function InstitutionPortal({
           [Users, "Comissão técnica"],
           [ClipboardList, "Inscrições"],
           [BarChart3, "Relatórios"],
-          [Bell, "Notificações"],
           ...(canAdmin
             ? [
                 [Users, "Usuários da Secretaria"],
@@ -386,9 +384,6 @@ export default function InstitutionPortal({
             >
               <Icon size={18} />
               {label}
-              {label === "Notificações" && notifications > 0 && (
-                <span className="number">{notifications}</span>
-              )}
             </button>
           ))}
         </nav>
@@ -463,7 +458,20 @@ export default function InstitutionPortal({
             {institution.name} ·{" "}
             {route.area === "escola" ? "Escola" : "Secretaria"}
           </strong>
-          <span>Conta conectada</span>
+          <div className="portal-header-account">
+            <button
+              className={"header-notifications" + (page === "Notificações" ? " active" : "")}
+              aria-label="Notificações"
+              aria-description={notifications ? `${notifications} notificações não lidas` : "Nenhuma notificação não lida"}
+              title={notifications ? `${notifications} notificações não lidas` : "Notificações"}
+              aria-current={page === "Notificações" ? "page" : undefined}
+              onClick={() => go("Notificações", { primary: true })}
+            >
+              <Bell size={20} aria-hidden="true" />
+              {notifications > 0 && <span className="header-notification-count" aria-hidden="true">{notifications > 99 ? "99+" : notifications}</span>}
+            </button>
+            <span className="portal-account-status">Conta conectada</span>
+          </div>
         </header>
         <main>
           {route.schoolContext && (
@@ -482,7 +490,6 @@ export default function InstitutionPortal({
                   "Atletas",
                   "Comissão técnica",
                   "Minhas inscrições",
-                  "Notificações",
                   "Dados da escola",
                 ].map((label) => (
                   <button
