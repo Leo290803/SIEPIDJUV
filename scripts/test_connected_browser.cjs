@@ -477,11 +477,10 @@ try {
   await page.goto("http://localhost:5173");
   await page.getByRole("heading", { name: "Acessar o SIEP" }).waitFor();
   assert.equal(authCalls, 0);
-  await page.getByRole("button", { name: "Abrir demonstração local" }).click();
-  await page.getByText("Evento local preservado", { exact: true }).waitFor();
-  await page
-    .getByRole("button", { name: "Sair da demonstração e acessar minha conta" })
-    .click();
+  assert.equal(await page.getByRole("button", { name: "Abrir demonstração local" }).count(), 0);
+  await page.goto("http://localhost:5173/demonstracao");
+  await page.getByRole("heading", { name: "Acessar o SIEP" }).waitFor();
+  assert.equal(new URL(page.url()).pathname, "/entrar");
   await page.getByRole("button", { name: "Esqueci minha senha" }).click();
   await page.getByLabel(/^(E-mail|CPF ou e-mail)$/).fill(user.email);
   await page.getByRole("button", { name: "Enviar instruções" }).click();

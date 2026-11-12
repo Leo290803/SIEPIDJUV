@@ -118,7 +118,6 @@ export const publicPaths = [
   "/redefinir-senha",
   "/acesso-pendente",
   "/acesso-negado",
-  "/demonstracao",
 ];
 export function resolveRoute(path) {
   for (const definition of routeDefinitions) {

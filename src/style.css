@@ -68,3 +68,22 @@
 .access-credentials { border:2px solid #739ac5; background:#f3f7fc; margin-bottom:20px; overflow-wrap:anywhere; }
 .access-credentials>.text-btn { float:right; }.access-credentials h2 { font-size:18px; line-height:1.5; color:#173f70; }.access-credentials p { line-height:1.7; }.access-credentials p>strong { font-family:monospace; font-size:18px; letter-spacing:1px; }.access-credentials .eyebrow { display:block; margin-top:8px; }
 @media(max-width:600px){.access-credentials>.text-btn{float:none;display:block;margin:0 0 12px auto}}
+
+/* Login único: layout isolado das telas administrativas. */
+.account-login-shell { background:radial-gradient(ellipse at 20% 10%,#e8eff8 0,transparent 55%),#f4f6fa; padding:32px 20px; }
+.account-login-card { max-width:440px; padding:34px 38px 28px; border:1px solid #dce5ef; border-top:4px solid #214e7c; border-radius:16px; box-shadow:0 16px 48px #1737570a; }
+.account-login-brand { width:240px; height:100px; position:relative; overflow:hidden; margin:0 auto 26px; }
+.account-login-brand>img { position:absolute; width:260px; max-width:none; left:50%; top:50%; transform:translate(-50%,-50%); }
+.account-login-card h1 { font-size:25px; line-height:1.3; letter-spacing:-.5px; margin:0 0 10px; color:#173757; }
+.account-login-card>.form-note { font-size:13px; line-height:1.7; color:#6b7c90; margin:0 0 26px; }
+.account-login-card form fieldset { display:flex; flex-direction:column; gap:20px; }
+.account-login-card form label { display:flex; flex-direction:column; gap:9px; margin:0; font-size:13px; font-weight:600; color:#334b65; }
+.account-login-card input { width:100%; min-height:48px; border:1px solid #ccd8e5; border-radius:7px; padding:12px 13px; font-size:15px; font-weight:400; background:#fff; }
+.account-login-card input:focus { border-color:#739ac5; outline:3px solid #dfeaf7; outline-offset:0; }
+.account-password-field { display:block; position:relative; }.account-password-field>input { padding-right:48px; }
+.account-password-field>button { position:absolute; right:4px; top:4px; height:40px; width:40px; color:#71859b; }
+.account-login-card form .primary { min-height:48px; border-radius:7px; font-size:14px; font-weight:600; gap:12px; margin-top:4px; }
+.account-login-card .account-links { justify-content:center; margin:20px 0 0; }.account-login-card .account-links button { font-size:12px; padding:5px; color:#285d93; }
+.account-login-card .school-error,.account-login-card .school-success { margin:0; font-size:13px; line-height:1.6; }
+.account-access-help { border-top:1px solid #e5ebf2; padding-top:20px; margin:22px 0 0; text-align:center; font-size:12px; color:#7b8b9e; line-height:1.6; }
+@media(max-width:480px){.account-login-shell{padding:24px 16px}.account-login-card{padding:28px 24px 24px;border-radius:12px}.account-login-brand{margin-bottom:22px}.account-login-card h1{font-size:23px}}

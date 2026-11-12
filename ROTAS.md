@@ -14,7 +14,7 @@ O registro central fica em `src/routing/routes.js`. IDs nas URLs nunca concedem 
 | `/recuperar-senha`, `/redefinir-senha` | Recuperação e definição da nova senha |
 | `/acesso-pendente` | Orientação para procurar a Secretaria; não permite solicitar vínculo |
 | `/acesso-negado` | Acesso recusado |
-| `/demonstracao` | Demonstração local explícita |
+| `/demonstracao` | Endereço antigo; redireciona ao login. Demonstração retirada da entrada |
 
 Rotas privadas sem sessão encaminham ao login correspondente, preservando somente retorno interno registrado. Sessão expirada exige novo login. URLs desconhecidas exibem 404. Os aliases `/secretaria`, `/escola` e suas raízes por instituição encaminham ao painel autorizado. Recuperação mantém os callbacks já configurados no Auth.
 

@@ -3,8 +3,9 @@ import { Navigate, useLocation, useNavigate, Link } from "react-router-dom";
 import { resolveRoute, publicPaths } from "./routing/routes.js";
 import { supabase, readableError } from "./data/client.js";
 const ConnectedApp = lazy(() => import("./ConnectedApp.jsx"));
+import { Eye, EyeOff, ArrowRight } from "lucide-react";
 import logo from "../Gemini_Generated_Image_wvkarowvkarowvka-removebg-preview.png";
-export default function AccountGate({ Demo }) {
+export default function AccountGate() {
   const routeLocation = useLocation(),
     navigate = useNavigate(),
     epoch = useRef(0);
@@ -16,7 +17,7 @@ export default function AccountGate({ Demo }) {
         : "login";
   const [session, setSession] = useState(null),
     [ready, setReady] = useState(false),
-    [demo, setDemo] = useState(false),
+    [showPassword, setShowPassword] = useState(false),
     [mode, setMode] = useState(
       new URLSearchParams(location.search).get("recovery") === "1"
         ? "password"
@@ -72,6 +73,7 @@ export default function AccountGate({ Demo }) {
   }, [ready, mode, session]);
   useEffect(() => {
     setMode(authMode);
+    setShowPassword(false);
     setError((current) =>
       authMode === "reset" &&
       current.startsWith("O link de recuperação expirou")
@@ -132,17 +134,7 @@ export default function AccountGate({ Demo }) {
         replace
       />
     );
-  if (routeLocation.pathname === "/demonstracao")
-    return (
-      <>
-        <div className="demo-return">
-          <button className="secondary" onClick={() => navigate("/entrar")}>
-            Sair da demonstração e acessar minha conta
-          </button>
-        </div>
-        <Demo />
-      </>
-    );
+  if (routeLocation.pathname === "/demonstracao") return <Navigate to="/entrar" replace />;
   if (!ready)
     return (
       <div className="account-shell">
@@ -197,14 +189,14 @@ export default function AccountGate({ Demo }) {
     password: "Definir nova senha",
   };
   return (
-    <div className="account-shell">
-      <div className="account-card">
-        <img
+    <div className="account-shell account-login-shell">
+      <div className="account-card account-login-card">
+        <div className="account-login-brand"><img
           src={logo}
           alt="SIEP — Sistema de Inscrições em Eventos e Projetos"
-        />
+        /></div>
         <h1>{titles[mode]}</h1>
-        {mode === "login" && <p className="form-note">Entre com seu CPF ou e-mail e senha. O sistema abrirá a área autorizada para sua conta.</p>}
+        {mode === "login" && <p className="form-note">Entre com suas credenciais para continuar.</p>}
         {mode === "reset" && <p className="form-note">Acesso por CPF: procure a Secretaria para obter ajuda. Esta recuperação por e-mail atende contas que já usam e-mail.</p>}
         <form onSubmit={submit}>
           <fieldset disabled={busy}>
@@ -222,16 +214,16 @@ export default function AccountGate({ Demo }) {
             {mode !== "reset" && (
               <label>
                 {mode === "password" ? "Nova senha" : "Senha"}
-                <input
+                <span className="account-password-field"><input
                   name="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   minLength={mode === "login" ? 1 : 10}
                   maxLength={128}
                   autoComplete={
                     mode === "login" ? "current-password" : "new-password"
                   }
-                />
+                /><button type="button" aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}</button></span>
               </label>
             )}
             {error && (
@@ -252,6 +244,7 @@ export default function AccountGate({ Demo }) {
                   : mode === "password"
                     ? "Salvar senha"
                     : "Entrar"}
+              {mode === "login" && !busy && <ArrowRight size={17} aria-hidden="true" />}
             </button>
           </fieldset>
         </form>
@@ -284,13 +277,7 @@ export default function AccountGate({ Demo }) {
             </button>
           )}
         </div>
-        <hr />
-        <p className="form-note">
-          A demonstração mantém os cadastros anteriores neste navegador.
-        </p>
-        <button className="secondary" onClick={() => navigate("/demonstracao")}>
-          Abrir demonstração local
-        </button>
+        <p className="account-access-help">Precisa de acesso? Procure a Secretaria.</p>
       </div>
     </div>
   );

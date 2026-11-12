@@ -2,6 +2,12 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Login reorganizado e demonstração retirada da entrada
+
+A pedido do usuário, removidos o botão/texto de demonstração e o carregamento do DemoApp na entrada. `/demonstracao` agora redireciona ao login. O arquivo legado e os dados de localStorage/IndexedDB não foram apagados. Não reintroduzir acesso à demonstração no produto.
+
+O login único tem cartão compacto, logo sem o excesso de espaço transparente, campos empilhados, botão de largura completa, controle mostrar/ocultar senha e layout móvel. Fluxos de CPF/e-mail, senha gerada sem troca obrigatória e permissões permanecem. Build e Chromium verificaram login/recuperação, acesso gerenciado e layout desktop/mobile, com HTTP do provedor simulado.
+
 ## Senha gerada sem troca obrigatória — decisão mais recente
 
 O usuário retirou a exigência de troca no primeiro acesso. O responsável entra diretamente na escola autorizada com a senha gerada (ano de nascimento + quatro últimos dígitos do CPF). O frontend não chama mais a verificação de troca; novas contas não recebem a marca administrativa. A migração `20261112180000_remove_required_initial_password_change` remove somente as marcas antigas, sem mudar hashes/senhas, e mantém a RPC de compatibilidade retornando false. São 17 migrações. Não reintroduzir a exigência. Contas que já alteraram sua senha mantêm a senha atual; não redefinir automaticamente.

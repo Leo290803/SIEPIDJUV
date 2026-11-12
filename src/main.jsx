@@ -1,9 +1,8 @@
-import React, { lazy, Suspense } from "react";
+import React, { Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import AccountGate from "./AccountGate.jsx";
 import "./style.css";
-const Demo = lazy(() => import("./DemoApp.jsx"));
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
     <Suspense
@@ -13,7 +12,7 @@ createRoot(document.getElementById("root")).render(
         </div>
       }
     >
-      <AccountGate Demo={Demo} />
+      <AccountGate />
     </Suspense>
   </BrowserRouter>,
 );
