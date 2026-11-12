@@ -132,7 +132,7 @@ export default function ConnectedApp({ session }) {
         new URLSearchParams(location.search).get("retorno"),
       );
       if (requested && path.includes("entrar"))
-        return <Navigate to={requested} replace />;
+        return <Navigate to={accessDecision(resolveRoute(requested), access).allowed ? requested : landingPath(access)} replace />;
       const area =
         rootArea ||
         (alias

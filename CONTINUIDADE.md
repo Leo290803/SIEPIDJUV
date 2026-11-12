@@ -2,6 +2,10 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Login único — decisão mais recente
+
+Removidos os links visuais de escolha Secretaria/Escola. A entrada é única, com CPF ou e-mail e senha. O banco informa os vínculos aprovados e a navegação abre automaticamente a Secretaria para funcionários ou a escola autorizada para responsáveis. URLs antigas de login redirecionam a `/entrar`, preservando retorno interno de links protegidos. Os portais, rotas e permissões continuam separados. Não reintroduzir escolha de área na tela de login.
+
 ## Acesso escolar gerado pela Secretaria — decisão atual (substitui solicitações abertas)
 
 O usuário retirou a inscrição pública de contas e definiu acesso sem e-mail. A Secretaria cadastra o responsável, CPF, nascimento e escola, salva e usa **Gerar acesso**. O botão pede confirmação do responsável/escola. Usuário = CPF com 11 dígitos (preserva zeros iniciais); senha inicial = ano de nascimento + quatro últimos dígitos do CPF. Exemplo fornecido pelo usuário: CPF `04182530217`, nascimento `2003-08-29`, senha inicial `20030217`.

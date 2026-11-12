@@ -8,16 +8,7 @@ export default function AccountGate({ Demo }) {
   const routeLocation = useLocation(),
     navigate = useNavigate(),
     epoch = useRef(0);
-  const entryArea = routeLocation.pathname.startsWith("/secretaria")
-    ? "secretaria"
-    : routeLocation.pathname.startsWith("/escola")
-      ? "escola"
-      : ["secretaria", "escola"].includes(
-            new URLSearchParams(routeLocation.search).get("area"),
-          )
-        ? new URLSearchParams(routeLocation.search).get("area")
-        : "";
-  const entryPath = entryArea ? "/" + entryArea + "/entrar" : "/entrar";
+  const entryPath = "/entrar";
   const authMode = routeLocation.pathname === "/recuperar-senha"
       ? "reset"
       : routeLocation.pathname === "/redefinir-senha"
@@ -132,6 +123,7 @@ export default function AccountGate({ Demo }) {
       setBusy(false);
     }
   }
+  if (["/secretaria/entrar", "/escola/entrar"].includes(routeLocation.pathname)) return <Navigate to={"/entrar" + routeLocation.search} replace />;
   if (routeLocation.pathname.endsWith("/cadastro")) return <Navigate to={entryPath} replace />;
   if (routeLocation.pathname.length > 1 && routeLocation.pathname.endsWith("/"))
     return (
@@ -200,11 +192,7 @@ export default function AccountGate({ Demo }) {
     );
   }
   const titles = {
-    login: routeLocation.pathname.startsWith("/secretaria")
-      ? "Acesso da Secretaria"
-      : routeLocation.pathname.startsWith("/escola")
-        ? "Acesso da Escola"
-        : "Acessar o SIEP",
+    login: "Acessar o SIEP",
     reset: "Recuperar acesso",
     password: "Definir nova senha",
   };
@@ -216,14 +204,7 @@ export default function AccountGate({ Demo }) {
           alt="SIEP — Sistema de Inscrições em Eventos e Projetos"
         />
         <h1>{titles[mode]}</h1>
-        {mode === "login" &&
-          ["/", "/entrar"].includes(routeLocation.pathname) && (
-            <div className="account-links">
-              <Link to="/secretaria/entrar">Acesso da Secretaria</Link>
-              <Link to="/escola/entrar">Acesso da Escola</Link>
-            </div>
-          )}
-        {mode === "login" && <p className="form-note">O acesso é cadastrado pela Secretaria. Entre com seu CPF e a senha inicial entregue pela equipe. Contas existentes por e-mail continuam funcionando.</p>}
+        {mode === "login" && <p className="form-note">Entre com seu CPF ou e-mail e senha. O sistema abrirá a área autorizada para sua conta.</p>}
         {mode === "password" && new URLSearchParams(routeLocation.search).has("primeiro") && <p className="form-note">Este é seu primeiro acesso. Defina uma nova senha com pelo menos 10 caracteres para continuar.</p>}
         {mode === "reset" && <p className="form-note">Acesso por CPF: procure a Secretaria para obter ajuda. Esta recuperação por e-mail atende contas que já usam e-mail.</p>}
         <form onSubmit={submit}>
@@ -282,8 +263,7 @@ export default function AccountGate({ Demo }) {
                 className="text-btn"
                 onClick={() => {
                   navigate(
-                    "/recuperar-senha" +
-                      (entryArea ? "?area=" + entryArea : ""),
+                    "/recuperar-senha",
                   );
                   setError("");
                   setMessage("");

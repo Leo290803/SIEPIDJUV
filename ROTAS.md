@@ -7,7 +7,7 @@ O registro central fica em `src/routing/routes.js`. IDs nas URLs nunca concedem 
 | Caminho | Comportamento |
 | --- | --- |
 | `/`, `/entrar` | Entrada geral; sessão válida segue ao primeiro vínculo autorizado |
-| `/secretaria/entrar`, `/escola/entrar` | Login específico da área |
+| `/secretaria/entrar`, `/escola/entrar` | Endereços antigos; redirecionam ao login único `/entrar` |
 | `/cadastro`, `/secretaria/cadastro`, `/escola/cadastro` | Cadastro público encerrado; redireciona ao login |
 | `/recuperar-senha`, `/redefinir-senha` | Recuperação e definição da nova senha |
 | `/acesso-pendente` | Orientação para procurar a Secretaria; não permite solicitar vínculo |
@@ -46,3 +46,5 @@ Metadados editáveis do Auth não concedem papel. A revogação é aplicada no s
 ## Credenciais escolares geradas pela Secretaria
 
 Cadastro/CPF/nascimento/escola são conferidos em Responsáveis. **Gerar acesso** cria a conta sem e-mail: usuário CPF e senha inicial ano + últimos quatro dígitos. O primeiro login por CPF é encaminhado a `/redefinir-senha?primeiro=1`; o banco bloqueia os dados da escola até a troca. Login por e-mail de contas anteriores continua válido. Recuperação por CPF exige atendimento da Secretaria.
+
+A tela de login não oferece seleção de área. A entrada comum identifica os vínculos do banco e abre o portal autorizado, sem conceder direitos pela URL.

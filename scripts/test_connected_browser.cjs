@@ -759,18 +759,13 @@ try {
   );
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await page.getByRole("button", { name: "Sair da conta" }).click();
-  await page.getByRole("heading", { name: "Acesso da Secretaria" }).waitFor();
+  await page.getByRole("heading", { name: "Acessar o SIEP" }).waitFor();
   isAdmin = false;
   user.user_metadata = { role: "admin", is_admin: true };
   await page.getByLabel(/^(E-mail|CPF ou e-mail)$/).fill(user.email);
   await page.getByLabel("Senha", { exact: true }).fill("senha-de-teste-longa");
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  await page
-    .getByRole("heading", { name: "Acesso não autorizado", exact: true })
-    .waitFor();
-  await page
-    .getByRole("link", { name: "Ir para minha área", exact: true })
-    .click();
+
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await page
     .getByRole("button", { name: "Dados da escola", exact: true })
@@ -843,7 +838,7 @@ try {
     .getByRole("button", { name: "Sair da conta", exact: true })
     .click();
   await page
-    .getByRole("heading", { name: "Acesso da Escola", exact: true })
+    .getByRole("heading", { name: "Acessar o SIEP", exact: true })
     .waitFor();
   await page.goBack();
   await page.getByRole("button", { name: "Entrar", exact: true }).waitFor();
@@ -856,7 +851,7 @@ try {
   );
   await page.goto("http://localhost:5173/secretaria/" + tenant + "/atletas");
   await page
-    .getByRole("heading", { name: "Acesso da Secretaria", exact: true })
+    .getByRole("heading", { name: "Acessar o SIEP", exact: true })
     .waitFor();
   assert.equal(
     new URL(page.url()).searchParams.get("retorno"),
