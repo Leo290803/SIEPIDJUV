@@ -744,6 +744,7 @@ try {
     path: "/tmp/siep-connected-desktop.png",
     fullPage: true,
   });
+  if (process.env.SIEP_LAYOUT_AUDIT) await require("./audit_layout.cjs")({page,tenant,schoolId:tables.schools[0].id,eventId:tables.events[0].id,registrationId:tables.registrations[0]?.id,area:"secretaria"});
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: "/tmp/siep-connected-mobile.png",
@@ -785,6 +786,7 @@ try {
     0,
   );
   assert.ok(new URL(page.url()).pathname.startsWith("/escola/"));
+  if (process.env.SIEP_LAYOUT_AUDIT) await require("./audit_layout.cjs")({page,tenant,schoolId:tables.schools[0].id,eventId:tables.events[0].id,registrationId:tables.registrations[0]?.id,area:"escola"});
   await page.goto(
     "http://localhost:5173/secretaria/" + tenant + "/instituicao",
   );

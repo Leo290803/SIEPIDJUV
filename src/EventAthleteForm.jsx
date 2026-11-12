@@ -427,7 +427,7 @@ export default function EventAthleteForm({
               {birthNotice}
             </p>
           )}
-          <fieldset>
+          <fieldset className="selection-grid">
             {eligibleCategories.map((c) => (
               <label className="checkbox" key={c.id}>
                 <input

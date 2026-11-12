@@ -128,7 +128,7 @@ export function RegistrationEditor({
           {registration ? "Continuar inscrição" : "Novo rascunho"}
         </p>
         <form onSubmit={submit}>
-          <fieldset disabled={busy}>
+          <fieldset className="form-fields" disabled={busy}>
             <label>
               Modalidade e categoria *
               <select
@@ -701,7 +701,7 @@ export default function ConnectedRegistrations({
                 }
               }}
             >
-              <fieldset disabled={busy}>
+              <fieldset className="form-fields" disabled={busy}>
                 <label>
                   Justificativa *
                   <input

@@ -53,14 +53,14 @@ export default function StaffAccounts({ tenant }) {
           {message}
         </p>
       )}
-      <form
+      <form className="portal-form"
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
           save(f.get("email"), f.get("role"), "approved");
         }}
       >
-        <fieldset disabled={busy}>
+        <fieldset className="form-fields" disabled={busy}>
           <div className="form-row">
             <label>
               E-mail da conta confirmada
@@ -74,7 +74,7 @@ export default function StaffAccounts({ tenant }) {
               </select>
             </label>
           </div>
-          <button className="primary">Vincular à Secretaria</button>
+          <div className="school-form-footer"><button className="primary">Vincular à Secretaria</button></div>
         </fieldset>
       </form>
       <div className="table-scroll">

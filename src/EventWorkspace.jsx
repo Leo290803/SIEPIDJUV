@@ -32,7 +32,7 @@ function Functions({ event, onSave }) {
         Habilite as funções permitidas para os profissionais selecionados nas
         inscrições.
       </p>
-      <fieldset>
+      <fieldset className="selection-grid">
         {roles.map((r) => (
           <label className="checkbox" key={r}>
             <input

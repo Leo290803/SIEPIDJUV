@@ -2,6 +2,12 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Revisão geral de alinhamento das telas
+
+A pedido do usuário, revisados os dois portais, todas as cinco abas de evento e os formulários/janelas em larguras de 1440, 1024 e 390 pixels. A grade global de fieldsets comprimindo o conteúdo foi substituída por blocos estruturais e grade explícita somente para opções. Corrigidos campos/ações de eventos, inscrições, Instituição e usuários, alinhamento de rótulos com quebras, formulários de provas no celular e transbordamentos. Não reintroduzir grade de duas colunas em todo `fieldset`.
+
+Relatório e comandos: [REVISAO_VISUAL.md](REVISAO_VISUAL.md). `scripts/audit_layout.cjs` usa os fixtures do teste conectado e gera capturas/medições; execute com `SIEP_LAYOUT_AUDIT=after` e `details`. Os testes não gravam no Supabase real. Permissões, rotas e contratos do banco permanecem os existentes.
+
 ## Notificações no cabeçalho
 
 O acesso às notificações foi movido do menu lateral e das abas de acompanhamento para um sino junto de Conta conectada no cabeçalho dos dois portais. O botão indica a quantidade não lida (limite visual 99+), tem rótulo acessível/tooltip e abre a mesma rota de notificações da conta. Em celular, o texto de status é ocultado para manter o sino acessível. Leitura e permissões existentes foram preservadas.

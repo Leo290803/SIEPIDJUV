@@ -13,7 +13,7 @@ export function InstitutionForm({ institution, onSave }) {
   return (
     <div className="panel">
       <h2>Instituição</h2>
-      <form
+      <form className="portal-form"
         onSubmit={async (e) => {
           e.preventDefault();
           if (busy) return;
@@ -36,7 +36,7 @@ export function InstitutionForm({ institution, onSave }) {
           }
         }}
       >
-        <fieldset disabled={busy}>
+        <fieldset className="form-fields" disabled={busy}>
           <label>
             Nome
             <input
@@ -59,7 +59,7 @@ export function InstitutionForm({ institution, onSave }) {
               {error}
             </p>
           )}
-          <button className="primary">Salvar instituição</button>
+          <div className="school-form-footer"><button className="primary">{busy ? "Salvando…" : "Salvar instituição"}</button></div>
         </fieldset>
       </form>
     </div>
@@ -103,7 +103,7 @@ export function EventForm({ event, onSave, onClose }) {
             }
           }}
         >
-          <fieldset disabled={busy}>
+          <fieldset className="form-fields" disabled={busy}>
             <label>
               Nome do evento
               <input
@@ -220,7 +220,7 @@ export function AccessRequests({ tenant, schools }) {
       )}
       {!rows.length && <p>Nenhuma solicitação recebida.</p>}
       {rows.map((row) => (
-        <form
+        <form className="portal-form"
           key={row.id}
           onSubmit={async (e) => {
             e.preventDefault();
@@ -243,7 +243,7 @@ export function AccessRequests({ tenant, schools }) {
             }
           }}
         >
-          <fieldset disabled={busy}>
+          <fieldset className="form-fields" disabled={busy}>
             <h3>
               {row.requested_identity.full_name} ·{" "}
               {schools.find((s) => s.id === row.link?.school_id)?.name}
