@@ -87,3 +87,7 @@
 .account-login-card .school-error,.account-login-card .school-success { margin:0; font-size:13px; line-height:1.6; }
 .account-access-help { border-top:1px solid #e5ebf2; padding-top:20px; margin:22px 0 0; text-align:center; font-size:12px; color:#7b8b9e; line-height:1.6; }
 @media(max-width:480px){.account-login-shell{padding:24px 16px}.account-login-card{padding:28px 24px 24px;border-radius:12px}.account-login-brand{margin-bottom:22px}.account-login-card h1{font-size:23px}}
+
+.connected-sidebar .profile>div { flex:1; min-width:0; }
+.profile-settings { flex:0 0 34px; width:34px; height:34px; color:#667b93; border:1px solid transparent; border-radius:6px; }
+.profile-settings:hover,.profile-settings.active { background:#eaf0f7; border-color:#d5e1ef; color:#214e7c; }

@@ -2,6 +2,10 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Configurações junto do perfil
+
+A tela Instituição saiu da lista principal e é acessada pela engrenagem ao lado do nome/papel do usuário no rodapé da barra lateral. O botão tem rótulo acessível, tooltip e estado ativo. Visível somente ao administrador no portal da Secretaria; a rota e a autorização de administrador foram mantidas.
+
 ## Login reorganizado e demonstração retirada da entrada
 
 A pedido do usuário, removidos o botão/texto de demonstração e o carregamento do DemoApp na entrada. `/demonstracao` agora redireciona ao login. O arquivo legado e os dados de localStorage/IndexedDB não foram apagados. Não reintroduzir acesso à demonstração no produto.

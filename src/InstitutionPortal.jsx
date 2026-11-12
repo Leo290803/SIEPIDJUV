@@ -261,7 +261,6 @@ export default function InstitutionPortal({
           [Bell, "Notificações"],
           ...(canAdmin
             ? [
-                [Settings, "Instituição"],
                 [Users, "Usuários da Secretaria"],
               ]
             : []),
@@ -423,6 +422,13 @@ export default function InstitutionPortal({
                     : "Responsável escolar"}
               </small>
             </div>
+            {canAdmin && route.area === "secretaria" && <button
+              className={"profile-settings" + (page === "Instituição" ? " active" : "")}
+              aria-label="Configurações da instituição"
+              title="Configurações da instituição"
+              aria-current={page === "Instituição" ? "page" : undefined}
+              onClick={() => go("Instituição", { primary: true })}
+            ><Settings size={19} aria-hidden="true" /></button>}
           </div>
           <button
             className="settings"
