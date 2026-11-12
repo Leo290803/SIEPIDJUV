@@ -1,6 +1,6 @@
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personDataIssues, normalizeCpf } from "./personData.js";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Users, Plus, Search, Check, X } from "lucide-react";
 import { initialSchools } from "./Schools.jsx";
 export const initialResponsibles = [
@@ -34,6 +34,10 @@ export default function Responsibles({
   onPersist,
   onDecide,
   connected = false,
+  routeAction,
+  routeRecordId,
+  onOpenRecord,
+  onCloseRecord,
 }) {
   const [query, setQuery] = useState(""),
     [filter, setFilter] = useState("Todos"),
@@ -50,6 +54,18 @@ export default function Responsibles({
   } catch {
     schools = providedSchools || initialSchools;
   }
+  useEffect(() => {
+    if (!onOpenRecord) return;
+    if (routeAction === "new") setForm({});
+    else if (routeAction === "edit")
+      setForm(records.find((r) => r.id === routeRecordId) || false);
+    else setForm(false);
+    setError("");
+  }, [routeAction, routeRecordId]);
+  const closeRecord = () => {
+    setForm(false);
+    onCloseRecord?.();
+  };
   const persist = async (next, entry) => {
     try {
       if (onPersist) await onPersist(entry);
@@ -140,7 +156,7 @@ export default function Responsibles({
         record,
       )
     ) {
-      setForm(false);
+      closeRecord();
       setMessage(
         form.id
           ? "Dados do responsável atualizados."
@@ -240,7 +256,8 @@ export default function Responsibles({
             <button
               className="primary"
               onClick={() => {
-                setForm(true);
+                if (onOpenRecord) onOpenRecord({});
+                else setForm(true);
                 setError("");
               }}
             >
@@ -319,7 +336,8 @@ export default function Responsibles({
                 className="secondary"
                 aria-label={`Editar responsável ${r.name}`}
                 onClick={() => {
-                  setForm(r);
+                  if (onOpenRecord) onOpenRecord(r);
+                  else setForm(r);
                   setError("");
                 }}
               >
@@ -366,7 +384,7 @@ export default function Responsibles({
             <button
               className="close"
               aria-label="Fechar cadastro"
-              onClick={() => setForm(false)}
+              onClick={closeRecord}
             >
               <X />
             </button>
@@ -467,7 +485,7 @@ export default function Responsibles({
                 <button
                   type="button"
                   className="secondary"
-                  onClick={() => setForm(false)}
+                  onClick={closeRecord}
                 >
                   Cancelar
                 </button>

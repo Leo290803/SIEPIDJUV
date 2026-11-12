@@ -1,6 +1,6 @@
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personDataIssues, validCpf } from "./personData.js";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Users,
   Plus,
@@ -31,6 +31,10 @@ export default function Athletes({
   onPersist,
   onDocumentDownload,
   connected = false,
+  routeAction,
+  routeRecordId,
+  onOpenRecord,
+  onCloseRecord,
 }) {
   const [localRecords, setRecords] = useState(() => {
       if (providedRecords) return [];
@@ -58,6 +62,18 @@ export default function Athletes({
   } catch {
     schools = providedSchools || initialSchools;
   }
+  useEffect(() => {
+    if (!onOpenRecord) return;
+    if (routeAction === "new") setEditing(schoolId ? { schoolId } : {});
+    else if (routeAction === "edit")
+      setEditing(records.find((r) => r.id === routeRecordId) || null);
+    else setEditing(null);
+    setError("");
+  }, [routeAction, routeRecordId]);
+  const closeRecord = () => {
+    setEditing(null);
+    onCloseRecord?.();
+  };
   const schoolName = (r) =>
     schools.find((s) => s.id === r.schoolId)?.name || r.school;
   const persist = async (next, entry, options) => {
@@ -77,6 +93,10 @@ export default function Athletes({
     }
   };
   const open = (r) => {
+    if (onOpenRecord) {
+      onOpenRecord(r);
+      return;
+    }
     setEditing(r);
     setError("");
     setMessage("");
@@ -150,7 +170,7 @@ export default function Athletes({
         entry,
       )
     ) {
-      setEditing(null);
+      closeRecord();
       setMessage(
         connected ? "Atleta salvo no banco." : "Atleta salvo neste navegador.",
       );
@@ -346,11 +366,11 @@ export default function Athletes({
           schoolName={schools.find((s) => s.id === schoolId)?.name || ""}
           athlete={editing}
           records={records}
-          onClose={() => setEditing(null)}
+          onClose={closeRecord}
           onSave={async (entry, options) => {
             if (connected) {
               await onPersist(entry, options);
-              setEditing(null);
+              closeRecord();
               setMessage("Cadastro salvo para " + event.name);
               return true;
             }
@@ -364,7 +384,7 @@ export default function Athletes({
               ))
             )
               return false;
-            setEditing(null);
+            closeRecord();
             setMessage("Cadastro salvo para " + event.name);
             return true;
           }}
@@ -381,7 +401,7 @@ export default function Athletes({
             <button
               className="close"
               aria-label="Fechar cadastro"
-              onClick={() => setEditing(null)}
+              onClick={closeRecord}
             >
               <X />
             </button>
@@ -457,7 +477,7 @@ export default function Athletes({
                 <button
                   type="button"
                   className="secondary"
-                  onClick={() => setEditing(null)}
+                  onClick={closeRecord}
                 >
                   Cancelar
                 </button>

@@ -1,25 +1,48 @@
-import React, { lazy, useEffect, useState } from "react";
+import React, { lazy, useEffect, useRef, useState } from "react";
+import { Navigate, useLocation, useNavigate, Link } from "react-router-dom";
+import { resolveRoute, publicPaths } from "./routing/routes.js";
 import { supabase, readableError } from "./data/client.js";
 const ConnectedApp = lazy(() => import("./ConnectedApp.jsx"));
 import logo from "../Gemini_Generated_Image_wvkarowvkarowvka-removebg-preview.png";
 export default function AccountGate({ Demo }) {
+  const routeLocation = useLocation(),
+    navigate = useNavigate(),
+    epoch = useRef(0);
+  const entryArea = routeLocation.pathname.startsWith("/secretaria")
+    ? "secretaria"
+    : routeLocation.pathname.startsWith("/escola")
+      ? "escola"
+      : ["secretaria", "escola"].includes(
+            new URLSearchParams(routeLocation.search).get("area"),
+          )
+        ? new URLSearchParams(routeLocation.search).get("area")
+        : "";
+  const entryPath = entryArea ? "/" + entryArea + "/entrar" : "/entrar";
+  const authMode = routeLocation.pathname.endsWith("/cadastro")
+    ? "signup"
+    : routeLocation.pathname === "/recuperar-senha"
+      ? "reset"
+      : routeLocation.pathname === "/redefinir-senha"
+        ? "password"
+        : "login";
   const [session, setSession] = useState(null),
     [ready, setReady] = useState(false),
     [demo, setDemo] = useState(false),
     [mode, setMode] = useState(
       new URLSearchParams(location.search).get("recovery") === "1"
         ? "password"
-        : "login",
+        : authMode,
     ),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
   useEffect(() => {
     let active = true;
+    const initialEpoch = epoch.current;
     supabase.auth
       .getSession()
       .then(({ data, error }) => {
-        if (active) {
+        if (active && epoch.current === initialEpoch) {
           setSession(data.session);
           setReady(true);
           if (error) setError(readableError(error));
@@ -35,8 +58,12 @@ export default function AccountGate({ Demo }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!active) return;
+      if (event !== "INITIAL_SESSION") epoch.current++;
       setSession(session);
-      if (event === "PASSWORD_RECOVERY") setMode("password");
+      if (event === "PASSWORD_RECOVERY") {
+        setMode("password");
+        navigate("/redefinir-senha", { replace: true });
+      }
       if (event === "SIGNED_OUT") setMode("login");
       setReady(true);
     });
@@ -48,11 +75,22 @@ export default function AccountGate({ Demo }) {
   useEffect(() => {
     if (ready && mode === "password" && !session) {
       setMode("reset");
+      navigate("/recuperar-senha", { replace: true });
       setError(
         "O link de recuperação expirou ou já foi utilizado. Solicite novas instruções.",
       );
     }
   }, [ready, mode, session]);
+  useEffect(() => {
+    setMode(authMode);
+    setError((current) =>
+      authMode === "reset" &&
+      current.startsWith("O link de recuperação expirou")
+        ? current
+        : "",
+    );
+    setMessage("");
+  }, [authMode]);
   async function submit(e) {
     e.preventDefault();
     if (busy) return;
@@ -92,7 +130,7 @@ export default function AccountGate({ Demo }) {
       if (mode === "password") {
         response = await supabase.auth.updateUser({ password });
         if (!response.error) {
-          history.replaceState(null, "", location.pathname);
+          navigate("/", { replace: true });
           setMode("login");
           setMessage("Senha atualizada.");
         }
@@ -104,11 +142,18 @@ export default function AccountGate({ Demo }) {
       setBusy(false);
     }
   }
-  if (demo)
+  if (routeLocation.pathname.length > 1 && routeLocation.pathname.endsWith("/"))
+    return (
+      <Navigate
+        to={routeLocation.pathname.replace(/\/+$/, "") + routeLocation.search}
+        replace
+      />
+    );
+  if (routeLocation.pathname === "/demonstracao")
     return (
       <>
         <div className="demo-return">
-          <button className="secondary" onClick={() => setDemo(false)}>
+          <button className="secondary" onClick={() => navigate("/entrar")}>
             Sair da demonstração e acessar minha conta
           </button>
         </div>
@@ -121,10 +166,54 @@ export default function AccountGate({ Demo }) {
         <p role="status">Verificando acesso…</p>
       </div>
     );
-  if (session && mode !== "password")
+  if (session && mode !== "password" && authMode !== "password")
     return <ConnectedApp key={session.user.id} session={session} />;
+  const isEntry = [
+    "/",
+    "/entrar",
+    "/secretaria/entrar",
+    "/escola/entrar",
+    "/cadastro",
+    "/secretaria/cadastro",
+    "/escola/cadastro",
+    "/recuperar-senha",
+    "/redefinir-senha",
+  ].includes(routeLocation.pathname);
+  if (!session && !isEntry && routeLocation.pathname !== "/demonstracao") {
+    if (
+      resolveRoute(routeLocation.pathname) ||
+      /^\/(secretaria|escola)\/[^/]+$/.test(routeLocation.pathname) ||
+      ["/secretaria", "/escola", "/acesso-pendente", "/acesso-negado"].includes(
+        routeLocation.pathname,
+      )
+    ) {
+      const entry = routeLocation.pathname.startsWith("/secretaria")
+        ? "/secretaria/entrar"
+        : routeLocation.pathname.startsWith("/escola")
+          ? "/escola/entrar"
+          : "/entrar";
+      return (
+        <Navigate
+          to={entry + "?retorno=" + encodeURIComponent(routeLocation.pathname)}
+          replace
+        />
+      );
+    }
+    return (
+      <div className="account-shell">
+        <div className="account-card">
+          <h1>Página não encontrada</h1>
+          <Link to="/entrar">Acessar o sistema</Link>
+        </div>
+      </div>
+    );
+  }
   const titles = {
-    login: "Acessar o SIEP",
+    login: routeLocation.pathname.startsWith("/secretaria")
+      ? "Acesso da Secretaria"
+      : routeLocation.pathname.startsWith("/escola")
+        ? "Acesso da Escola"
+        : "Acessar o SIEP",
     signup: "Criar minha conta",
     reset: "Recuperar acesso",
     password: "Definir nova senha",
@@ -137,6 +226,13 @@ export default function AccountGate({ Demo }) {
           alt="SIEP — Sistema de Inscrições em Eventos e Projetos"
         />
         <h1>{titles[mode]}</h1>
+        {mode === "login" &&
+          ["/", "/entrar"].includes(routeLocation.pathname) && (
+            <div className="account-links">
+              <Link to="/secretaria/entrar">Acesso da Secretaria</Link>
+              <Link to="/escola/entrar">Acesso da Escola</Link>
+            </div>
+          )}
         <form onSubmit={submit}>
           <fieldset disabled={busy}>
             {mode === "signup" && (
@@ -211,7 +307,10 @@ export default function AccountGate({ Demo }) {
               <button
                 className="text-btn"
                 onClick={() => {
-                  setMode("reset");
+                  navigate(
+                    "/recuperar-senha" +
+                      (entryArea ? "?area=" + entryArea : ""),
+                  );
                   setError("");
                   setMessage("");
                 }}
@@ -221,7 +320,11 @@ export default function AccountGate({ Demo }) {
               <button
                 className="text-btn"
                 onClick={() => {
-                  setMode("signup");
+                  navigate(
+                    entryArea === "secretaria"
+                      ? "/secretaria/cadastro"
+                      : "/escola/cadastro",
+                  );
                   setError("");
                   setMessage("");
                 }}
@@ -233,7 +336,7 @@ export default function AccountGate({ Demo }) {
             <button
               className="text-btn"
               onClick={() => {
-                setMode("login");
+                navigate(entryPath);
                 setError("");
                 setMessage("");
               }}
@@ -246,7 +349,7 @@ export default function AccountGate({ Demo }) {
         <p className="form-note">
           A demonstração mantém os cadastros anteriores neste navegador.
         </p>
-        <button className="secondary" onClick={() => setDemo(true)}>
+        <button className="secondary" onClick={() => navigate("/demonstracao")}>
           Abrir demonstração local
         </button>
       </div>

@@ -1,5 +1,7 @@
 # SIEP — Sistema de Inscrições em Eventos e Projetos
 
+> Atualização de acesso: portais separados em `/secretaria/entrar` e `/escola/entrar`, com rotas e permissões documentadas em [ROTAS.md](ROTAS.md). A migração `20261112150000_portal_access_and_staff_accounts` acrescenta `siep_my_access`, `siep_staff_accounts` e `siep_set_staff_account`. Os dois últimos exigem administrador; a primeira retorna somente os vínculos aprovados da própria conta. São 14 migrações e sete suítes SQL.
+
 Primeira versão navegável em React e Vite, em português, com layout responsivo.
 
 Para continuar o trabalho em outro chat, leia [CONTINUIDADE.md](CONTINUIDADE.md): decisões do produto, estado implementado, pendências e próximos passos do Supabase.

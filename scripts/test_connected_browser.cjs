@@ -38,6 +38,7 @@ try {
     failSchool = true,
     resetRedirect = "",
     authCalls = 0;
+  let isManager = false;
   const tables = {
     institutions: [
       {
@@ -113,6 +114,20 @@ try {
       if (url.pathname.startsWith("/auth/")) {
         authCalls++;
         if (url.pathname.endsWith("/token")) {
+          if(url.searchParams.get('grant_type')==='refresh_token'&&body.refresh_token==='expired-test')return response(route,{error:'invalid_grant',message:'Invalid Refresh Token',msg:'Invalid Refresh Token'},400);
+          if (
+            url.searchParams.get("grant_type") === "password" &&
+            body.password !== "senha-de-teste-longa"
+          )
+            return response(
+              route,
+              {
+                error: "invalid_grant",
+                message: "Invalid login credentials",
+                msg: "Invalid login credentials",
+              },
+              400,
+            );
           const token =
             btoa(JSON.stringify({ alg: "HS256" })) +
             "." +
@@ -363,6 +378,27 @@ try {
         return response(route, r);
       }
 
+      if (table === "siep_my_access")
+        return response(route, [
+          {
+            ...tables.institutions[0],
+            staff_role: isAdmin ? "admin" : isManager ? "manager" : null,
+            schools:
+              isAdmin || isManager
+                ? []
+                : tables.schools.map((s) => ({ id: s.id, name: s.name })),
+          },
+        ]);
+      if (table === "siep_staff_accounts")
+        return isAdmin
+          ? response(
+              route,
+              tables.institution_memberships.map((m) => ({
+                ...m,
+                email: user.email,
+              })),
+            )
+          : response(route, { code: "42501", message: "denied" }, 403);
       if (table === "siep_save_event_configuration") {
         const ev = tables.events.find((e) => e.id === body.p_event_id);
         if (body.p_expected_version !== ev.configuration_version)
@@ -609,25 +645,30 @@ try {
     .click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   assert.equal(tables.people.length, 1, "Profissão duplicou pessoa");
-  await page.getByRole("button", { name: "Escola", exact: true }).click();
+  assert.equal(
+    await page.getByText("Área de trabalho:", { exact: true }).count(),
+    0,
+  );
+  await page.getByRole("button", { name: "Escolas", exact: true }).click();
+  await page.getByRole("button", { name: "Acompanhar", exact: true }).click();
   await page
     .getByRole("button", { name: "Trabalhar neste evento", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Trocar evento", exact: true })
     .waitFor();
-  await page.getByRole("button", { name: "Atletas", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Atletas da escola", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Editar Atleta conectado", exact: true })
     .click();
   await page.getByRole("checkbox", { name: /Futsal · 12 a 14 anos/ }).check();
-  await page
-    .getByLabel("Anexar Foto", { exact: true })
-    .setInputFiles({
-      name: "foto.png",
-      mimeType: "image/png",
-      buffer: Buffer.from("fake-image"),
-    });
+  await page.getByLabel("Anexar Foto", { exact: true }).setInputFiles({
+    name: "foto.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("fake-image"),
+  });
   await page
     .getByRole("button", { name: "Concluir cadastro", exact: true })
     .click();
@@ -642,7 +683,7 @@ try {
     null,
   );
   await page
-    .getByRole("button", { name: "Minhas inscrições", exact: true })
+    .getByRole("button", { name: "Inscrições da escola", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Nova inscrição neste evento", exact: true })
@@ -666,7 +707,9 @@ try {
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page.getByRole("cell", { name: "Enviada", exact: true }).waitFor();
-  await page.getByRole("button", { name: "Secretaria", exact: true }).click();
+  await page
+    .getByRole("button", { name: "← Escolas da instituição", exact: true })
+    .click();
   await page.getByRole("button", { name: "Inscrições", exact: true }).click();
   await page.getByRole("button", { name: "Aprovar", exact: true }).click();
   await page.getByLabel("Justificativa *", { exact: true }).fill("Conferido");
@@ -681,7 +724,13 @@ try {
   await page
     .getByText("Nenhuma notificação recebida.", { exact: true })
     .waitFor();
+  const retainedPath = new URL(page.url()).pathname;
   await page.reload();
+  await page
+    .getByRole("heading", { name: "Notificações da minha conta", exact: true })
+    .waitFor();
+  assert.equal(new URL(page.url()).pathname, retainedPath);
+  await page.getByRole("button", { name: "Visão geral", exact: true }).click();
   await page
     .getByRole("button", { name: "Novo evento", exact: true })
     .waitFor();
@@ -709,11 +758,18 @@ try {
   );
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await page.getByRole("button", { name: "Sair da conta" }).click();
-  await page.getByRole("heading", { name: "Acessar o SIEP" }).waitFor();
+  await page.getByRole("heading", { name: "Acesso da Secretaria" }).waitFor();
   isAdmin = false;
+  user.user_metadata = { role: "admin", is_admin: true };
   await page.getByLabel("E-mail", { exact: true }).fill(user.email);
   await page.getByLabel("Senha", { exact: true }).fill("senha-de-teste-longa");
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Acesso não autorizado", exact: true })
+    .waitFor();
+  await page
+    .getByRole("link", { name: "Ir para minha área", exact: true })
+    .click();
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await page
     .getByRole("button", { name: "Dados da escola", exact: true })
@@ -733,9 +789,110 @@ try {
       .count(),
     0,
   );
+  assert.ok(new URL(page.url()).pathname.startsWith("/escola/"));
+  await page.goto(
+    "http://localhost:5173/secretaria/" + tenant + "/instituicao",
+  );
+  await page
+    .getByRole("heading", { name: "Acesso não autorizado", exact: true })
+    .waitFor();
+  await page.goto(
+    "http://localhost:5173/escola/" +
+      tenant +
+      "/escolas/99999999-9999-4999-8999-999999999999/atletas",
+  );
+  await page
+    .getByRole("heading", { name: "Acesso não autorizado", exact: true })
+    .waitFor();
+  await page.goto("http://localhost:5173/rota-inexistente");
+  await page
+    .getByRole("heading", { name: "Página não encontrada", exact: true })
+    .waitFor();
+  isManager = true;
+  await page.goto("http://localhost:5173/secretaria/" + tenant + "/usuarios");
+  await page
+    .getByRole("heading", { name: "Acesso não autorizado", exact: true })
+    .waitFor();
+  await page.goto("http://localhost:5173/secretaria/" + tenant + "/eventos");
+  await page
+    .getByRole("button", { name: "Novo evento", exact: true })
+    .waitFor();
+  isAdmin = true;
+  isManager = false;
+  await page.goto("http://localhost:5173/secretaria/" + tenant + "/usuarios");
+  await page
+    .getByRole("heading", {
+      name: "Usuários da Secretaria",
+      level: 1,
+      exact: true,
+    })
+    .waitFor();
+  isAdmin = false;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page
+    .getByRole("heading", { name: "Acesso não autorizado", exact: true })
+    .waitFor();
+  await page.goto(
+    "http://localhost:5173/entrar?retorno=https://example.invalid",
+  );
+  await page.getByRole("button", { name: "Abrir menu", exact: true }).waitFor();
+  assert.equal(new URL(page.url()).origin, "http://localhost:5173");
+  await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Sair da conta", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "Acesso da Escola", exact: true })
+    .waitFor();
+  await page.goBack();
+  await page.getByRole("button", { name: "Entrar", exact: true }).waitFor();
+  assert.ok(new URL(page.url()).pathname.includes("entrar"));
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Cadastrar atleta", exact: true })
+      .count(),
+    0,
+  );
+  await page.goto("http://localhost:5173/secretaria/" + tenant + "/atletas");
+  await page
+    .getByRole("heading", { name: "Acesso da Secretaria", exact: true })
+    .waitFor();
+  assert.equal(
+    new URL(page.url()).searchParams.get("retorno"),
+    "/secretaria/" + tenant + "/atletas",
+  );
+  await page.getByLabel("E-mail", { exact: true }).fill(user.email);
+  await page.getByLabel("Senha", { exact: true }).fill("senha-incorreta");
+  await page.getByRole("button", { name: "Entrar", exact: true }).click();
+  await page.getByText("E-mail ou senha inválidos.", { exact: true }).waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Novo evento", exact: true })
+      .count(),
+    0,
+  );
+  await page.goto("http://localhost:5173/redefinir-senha");
+  await page
+    .getByRole("heading", { name: "Recuperar acesso", exact: true })
+    .waitFor();
+  await page
+    .getByText(
+      "O link de recuperação expirou ou já foi utilizado. Solicite novas instruções.",
+      { exact: true },
+    )
+    .waitFor();
+  await page.goto('http://localhost:5173/escola/entrar');
+  await page.getByLabel('E-mail',{exact:true}).fill(user.email);
+  await page.getByLabel('Senha',{exact:true}).fill('senha-de-teste-longa');
+  await page.getByRole('button',{name:'Entrar',exact:true}).click();
+  await page.getByRole('button',{name:'Abrir menu',exact:true}).waitFor();
+  await page.evaluate(()=>{const key=Object.keys(localStorage).find(key=>key.startsWith('sb-')&&key.endsWith('-auth-token'));const session=JSON.parse(localStorage.getItem(key));session.expires_at=1;session.refresh_token='expired-test';localStorage.setItem(key,JSON.stringify(session));});
+  await page.reload();
+  await page.getByRole('button',{name:'Entrar',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Cadastrar atleta',exact:true}).count(),0);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: navegação completa, login/recuperação, escola, atleta/profissional sem duplicação, documento privado, cadastro na edição, inscrição, envio, aprovação, relatórios, notificações, recarga, permissões, mobile e demo preservada; API simulada.",
+    "PASS: navegação completa, login/recuperação, escola, atleta/profissional sem duplicação, documento privado, cadastro na edição, inscrição, envio, aprovação, relatórios, notificações, recarga, permissões, mobile e demo preservada; URLs, recarga, acesso negado, gestor/admin, vínculo escolar, revogação, logout/voltar e redirect seguro; API simulada.",
   );
   await browser.close();
 })().catch((error) => {

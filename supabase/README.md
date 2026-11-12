@@ -1,5 +1,7 @@
 # Banco SIEP
 
+> Atualização de acesso: portais separados em `/secretaria/entrar` e `/escola/entrar`, com rotas e permissões documentadas em [ROTAS.md](../ROTAS.md). A migração `20261112150000_portal_access_and_staff_accounts` acrescenta `siep_my_access`, `siep_staff_accounts` e `siep_set_staff_account`. Os dois últimos exigem administrador; a primeira retorna somente os vínculos aprovados da própria conta. São 14 migrações e sete suítes SQL.
+
 Projeto: `siep` (`oshzcmmbhxvmchjgxztp`). Treze migrações versionadas, aplicadas e verificadas: a base inicial e doze incrementos para os fluxos previstos em CONTINUIDADE.md. O portal conectado usa a navegação completa, com pessoas, participações, arquivos privados, inscrições/análise, relatórios, notificações e área da escola. A demonstração anterior continua separada, sem importação automática.
 
 ## Operação e histórico

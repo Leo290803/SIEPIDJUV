@@ -1,3 +1,7 @@
+import { useNavigate, useLocation } from "react-router-dom";
+import { portalPath, eventTabs, safeReturn } from "./routing/routes.js";
+import AccessState from "./routing/AccessState.jsx";
+import StaffAccounts from "./StaffAccounts.jsx";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
@@ -70,7 +74,10 @@ export default function InstitutionPortal({
   onInstitutionChanged,
   membership,
   repo,
+  route,
 }) {
+  const navigate = useNavigate(),
+    location = useLocation();
   const api = useMemo(() => portalRepository(supabase), []),
     tenant = institution.id,
     canManage = !!membership,
@@ -81,14 +88,8 @@ export default function InstitutionPortal({
     [schools, setSchools] = useState([]),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
-    [page, setPage] = useState("Visão geral"),
-    [area, setArea] = useState(canManage ? "Secretaria" : "Escola"),
-    [schoolId, setSchoolId] = useState(""),
-    [eventId, setEventId] = useState(""),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
-    [form, setForm] = useState(null),
-    [duplicate, setDuplicate] = useState(null),
     [refreshKey, setRefreshKey] = useState(0);
   useEffect(() => {
     let active = true;
@@ -112,25 +113,79 @@ export default function InstitutionPortal({
       active = false;
     };
   }, [repo, api, tenant, refreshKey]);
-  const school =
-      schools.filter((s) => !s.archived).find((s) => s.id === schoolId) ||
-      schools.find((s) => !s.archived),
-    schoolArea = area === "Escola",
-    activeEvent = events.find(
-      (e) =>
-        e.id ===
-          data.contexts.find((c) => c.school_id === school?.id)?.event_id &&
-        e.status === "Inscrições abertas",
-    ),
-    managedEvent = events.find((e) => e.id === eventId);
-  const requests = data.responsibles.filter((r) => r.status === "Pendente");
-  const notifications = data.notifications.filter((n) => !n.read_at).length;
-  const go = (next) => {
+  const page = route.page,
+    schoolArea = route.area === "escola" || route.schoolContext,
+    schoolId = route.schoolId,
+    eventId = route.eventId || "";
+  const school = schools.find((s) => s.id === schoolId);
+  const activeEvent = events.find(
+    (e) =>
+      e.id ===
+        data.contexts.find((c) => c.school_id === school?.id)?.event_id &&
+      e.status === "Inscrições abertas",
+  );
+  const managedEvent = events.find((e) => e.id === eventId);
+  const form =
+    route.action === "newEvent"
+      ? { create: true }
+      : route.action === "editEvent"
+        ? managedEvent
+        : null;
+  const duplicate = route.action === "duplicateEvent" ? managedEvent : null;
+  const requests = data.responsibles.filter((r) => r.status === "Pendente"),
+    notifications = data.notifications.filter((n) => !n.read_at).length;
+  const go = (next, { primary = false, action, recordId } = {}) => {
     setMobileMenu(false);
-    setPage(next);
-    setEventId("");
     setMessage("");
     setError("");
+    navigate(
+      portalPath(route.area, tenant, next, {
+        schoolId: primary && route.area === "secretaria" ? undefined : schoolId,
+        schoolContext: primary ? false : route.schoolContext,
+        action,
+        recordId,
+      }),
+    );
+  };
+  const setPage = (next) => go(next, { primary: true });
+  const setEventId = (id) =>
+    navigate(
+      portalPath("secretaria", tenant, "Eventos", id ? { eventId: id } : {}),
+    );
+  const setSchoolId = (id) =>
+    navigate(
+      portalPath(route.area, tenant, "Visão geral", {
+        schoolId: id,
+        schoolContext: route.schoolContext,
+      }),
+    );
+  const setForm = (value) => {
+    if (!value) {
+      navigate(
+        safeReturn(location.state?.returnTo) ||
+          portalPath(
+            "secretaria",
+            tenant,
+            "Eventos",
+            eventId ? { eventId } : {},
+          ),
+      );
+      return;
+    }
+    navigate(
+      "/secretaria/" +
+        tenant +
+        "/eventos/" +
+        (value.create ? "novo" : value.id + "/editar"),
+      { state: { returnTo: location.pathname } },
+    );
+  };
+  const setDuplicate = (value) => {
+    if (!value) {
+      setEventId(eventId);
+      return;
+    }
+    navigate("/secretaria/" + tenant + "/eventos/" + value.id + "/duplicar");
   };
   async function refresh() {
     const [events, schools, data] = await Promise.all([
@@ -183,33 +238,37 @@ export default function InstitutionPortal({
       (!schoolArea || r.school_id === school?.id) &&
       (!schoolArea || !activeEvent || r.event_id === activeEvent.id),
   );
-  const nav = schoolArea
-    ? [
-        [LayoutDashboard, "Visão geral"],
-        [CalendarDays, "Eventos disponíveis"],
-        [Users, "Atletas"],
-        [Users, "Comissão técnica"],
-        [ClipboardList, "Minhas inscrições"],
-        [Bell, "Notificações"],
-        [School, "Dados da escola"],
-      ]
-    : [
-        [LayoutDashboard, "Visão geral"],
-        [CalendarDays, "Eventos"],
-        [School, "Escolas"],
-        [Users, "Responsáveis"],
-        [Users, "Atletas"],
-        [Users, "Comissão técnica"],
-        [ClipboardList, "Inscrições"],
-        [BarChart3, "Relatórios"],
-        [Bell, "Notificações"],
-        ...(canAdmin ? [[Settings, "Instituição"]] : []),
-      ];
+  const nav =
+    route.area === "escola"
+      ? [
+          [LayoutDashboard, "Visão geral"],
+          [CalendarDays, "Eventos disponíveis"],
+          [Users, "Atletas"],
+          [Users, "Comissão técnica"],
+          [ClipboardList, "Minhas inscrições"],
+          [Bell, "Notificações"],
+          [School, "Dados da escola"],
+        ]
+      : [
+          [LayoutDashboard, "Visão geral"],
+          [CalendarDays, "Eventos"],
+          [School, "Escolas"],
+          [Users, "Responsáveis"],
+          [Users, "Atletas"],
+          [Users, "Comissão técnica"],
+          [ClipboardList, "Inscrições"],
+          [BarChart3, "Relatórios"],
+          [Bell, "Notificações"],
+          ...(canAdmin
+            ? [
+                [Settings, "Instituição"],
+                [Users, "Usuários da Secretaria"],
+              ]
+            : []),
+        ];
   const roleFormSchool = schoolArea ? school?.id : undefined;
   const showPicker =
-    schoolArea &&
-    !activeEvent &&
-    ["Visão geral", "Atletas", "Minhas inscrições"].includes(page);
+    schoolArea && !activeEvent && ["Visão geral", "Atletas"].includes(page);
   const showActive =
     schoolArea &&
     activeEvent &&
@@ -219,6 +278,34 @@ export default function InstitutionPortal({
       "Minhas inscrições",
       "Comissão técnica",
     ].includes(page);
+  const recordLists = {
+    Atletas: data.athletes,
+    "Comissão técnica": data.staff,
+    Responsáveis: data.responsibles,
+  };
+  if (
+    !loading &&
+    ((eventId && !managedEvent) ||
+      (schoolId && !school) ||
+      (route.recordId &&
+        !recordLists[page]?.some(
+          (r) =>
+            r.id === route.recordId && (!schoolId || r.schoolId === schoolId),
+        )) ||
+      (route.registrationId &&
+        !data.registrations.some(
+          (r) =>
+            r.id === route.registrationId &&
+            (!schoolId || r.school_id === schoolId),
+        )))
+  )
+    return (
+      <AccessState
+        kind="missing"
+        access={[institution]}
+        message="Registro indisponível nesta instituição ou escola."
+      />
+    );
   return (
     <div className="app">
       <aside
@@ -233,7 +320,7 @@ export default function InstitutionPortal({
         </button>
         <button
           className="brand official-brand"
-          onClick={() => go("Visão geral")}
+          onClick={() => go("Visão geral", { primary: true })}
         >
           <img
             src={logo}
@@ -271,11 +358,15 @@ export default function InstitutionPortal({
               value={school?.id || ""}
               onChange={(e) => {
                 setSchoolId(e.target.value);
-                go("Visão geral");
               }}
             >
               {schools
-                .filter((s) => !s.archived)
+                .filter(
+                  (s) =>
+                    !s.archived &&
+                    (route.area === "secretaria" ||
+                      institution.schools.some((own) => own.id === s.id)),
+                )
                 .map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -285,14 +376,14 @@ export default function InstitutionPortal({
           </label>
         )}
         <div className="nav-label">
-          {schoolArea ? "ÁREA DA ESCOLA" : "ÁREA DA SECRETARIA"}
+          {route.area === "escola" ? "ÁREA DA ESCOLA" : "ÁREA DA SECRETARIA"}
         </div>
         <nav>
           {nav.map(([Icon, label]) => (
             <button
               key={label}
               className={page === label ? "active" : ""}
-              onClick={() => go(label)}
+              onClick={() => go(label, { primary: true })}
             >
               <Icon size={18} />
               {label}
@@ -302,7 +393,7 @@ export default function InstitutionPortal({
             </button>
           ))}
         </nav>
-        {!schoolArea && (
+        {route.area === "secretaria" && (
           <>
             <div className="nav-label">OUTROS MÓDULOS</div>
             <nav>
@@ -310,7 +401,7 @@ export default function InstitutionPortal({
                 <button
                   key={label}
                   className={page === label ? "active" : ""}
-                  onClick={() => go(label)}
+                  onClick={() => go(label, { primary: true })}
                 >
                   <Settings size={18} />
                   {label}
@@ -363,29 +454,46 @@ export default function InstitutionPortal({
             <Menu size={20} />
           </button>
           <strong>
-            {institution.name} · {schoolArea ? "Escola" : "Secretaria"}
+            {institution.name} ·{" "}
+            {route.area === "escola" ? "Escola" : "Secretaria"}
           </strong>
           <span>Conta conectada</span>
         </header>
         <main>
-          {canManage && (
-            <div className="area-switch">
-              <div>
-                <strong>Área de trabalho:</strong>
-                {["Secretaria", "Escola"].map((value) => (
+          {route.schoolContext && (
+            <div className="panel">
+              <button
+                className="text-btn"
+                onClick={() => go("Escolas", { primary: true })}
+              >
+                ← Escolas da instituição
+              </button>
+              <h2>Acompanhamento de {school?.name || "escola"}</h2>
+              <nav className="school-context-tabs">
+                {[
+                  "Visão geral",
+                  "Eventos disponíveis",
+                  "Atletas",
+                  "Comissão técnica",
+                  "Minhas inscrições",
+                  "Notificações",
+                  "Dados da escola",
+                ].map((label) => (
                   <button
-                    key={value}
-                    disabled={busy}
-                    className={area === value ? "selected" : ""}
-                    onClick={() => {
-                      setArea(value);
-                      go("Visão geral");
-                    }}
+                    key={label}
+                    className={page === label ? "active" : ""}
+                    onClick={() => go(label)}
                   >
-                    {value}
+                    {{
+                      "Visão geral": "Resumo da escola",
+                      "Eventos disponíveis": "Eventos da escola",
+                      Atletas: "Atletas da escola",
+                      "Comissão técnica": "Profissionais da escola",
+                      "Minhas inscrições": "Inscrições da escola",
+                    }[label] || label}
                   </button>
                 ))}
-              </div>
+              </nav>
             </div>
           )}
           {error && (
@@ -588,6 +696,15 @@ export default function InstitutionPortal({
                       <EventWorkspace
                         key={eventId}
                         connected
+                        activeTab={route.tab || "overview"}
+                        onTabChange={(tab) =>
+                          navigate(
+                            portalPath("secretaria", tenant, "Eventos", {
+                              eventId,
+                              tab,
+                            }),
+                          )
+                        }
                         event={managedEvent}
                         onSave={saveConfiguration}
                         saving={busy}
@@ -604,6 +721,14 @@ export default function InstitutionPortal({
                   {page === "Escolas" && !schoolArea && (
                     <Schools
                       records={schools}
+                      onOpenSchool={(school) =>
+                        navigate(
+                          portalPath("secretaria", tenant, "Visão geral", {
+                            schoolId: school.id,
+                            schoolContext: true,
+                          }),
+                        )
+                      }
                       onSaveSchool={async (entry, exists) => {
                         setBusy(true);
                         try {
@@ -651,6 +776,15 @@ export default function InstitutionPortal({
                       schoolId={roleFormSchool}
                       event={schoolArea ? activeEvent : undefined}
                       records={data.athletes}
+                      routeAction={route.action}
+                      routeRecordId={route.recordId}
+                      onOpenRecord={(r) =>
+                        go("Atletas", {
+                          action: r.id ? "edit" : "new",
+                          recordId: r.id,
+                        })
+                      }
+                      onCloseRecord={() => go("Atletas")}
                       schools={schools}
                       onPersist={(entry, options) =>
                         savePerson("athlete", entry, options)
@@ -664,6 +798,15 @@ export default function InstitutionPortal({
                       connected
                       schoolId={roleFormSchool}
                       records={data.staff}
+                      routeAction={route.action}
+                      routeRecordId={route.recordId}
+                      onOpenRecord={(r) =>
+                        go("Comissão técnica", {
+                          action: r.id ? "edit" : "new",
+                          recordId: r.id,
+                        })
+                      }
+                      onCloseRecord={() => go("Comissão técnica")}
                       schools={schools}
                       onPersist={(entry) => savePerson("staff", entry)}
                     />
@@ -673,6 +816,15 @@ export default function InstitutionPortal({
                       <Responsibles
                         connected
                         records={data.responsibles}
+                        routeAction={route.action}
+                        routeRecordId={route.recordId}
+                        onOpenRecord={(r) =>
+                          go("Responsáveis", {
+                            action: r.id ? "edit" : "new",
+                            recordId: r.id,
+                          })
+                        }
+                        onCloseRecord={() => go("Responsáveis")}
                         schools={schools}
                         onPersist={(entry) => savePerson("responsible", entry)}
                         onDecide={async (record, status, reason) => {
@@ -703,6 +855,24 @@ export default function InstitutionPortal({
                           "-" +
                           (schoolArea ? activeEvent?.id : "all")
                         }
+                        routeAction={route.action}
+                        routeRegistrationId={route.registrationId}
+                        onRoute={(action) => {
+                          const base = portalPath(route.area, tenant, page, {
+                            schoolId,
+                            schoolContext: route.schoolContext,
+                          });
+                          navigate(
+                            base +
+                              (action?.id
+                                ? "/" +
+                                  action.id +
+                                  (action.history ? "/historico" : "/editar")
+                                : action
+                                  ? "/nova"
+                                  : ""),
+                          );
+                        }}
                         events={events}
                         schools={schools}
                         data={data}
@@ -838,6 +1008,9 @@ export default function InstitutionPortal({
                           </article>
                         ))}
                     </div>
+                  )}
+                  {page === "Usuários da Secretaria" && canAdmin && (
+                    <StaffAccounts tenant={tenant} />
                   )}
                   {page === "Instituição" && canAdmin && (
                     <InstitutionForm

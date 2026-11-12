@@ -13,6 +13,10 @@ export const supabase = createClient(
   },
 );
 export function readableError(error) {
+  if (
+    error?.message?.includes("Refresh Token") ||
+    ["PGRST301", "PGRST303"].includes(error?.code)
+  ) return "Sua sessão expirou. Entre novamente.";
   if (error?.code === "40001" || error?.code === "PGRST116")
     return "Outro usuário alterou este registro. Recarregue antes de salvar novamente.";
   if (error?.code === "23505")

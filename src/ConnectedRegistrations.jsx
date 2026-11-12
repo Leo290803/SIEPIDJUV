@@ -368,6 +368,9 @@ export default function ConnectedRegistrations({
   event,
   manager,
   onChanged,
+  routeAction,
+  routeRegistrationId,
+  onRoute,
 }) {
   const [query, setQuery] = useState(""),
     [status, setStatus] = useState("all"),
@@ -379,6 +382,43 @@ export default function ConnectedRegistrations({
     [warnings, setWarnings] = useState(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!onRoute) return;
+    let active = true;
+    setStarting(routeAction === "newRegistration");
+    setEditing(
+      routeAction === "editRegistration"
+        ? data.registrations.find((r) => r.id === routeRegistrationId)
+        : null,
+    );
+    setHistory(null);
+    if (routeAction === "registrationHistory") {
+      const r = data.registrations.find((r) => r.id === routeRegistrationId);
+      if (r) {
+        setBusy(true);
+        api
+          .history(tenant, r.id)
+          .then((result) => {
+            if (active) setHistory({ r, ...result });
+          })
+          .catch((error) => {
+            if (active) setError(readableError(error));
+          })
+          .finally(() => {
+            if (active) setBusy(false);
+          });
+      }
+    }
+    return () => {
+      active = false;
+    };
+  }, [routeAction, routeRegistrationId]);
+  const closeRoute = () => {
+    setEditing(null);
+    setStarting(false);
+    setHistory(null);
+    onRoute?.(null);
+  };
   const rows = data.registrations.filter(
     (r) =>
       (!school || r.school_id === school.id) &&
@@ -470,7 +510,10 @@ export default function ConnectedRegistrations({
               ))}
             </select>
             {school && event && (
-              <button className="primary" onClick={() => setStarting(true)}>
+              <button
+                className="primary"
+                onClick={() => (onRoute ? onRoute({}) : setStarting(true))}
+              >
                 <Plus size={16} />
                 Nova inscrição neste evento
               </button>
@@ -532,7 +575,9 @@ export default function ConnectedRegistrations({
                         ) && (
                           <button
                             className="secondary"
-                            onClick={() => setEditing(r)}
+                            onClick={() =>
+                              onRoute ? onRoute({ id: r.id }) : setEditing(r)
+                            }
                           >
                             Continuar
                           </button>
@@ -540,6 +585,10 @@ export default function ConnectedRegistrations({
                         <button
                           className="secondary"
                           onClick={async () => {
+                            if (onRoute) {
+                              onRoute({ id: r.id, history: true });
+                              return;
+                            }
                             setBusy(true);
                             setError("");
                             try {
@@ -592,10 +641,7 @@ export default function ConnectedRegistrations({
           registration={editing}
           data={data}
           api={api}
-          onClose={() => {
-            setEditing(null);
-            setStarting(false);
-          }}
+          onClose={closeRoute}
           onSaved={async (result) => {
             await onChanged();
             setWarnings(
@@ -706,7 +752,7 @@ export default function ConnectedRegistrations({
             <button
               className="close"
               aria-label="Fechar histórico"
-              onClick={() => setHistory(null)}
+              onClick={closeRoute}
             >
               <X />
             </button>

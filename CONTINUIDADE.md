@@ -2,6 +2,19 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Portais separados, autenticação e permissões — atualização mais recente
+
+Esta seção substitui o seletor de área e as contagens das entregas históricas abaixo.
+
+- Entradas independentes: `/secretaria/entrar` e `/escola/entrar`. Após autenticar, a conta só acessa vínculos aprovados retornados por `siep_my_access`, verificados no servidor. O portal conectado não possui seletor Secretaria/Escola.
+- Rotas reais para todos os módulos existentes, abas de evento, cadastro/edição de pessoas e edição/histórico de inscrições. Recarregar, compartilhar URL e voltar mantêm o contexto; `vercel.json` permite abrir URLs internas. Inventário: [ROTAS.md](ROTAS.md).
+- Secretaria: admin e manager. Instituição e Usuários da Secretaria exigem admin. A gestão de usuários associa contas já confirmadas, permite encerrar o vínculo e protege o último administrador; não cria senhas nem envia mensagens.
+- Escola: somente responsável com vínculo aprovado e ativo naquela escola. Ser administrador não cria vínculo escolar. A Secretaria usa o caminho explícito de acompanhamento da escola, mantendo sua identidade administrativa.
+- Sessão obrigatória, retorno interno validado, páginas de acesso negado/404, recuperação de senha e logout. Permissões são revalidadas ao focar a janela e a cada minuto; RLS e RPCs verificam cada operação no banco e bloqueiam a revogação imediatamente.
+- Nova migração versionada `20261112150000_portal_access_and_staff_accounts`: total de 14 migrações, preservando as 29 tabelas públicas e os dados existentes. Não editar migrações aplicadas.
+- Validação: 64 testes JS, sete suítes SQL, três cenários concorrentes PostgreSQL e navegação Chromium com API simulada. SQL/RLS também verificados no Supabase real. A simulação HTTP não comprova entrega de e-mail ou disponibilidade do provedor de autenticação.
+- Demonstração local continua em `/demonstracao`; dados antigos não foram apagados/importados. Competições e inscrições públicas continuam Em breve. Nenhuma publicação do ambiente autorizada ou executada.
+
 ## Navegação completa conectada — estado mais recente
 
 O usuário apontou que as telas já construídas haviam desaparecido ao entrar com login e autorizou integrá-las. Esta seção substitui a limitação da entrega anterior: o portal conectado agora mantém a navegação completa.

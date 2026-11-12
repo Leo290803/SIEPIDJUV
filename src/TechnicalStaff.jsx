@@ -1,6 +1,6 @@
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personDataIssues, normalizeCpf } from "./personData.js";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -40,6 +40,10 @@ export default function TechnicalStaff({
   schools: providedSchools,
   onPersist,
   connected = false,
+  routeAction,
+  routeRecordId,
+  onOpenRecord,
+  onCloseRecord,
 }) {
   const [localRecords, setRecords] = useState(() =>
     providedRecords ? [] : readStaff(),
@@ -61,6 +65,18 @@ export default function TechnicalStaff({
   } catch {
     schools = providedSchools || initialSchools;
   }
+  useEffect(() => {
+    if (!onOpenRecord) return;
+    if (routeAction === "new") setEditing(schoolId ? { schoolId } : {});
+    else if (routeAction === "edit")
+      setEditing(records.find((r) => r.id === routeRecordId) || null);
+    else setEditing(null);
+    setError("");
+  }, [routeAction, routeRecordId]);
+  const closeRecord = () => {
+    setEditing(null);
+    onCloseRecord?.();
+  };
   const schoolName = (record) =>
     schools.find((s) => s.id === record.schoolId)?.name || record.school;
   const scoped = records.filter((r) => !schoolId || r.schoolId === schoolId);
@@ -154,7 +170,7 @@ export default function TechnicalStaff({
         entry,
       )
     ) {
-      setEditing(null);
+      closeRecord();
       setMessage(
         connected
           ? "Profissional salvo no banco."
@@ -164,6 +180,10 @@ export default function TechnicalStaff({
     setBusy(false);
   }
   function open(record) {
+    if (onOpenRecord) {
+      onOpenRecord(record);
+      return;
+    }
     setEditing(record);
     setError("");
     setMessage("");
@@ -341,7 +361,7 @@ export default function TechnicalStaff({
             <button
               className="close"
               aria-label="Fechar cadastro"
-              onClick={() => setEditing(null)}
+              onClick={closeRecord}
             >
               <X />
             </button>
@@ -443,7 +463,7 @@ export default function TechnicalStaff({
                 <button
                   type="button"
                   className="secondary"
-                  onClick={() => setEditing(null)}
+                  onClick={closeRecord}
                 >
                   Cancelar
                 </button>
