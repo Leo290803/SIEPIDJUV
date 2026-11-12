@@ -1,6 +1,22 @@
 # Continuidade do SIEP — contexto para o próximo chat
 
-Atualizado em 11/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+
+## Integração atual — acesso e primeiras telas conectadas
+
+O usuário autorizou conectar o login e iniciar a integração de instituições, escolas e eventos. Esta atualização substitui as afirmações históricas de que nenhuma tela usa o banco.
+
+- `main.jsx` abre `AccountGate`: login/criação/recuperação com Supabase Auth, chave pública e PKCE. A demonstração anterior está em `DemoApp.jsx`, carregada sob escolha explícita. Nenhuma chave administrativa foi embutida no site.
+- `ConnectedApp.jsx` e `src/data/` conectam instituições, escolas (criar/editar/arquivar), eventos (criar/editar/situação/datas), quatro seções de configuração e duplicação. Vínculos de responsáveis podem ser solicitados e analisados com justificativa. Permissões vêm do banco, não de seletor visual.
+- Configuração é salva atomicamente por seção com versão esperada; falha mantém o formulário aberto. Campos, referências, arquivos e dados de outras seções são preservados. Escolas e metadados do evento também rejeitam atualizações desatualizadas.
+- IDJUV provisionado; o e-mail informado pelo usuário foi reservado **em tabela privada**, sem senha e sem envio de mensagem pelo agente. O titular usa Criar conta e confirma o endereço; só a confirmação do Auth ativa a primeira associação de admin. Não criar senha padrão nem pedir token novo.
+- Auth usa `https://siepidjuv.vercel.app` como URL oficial, com callbacks explícitos de confirmação/recuperação e localhost:5173 para desenvolvimento. Confirmação de e-mail foi preservada. Entrega de e-mail real não foi validada.
+- **Onze migrações aplicadas**, sem pendências: às oito anteriores somam-se `20261112130000_connected_event_configuration`, `20261112131000_first_administrator` e `20261112132000_duplicate_disabled_documents`. Não editar arquivos já aplicados.
+- O domínio da API administrativa já é permitido; o domínio `oshzcmmbhxvmchjgxztp.supabase.co` teve conexão negada (proxy 403) no executor. Sua inclusão foi salva em rascunho de rede, com `requires_publish=true`. O agente não publicou o ambiente. Para ativar essa mudança, o usuário revisa/salva o rascunho nas configurações e publica o ambiente; isso não exige outro token e não impede continuar testes independentes.
+- 50 testes JS, build, cinco suítes SQL e três cenários concorrentes passaram. Navegador Chromium foi testado com API simulada: login/recuperação, escolas/eventos/configuração, falhas, recarga, logout, leitura escolar e mobile. Não tratar API simulada como prova de login real ou e-mail entregue.
+- **Preservação:** nenhuma importação automática dos navegadores, nenhum dado local apagado. Portal conectado nunca cai silenciosamente para armazenamento local. Modo demonstração mantém os fluxos antigos identificados como locais.
+- Próxima integração: pessoas/participações, upload real e inscrições consumindo os contratos do banco já existente. CPF como identificador de login continua evolução futura; o login desta entrega é por e-mail verificado.
+- Arquivos operacionais: `scripts/provision_institution.py` reserva o primeiro admin de uma instituição sem criar senha/enviar e-mail. Não usar isso para substituir administradores existentes. Testes e comandos estão no README.
 
 ## Estado atual do banco — prioridade desta continuação
 

@@ -1,6 +1,6 @@
 # Banco SIEP
 
-Projeto: `siep` (`oshzcmmbhxvmchjgxztp`). Oito migrações versionadas, aplicadas e verificadas: a base inicial e sete incrementos para os fluxos previstos em CONTINUIDADE.md. A interface continua em demonstração local; nenhuma tela foi reescrita nesta entrega.
+Projeto: `siep` (`oshzcmmbhxvmchjgxztp`). Onze migrações versionadas, aplicadas e verificadas: a base inicial e dez incrementos para os fluxos previstos em CONTINUIDADE.md. O acesso conectado já usa instituições, escolas, eventos/configurações e vínculos de responsáveis; os demais módulos continuam na demonstração local.
 
 ## Operação e histórico
 
@@ -33,6 +33,9 @@ Esse histórico não é o do Supabase CLI. Não executar os mesmos arquivos dire
 | `20261112000500` | Elegíveis/prévia/recibo, capacidade, proteção do último admin e outbox |
 | `20261112000600` | Evento ativo, identidade com vários papéis, arquivamento e mapeamento legado |
 | `20261112000700` | Limite de escola da comissão técnica também nos rascunhos/snapshots |
+| `20261112130000` | Configuração atômica por seção e exigências desativadas preservadas |
+| `20261112131000` | Reserva privada do primeiro administrador, ativada apenas após confirmar e-mail |
+| `20261112132000` | Duplicação preserva exigências de documentos desativadas |
 
 Os nomes são identificadores de ordenação UTC, não datas de inscrição.
 
@@ -93,7 +96,7 @@ Todas as 29 tabelas públicas têm RLS. `anon` não lê dados nem executa RPCs d
 - Aprovação de responsáveis é da secretaria, com justificativa e histórico. O primeiro administrador é provisionado administrativamente após existir uma conta real no Auth; não há endpoint público para virar administrador.
 - Todas as funções `SECURITY DEFINER` fixam `search_path` e revogam execução pública. Predicados privados recebem apenas a permissão necessária para RLS. Auditoria e históricos são protegidos contra alteração.
 
-As telas de login/recuperação e a vinculação de contas reais à interface ainda precisam ser integradas. Não há contas ou instituições reais provisionadas por estas migrações.
+Login/recuperação e vínculo de contas já estão integrados nas primeiras telas. O IDJUV foi provisionado administrativamente, com o endereço do primeiro admin reservado em tabela privada. Nenhuma senha foi criada; a conta será criada pelo titular e ativada após confirmação do e-mail.
 
 ## Arquivos e histórico
 
@@ -115,12 +118,12 @@ Versões de inscrições preservam a identidade, escola, categoria/prova, docume
 
 ## Validação e limites da entrega
 
-Quatro suítes SQL (`foundation`, `operations`, `security`, `workflow`) cobrem RLS com papéis reais, anon, escopo por escola/cliente, solicitação/aprovação de vínculo, parâmetros das oito regras, exemplo esportivo aprovado, faixa/sexo, documentos, envio/correção/aprovação, duplicação, transferência, histórico e outbox. Fixtures são sempre revertidas.
+Cinco suítes SQL (`foundation`, `operations`, `security`, `workflow`, `connected_configuration`) cobrem RLS com papéis reais, anon, escopo por escola/cliente, solicitação/aprovação de vínculo, parâmetros das oito regras, exemplo esportivo aprovado, faixa/sexo, documentos, envio/correção/aprovação, duplicação, transferência, histórico e outbox. Fixtures são sempre revertidas.
 
 Reexecução após aplicar confirmou zero migrações pendentes, 29 tabelas protegidas, contagens anteriores e bucket preservados e nenhum fixture persistido.
 
 Três testes com conexões PostgreSQL simultâneas cobrem disputa da mesma vaga, disputa da mesma pessoa em vagas diferentes e edição com revisão desatualizada. Esses testes usam somente o PostgreSQL descartável local.
 
-A estrutura não substitui a integração: nenhuma tela usa essas tabelas/RPCs ainda. Os dados de localStorage/IndexedDB não estão disponíveis no executor e continuam nos navegadores. Login, worker de e-mail, upload real, relatórios visuais e importação serão ligados a estes contratos sem refazer o modelo principal. Competições e inscrições públicas continuam fora do escopo, conforme decisão anterior.
+A integração inicial já usa instituições, escolas, eventos/configurações e vínculos; pessoas/participações/inscrições/uploads ainda aguardam integração das telas. Os dados de localStorage/IndexedDB não estão disponíveis no executor e continuam nos navegadores. Worker de e-mail, upload real, relatórios visuais e importação serão ligados a estes contratos sem refazer o modelo principal. Competições e inscrições públicas continuam fora do escopo, conforme decisão anterior.
 
 Contratos e exemplos: [API.md](API.md).

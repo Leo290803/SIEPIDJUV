@@ -4,6 +4,18 @@ Primeira versão navegável em React e Vite, em português, com layout responsiv
 
 Para continuar o trabalho em outro chat, leia [CONTINUIDADE.md](CONTINUIDADE.md): decisões do produto, estado implementado, pendências e próximos passos do Supabase.
 
+## Acesso conectado
+
+A tela inicial agora oferece login por e-mail/senha, criação de conta e recuperação de senha via Supabase Auth. Instituições, escolas, eventos e suas configurações usam o banco com RLS; vínculos de responsáveis são solicitados e analisados pelo portal conectado.
+
+A demonstração anterior continua no botão **Abrir demonstração local**. Os dados de localStorage/IndexedDB foram preservados, não foram enviados ao banco nem são misturados com os registros conectados. Atletas, comissão, inscrições e uploads ainda permanecem na demonstração até a próxima integração.
+
+O IDJUV já foi provisionado. O endereço do primeiro administrador foi reservado em tabela privada: o titular deve usar **Criar conta**, escolher a própria senha e confirmar o e-mail. A confirmação libera automaticamente o vínculo administrativo preparado; não há senha padrão nem token administrativo no site.
+
+A configuração pública do projeto está em `src/data/publicConfig.js`. Vercel pode usar os valores padrão ou sobrescrever `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` com URL e chave **pública**. Nunca usar `service_role` ou `SUPABASE_ACCESS_TOKEN` nessas variáveis.
+
+O login real pelo executor depende da liberação do domínio `oshzcmmbhxvmchjgxztp.supabase.co` na rede do ambiente. A inclusão está salva em rascunho, não publicada. Testes no navegador usam API simulada; as migrações e RLS são testadas também no Supabase real com rollback.
+
 ## Executar
 
 Requer Node.js 22 ou superior e npm.
@@ -77,7 +89,7 @@ Use o checkout existente. Não é necessário criar um worktree.
 
 ## Limites atuais
 
-Este é um protótipo funcional de interface, sem backend. Os cadastros iniciais de eventos, escolas e responsáveis são exemplos. Os indicadores usam os registros locais, sem representar inscrições reais enviadas. A seleção de área serve para demonstração e não aplica controle de acesso. Os filtros de escola são apenas de interface, sem isolamento de segurança; todos os dados permanecem no mesmo navegador. Cadastros e decisões de vínculo dos responsáveis são persistidos neste navegador e não concedem acesso real. Não inserir dados pessoais reais.
+O modo de demonstração descrito abaixo é um protótipo local; o acesso conectado de instituições/escolas/eventos está descrito acima. Os cadastros iniciais de eventos, escolas e responsáveis são exemplos. Os indicadores usam os registros locais, sem representar inscrições reais enviadas. A seleção de área serve para demonstração e não aplica controle de acesso. Os filtros de escola são apenas de interface, sem isolamento de segurança; todos os dados permanecem no mesmo navegador. Cadastros e decisões de vínculo dos responsáveis são persistidos neste navegador e não concedem acesso real. Não inserir dados pessoais reais.
 
 Autenticação por CPF, recuperação de acesso, separação segura entre instituições, armazenamento online dos cadastros/documentos, envio de inscrições, análise e notificações ainda serão implementados no servidor. Eventos salvos no navegador não são publicados.
 
@@ -99,4 +111,13 @@ Cadastros antigos não são apagados quando faltar um dado obrigatório. Revise-
 
 ## Estrutura Supabase
 
-O banco tem oito migrações aplicadas e verificadas, 29 tabelas com RLS, validações no servidor e fluxos de inscrição/análise documentados. Modelo, executor, testes, segurança e integrações pendentes: [supabase/README.md](supabase/README.md). A interface permanece em demonstração local, sem integração com o banco nesta etapa.
+O banco tem onze migrações aplicadas e verificadas, 29 tabelas com RLS, validações no servidor e fluxos de inscrição/análise documentados. Modelo, executor, testes, segurança e integrações pendentes: [supabase/README.md](supabase/README.md). O portal conectado usa instituições, escolas, eventos/configurações e vínculos de responsáveis; os demais módulos e os dados anteriores permanecem na demonstração.
+
+## Testar a integração
+
+- `npm test`: regras do produto e mapeamento relacional dos eventos.
+- `npm run build`: aplicação de produção, com demonstração carregada separadamente.
+- `npm run test:database`: PostgreSQL descartável, cinco suítes SQL e três cenários de concorrência.
+- Com `npm run dev` em execução, `npm run test:browser`: Chromium + API simulada, sem criar contas ou enviar mensagens. Requer Chromium do sistema ou `npx playwright install chromium`; `CHROMIUM_PATH` permite outro executável.
+
+O teste de navegador cobre acesso, recuperação, persistência remota simulada, falhas sem falso sucesso, preservação da demonstração, recarga, permissões visuais e layout móvel. Ele não comprova entrega de e-mail nem autenticação real com o provedor.

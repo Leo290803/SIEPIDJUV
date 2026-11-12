@@ -130,3 +130,11 @@ Essas funções privadas não são endpoints públicos do PostgREST e não são 
 | `P0002` | Registro indisponível |
 
 Campos ausentes, datas/tipos inválidos também podem gerar os códigos padrão de conversão/not-null do PostgreSQL. Toda falha desfaz a operação; não salvar parcialmente no cliente como se o servidor tivesse aceitado. Erros de rede com resultado de commit desconhecido exigem consultar a revisão atual antes de reenviar.
+
+## Configuração conectada e primeiro administrador
+
+`siep_save_event_configuration(p_event_id,p_expected_version,p_section,p_payload)` salva `sports`, `rules`, `requirements` ou `functions` em transação, após autorizar a secretaria e conferir a versão atual. Retorna a nova versão. A camada `sectionPayload` em `src/data/eventMapping.js` define os arrays normalizados: modalidades/categorias/provas, regras, campos/documentos ou funções. Não aceita substituir registros de outro evento pelo ID. Registros de configuração ausentes são desativados/ocultados, preservando referências históricas; regras removidas são excluídas após confirmação no editor. Exigências desativadas não são solicitadas em novos cadastros e conservam os documentos antigos.
+
+`python scripts/provision_institution.py --project-ref oshzcmmbhxvmchjgxztp --email 'titular@exemplo.com'` prepara um cliente/admin. O script é administrativo, não é endpoint do portal. Reserva o endereço em `siep_private.bootstrap_administrators`, sem senha ou envio de mensagem; se já houver conta confirmada, ativa o vínculo. Caso contrário, um trigger do Auth só o ativa após `email_confirmed_at` ser preenchido para o endereço exato reservado. Reserva diferente ou admin preexistente são recusados para impedir substituição acidental.
+
+A autenticação real usa e-mail/senha e PKCE; recuperação volta à raiz com `?recovery=1`. A chave versionada em `publicConfig.js` é somente `anon`, com RLS; o token administrativo permanece no ambiente. Testes de navegador simulam HTTP do provedor e não substituem verificação real do e-mail.
