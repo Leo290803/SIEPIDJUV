@@ -253,7 +253,7 @@ export default function Responsibles({
         <span className="eyebrow">ACESSO DO RESPONSÁVEL</span>
         <h2>{accessResult.school}</h2>
         <p>Usuário (CPF): <strong>{accessResult.username}</strong></p>
-        {accessResult.created ? <><p>Senha inicial: <strong>{accessResult.initial_password}</strong></p><p>Entregue estes dados diretamente ao responsável. A troca de senha será exigida no primeiro acesso. Nenhum e-mail foi enviado.</p></> : <p>A conta já existia. A senha atual foi preservada.</p>}
+        {accessResult.created ? <><p>Senha inicial: <strong>{accessResult.initial_password}</strong></p><p>Entregue estes dados diretamente ao responsável. Nenhum e-mail foi enviado.</p></> : <p>A conta já existia. A senha atual foi preservada.</p>}
       </div>}
       <div className="panel">
         <div className="section-title">
@@ -352,7 +352,7 @@ export default function Responsibles({
                 Editar
               </button>
               {connected && onProvision && ["Pendente", "Aprovado"].includes(r.status) && !r.userId && <button className="primary" disabled={busy || !r.cpf || !r.birth} onClick={async () => {
-                if (!window.confirm(`Gerar acesso de ${r.name}, CPF ${r.cpf}, à escola ${schoolName(r)}? A senha inicial será o ano de nascimento + os 4 últimos dígitos do CPF, com troca no primeiro acesso.`)) return;
+                if (!window.confirm(`Gerar acesso de ${r.name}, CPF ${r.cpf}, à escola ${schoolName(r)}? A senha inicial será o ano de nascimento + os 4 últimos dígitos do CPF.`)) return;
                 setBusy(true); setError(""); setMessage(""); setAccessResult(null);
                 try { const result = await onProvision(r); setAccessResult(result); setMessage(`Acesso liberado para ${result.school}.`); }
                 catch (error) { setError(error.message); }

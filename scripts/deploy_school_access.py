@@ -4,10 +4,11 @@ import argparse,json,os,uuid,urllib.request,urllib.error
 from pathlib import Path
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--project-ref',required=True)
+parser.add_argument('--function',choices=['provision-school-access','cpf-login'])
 args=parser.parse_args()
 token=os.environ['SUPABASE_ACCESS_TOKEN']
 root=Path(__file__).resolve().parents[1]
-for slug in ['provision-school-access','cpf-login']:
+for slug in ([args.function] if args.function else ['provision-school-access','cpf-login']):
  boundary='siep-'+uuid.uuid4().hex
  metadata=json.dumps({'entrypoint_path':'index.ts','verify_jwt':False,'name':slug})
  content=(root/'supabase/functions'/slug/'index.ts').read_bytes()

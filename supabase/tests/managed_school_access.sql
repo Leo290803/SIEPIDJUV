@@ -29,13 +29,7 @@ begin
   execute 'reset role';
   perform set_config('request.jwt.claim.sub',account::text,true);
   execute 'set local role authenticated';
-  if not public.siep_password_change_required() or public.siep_my_access()<>'[]'::jsonb or exists(select 1 from public.schools where id=school) then raise exception 'Senha inicial liberou dados antes da troca';end if;
-  execute 'reset role';
-  update auth.users set raw_user_meta_data='{"siep_initial_password":false}' where id=account;
-  if not siep_private.password_change_required() then raise exception 'Metadado público removeu troca obrigatória';end if;
-  update auth.users set encrypted_password='hash-changed' where id=account;
-  execute 'set local role authenticated';
-  if public.siep_password_change_required() or public.siep_my_access()->0->'schools'->0->>'id'<>school::text then raise exception 'Troca de senha não liberou somente a escola correta';end if;
+  if public.siep_password_change_required() or public.siep_my_access()->0->'schools'->0->>'id'<>school::text then raise exception 'Acesso inicial exigiu troca ou liberou escola incorreta';end if;
   execute 'reset role';
   execute 'set local role service_role';
   for i in 1..9 loop perform public.siep_cpf_login_account('52998224725');end loop;

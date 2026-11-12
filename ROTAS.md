@@ -1,5 +1,7 @@
 # Rotas e permissões do SIEP
 
+> **Atualização:** a senha gerada permite entrada direta, sem troca obrigatória no primeiro acesso. Migração `20261112180000_remove_required_initial_password_change`: 17 migrações. Senhas existentes preservadas.
+
 O registro central fica em `src/routing/routes.js`. IDs nas URLs nunca concedem autorização: o cliente consulta `siep_my_access`, e o banco aplica RLS/RPC em cada operação.
 
 ## Entradas e sessão

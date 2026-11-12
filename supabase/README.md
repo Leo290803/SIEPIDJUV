@@ -1,5 +1,7 @@
 # Banco SIEP
 
+> **Atualização:** a senha gerada permite entrada direta, sem troca obrigatória no primeiro acesso. Migração `20261112180000_remove_required_initial_password_change`: 17 migrações. Senhas existentes preservadas.
+
 > Estado mais recente: 16 migrações e nove suítes SQL. Cadastro público desativado no Auth e RPCs de solicitação abertas revogadas. Secretaria gera acesso escolar sem e-mail; usuário CPF, senha inicial ano de nascimento + quatro últimos dígitos do CPF, com troca obrigatória antes de acessar dados. Endpoints versionados em `functions/` e implantação em `scripts/deploy_school_access.py`. Detalhes em API.md e ../CONTINUIDADE.md.
 
 > Atualização de acesso: portais separados em `/secretaria/entrar` e `/escola/entrar`, com rotas e permissões documentadas em [ROTAS.md](../ROTAS.md). A migração `20261112150000_portal_access_and_staff_accounts` acrescenta `siep_my_access`, `siep_staff_accounts` e `siep_set_staff_account`. Os dois últimos exigem administrador; a primeira retorna somente os vínculos aprovados da própria conta. São 14 migrações e sete suítes SQL.

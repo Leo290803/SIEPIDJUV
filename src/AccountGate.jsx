@@ -205,7 +205,6 @@ export default function AccountGate({ Demo }) {
         />
         <h1>{titles[mode]}</h1>
         {mode === "login" && <p className="form-note">Entre com seu CPF ou e-mail e senha. O sistema abrirá a área autorizada para sua conta.</p>}
-        {mode === "password" && new URLSearchParams(routeLocation.search).has("primeiro") && <p className="form-note">Este é seu primeiro acesso. Defina uma nova senha com pelo menos 10 caracteres para continuar.</p>}
         {mode === "reset" && <p className="form-note">Acesso por CPF: procure a Secretaria para obter ajuda. Esta recuperação por e-mail atende contas que já usam e-mail.</p>}
         <form onSubmit={submit}>
           <fieldset disabled={busy}>

@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
     let initial: string | null = null;
     if (!account) {
       initial = context.birth_date.slice(0, 4) + context.cpf.slice(-4);
-      const created = await fetch(base + '/auth/v1/admin/users', { method: 'POST', headers: { apikey: service, Authorization: 'Bearer ' + service, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: context.cpf + '@cpf.siep.invalid', password: initial, email_confirm: true, user_metadata: { display_name: context.name }, app_metadata: { siep_initial_password: true } }) });
+      const created = await fetch(base + '/auth/v1/admin/users', { method: 'POST', headers: { apikey: service, Authorization: 'Bearer ' + service, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: context.cpf + '@cpf.siep.invalid', password: initial, email_confirm: true, user_metadata: { display_name: context.name } }) });
       if (!created.ok) return reply({ error: 'Não foi possível gerar a conta. Confira o cadastro e tente novamente. Nenhum acesso foi liberado nesta tentativa.' }, 400);
       account = (await created.json()).id;
     }

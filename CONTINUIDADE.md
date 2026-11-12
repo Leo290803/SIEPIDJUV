@@ -2,6 +2,12 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Senha gerada sem troca obrigatória — decisão mais recente
+
+O usuário retirou a exigência de troca no primeiro acesso. O responsável entra diretamente na escola autorizada com a senha gerada (ano de nascimento + quatro últimos dígitos do CPF). O frontend não chama mais a verificação de troca; novas contas não recebem a marca administrativa. A migração `20261112180000_remove_required_initial_password_change` remove somente as marcas antigas, sem mudar hashes/senhas, e mantém a RPC de compatibilidade retornando false. São 17 migrações. Não reintroduzir a exigência. Contas que já alteraram sua senha mantêm a senha atual; não redefinir automaticamente.
+
+Validados build, 69 testes JS, nove suítes SQL no Supabase com rollback e fluxo de geração/login CPF no navegador com HTTP simulado. A alteração remove a obrigação de trocar, sem bloquear a API de alteração voluntária de senha do Auth.
+
 ## Login único — decisão mais recente
 
 Removidos os links visuais de escolha Secretaria/Escola. A entrada é única, com CPF ou e-mail e senha. O banco informa os vínculos aprovados e a navegação abre automaticamente a Secretaria para funcionários ou a escola autorizada para responsáveis. URLs antigas de login redirecionam a `/entrar`, preservando retorno interno de links protegidos. Os portais, rotas e permissões continuam separados. Não reintroduzir escolha de área na tela de login.
