@@ -1,105 +1,86 @@
 import React, { useState, useEffect } from "react";
 import { supabase, readableError } from "./data/client.js";
-export function PendingAccess({ onRefresh }) {
+export function PendingAccess({ onRefresh, institutionSlug = "idjuv" }) {
   const [schools, setSchools] = useState([]),
+    [selectedId, setSelectedId] = useState(""),
+    [confirmed, setConfirmed] = useState(false),
+    [name, setName] = useState(""),
     [error, setError] = useState(""),
-    [message, setMessage] = useState(""),
+    [sentSchool, setSentSchool] = useState(null),
     [busy, setBusy] = useState(false),
-    [searched, setSearched] = useState(false);
-  async function search(e) {
-    e.preventDefault();
-    const slug = new FormData(e.currentTarget).get("slug").trim().toLowerCase();
-    setBusy(true);
+    [loading, setLoading] = useState(true);
+  const selectedSchool = schools.find(s => s.id === selectedId);
+  async function loadSchools() {
+    setLoading(true);
     setError("");
-    setSchools([]);
-    setSearched(false);
     try {
-      const { data, error } = await supabase.rpc("siep_school_directory", {
-        p_institution_slug: slug,
-      });
+      const { data, error } = await supabase.rpc("siep_school_directory", { p_institution_slug: institutionSlug });
       if (error) throw error;
       setSchools(data || []);
-      setSearched(true);
-    } catch (error) {
-      setError(readableError(error));
-    } finally {
-      setBusy(false);
-    }
+    } catch (error) { setError(readableError(error)); }
+    finally { setLoading(false); }
   }
+  useEffect(() => {
+    loadSchools();
+    supabase.auth.getUser().then(({ data }) => {
+      setName(current => current || data.user?.user_metadata?.display_name || "");
+    }).catch(() => {});
+  }, [institutionSlug]);
   async function request(e) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || !selectedSchool || !confirmed) return;
+    const target = selectedSchool;
     setBusy(true);
     setError("");
     try {
-      const f = new FormData(e.currentTarget);
-      const { error } = await supabase.rpc("siep_request_school_link", {
-        p_school_id: f.get("school"),
-        p_data: {
-          full_name: f.get("name").trim(),
-          birth_date: f.get("birth"),
-          cpf: f.get("cpf"),
-          gender: f.get("gender"),
-        },
-      });
+      const { error } = await supabase.rpc("siep_request_school_access", { p_school_id: target.id, p_full_name: name.trim() });
       if (error) throw error;
-      setMessage("Solicitação enviada. O acesso será liberado após aprovação da Secretaria.");
-    } catch (error) {
-      setError(readableError(error));
-    } finally {
-      setBusy(false);
-    }
+      setSentSchool(target);
+    } catch (error) { setError(readableError(error)); }
+    finally { setBusy(false); }
+  }
+  function schoolSummary(school) {
+    return <div className="school-access-selected"><span>ESCOLA ESCOLHIDA</span><strong>{school.name}</strong><small>Instituição: {institutionSlug.toUpperCase()}{school.inep ? " · INEP: " + school.inep : ""}</small></div>;
   }
   return (
     <section className="school-access-card" aria-labelledby="school-access-title">
       <div className="school-access-heading">
         <span className="school-access-eyebrow">SIEP · ACESSO DA ESCOLA</span>
-        <h1 id="school-access-title">{message ? "Aguarde a aprovação" : "Vincule sua conta à escola"}</h1>
-        <p>Sua conta está conectada. Para acessar a área escolar, solicite um vínculo como responsável. A Secretaria precisa aprovar esse acesso.</p>
+        <h1 id="school-access-title">{sentSchool ? "Aguarde a aprovação" : "Solicite acesso à sua escola"}</h1>
+        <p>{sentSchool ? "Seu pedido foi enviado à Secretaria para análise." : "Escolha sua escola e confira o nome antes de solicitar. O acesso depende da aprovação da Secretaria."}</p>
       </div>
-      {message ? (
+      {sentSchool ? (
         <div className="school-access-confirmation" role="status">
           <span className="school-access-status">Solicitação enviada</span>
-          <h2>Agora é com a Secretaria</h2>
-          <p>{message}</p>
-          <p>Depois da aprovação, clique em <strong>Atualizar meu acesso</strong> para entrar na área da escola.</p>
+          {schoolSummary(sentSchool)}
+          <p>Você solicitou acesso como responsável por esta escola. Depois da aprovação, clique em <strong>Atualizar meu acesso</strong>.</p>
         </div>
       ) : (
-        <>
-          <section className="school-access-step" aria-labelledby="school-search-title">
-            <div className="school-access-step-title"><span aria-hidden="true">1</span><div><h2 id="school-search-title">Encontre sua escola</h2><p>Primeiro, informe a instituição responsável pelo evento.</p></div></div>
-            <form onSubmit={search} className="school-access-search">
-              <label htmlFor="institution-code">Código da instituição
-                <input id="institution-code" name="slug" defaultValue="idjuv" required autoCapitalize="none" spellCheck={false} aria-describedby="institution-code-help" onChange={() => { setSchools([]); setSearched(false); setError(""); }} />
-                <small id="institution-code-help">Para o IDJUV, use <strong>idjuv</strong>. O nome da escola será escolhido abaixo.</small>
-              </label>
-              <button className="secondary" disabled={busy}>{busy ? "Aguarde…" : "Pesquisar escolas"}</button>
+        <div className="school-access-step">
+          {loading ? <p role="status">Carregando escolas…</p> : schools.length ? (
+            <form onSubmit={request}>
+              <fieldset disabled={busy} className="school-access-fields">
+                <legend className="sr-only">Solicitação de acesso escolar</legend>
+                <label className="school-access-wide" htmlFor="access-school">Qual é a sua escola?</label>
+                <select className="school-access-wide" id="access-school" name="school" required value={selectedId} onChange={e => { setSelectedId(e.target.value); setConfirmed(false); setError(""); }}>
+                  <option value="" disabled>Selecione a escola em que você atua</option>
+                  {schools.map(s => <option key={s.id} value={s.id}>{s.name}{s.inep ? " · INEP " + s.inep : ""}</option>)}
+                </select>
+                <label className="school-access-wide">Nome completo do responsável<input name="name" required autoComplete="name" maxLength={160} value={name} onChange={e => setName(e.target.value)} /></label>
+                {selectedSchool && <div className="school-access-wide" aria-live="polite">
+                  {schoolSummary(selectedSchool)}
+                  <label className="school-access-check"><input type="checkbox" required checked={confirmed} onChange={e => setConfirmed(e.target.checked)} /><span>Confirmo que esta é a escola correta e quero solicitar acesso como responsável.</span></label>
+                </div>}
+                <div className="school-access-submit school-access-wide"><p>Confira a escola destacada antes de enviar.</p><button className="primary" disabled={busy || !selectedSchool || !confirmed}>{busy ? "Enviando…" : "Solicitar acesso à escola"}</button></div>
+              </fieldset>
             </form>
-            {searched && schools.length === 0 && <p className="school-access-empty" role="status">Nenhuma escola disponível para este código. Confira a instituição ou peça à Secretaria para verificar o cadastro da escola.</p>}
-          </section>
-          {schools.length > 0 && (
-            <section className="school-access-step" aria-labelledby="school-responsible-title">
-              <div className="school-access-step-title"><span aria-hidden="true">2</span><div><h2 id="school-responsible-title">Identifique o responsável</h2><p>Selecione a escola e preencha seus dados pessoais.</p></div></div>
-              <form onSubmit={request}>
-                <fieldset disabled={busy} className="school-access-fields">
-                  <legend className="sr-only">Dados para solicitar vínculo escolar</legend>
-                  <label className="school-access-wide">Escola
-                    <select name="school" required defaultValue=""><option value="" disabled>Selecione sua escola</option>{schools.map(s => <option key={s.id} value={s.id}>{s.name}{s.inep ? " · " + s.inep : ""}</option>)}</select>
-                  </label>
-                  <label className="school-access-wide">Nome completo do responsável<input name="name" required autoComplete="name" maxLength={160} /></label>
-                  <label>CPF<input name="cpf" required inputMode="numeric" placeholder="000.000.000-00" maxLength={14} /></label>
-                  <label>Data de nascimento<input name="birth" type="date" required /></label>
-                  <label className="school-access-wide">Sexo<select name="gender" required defaultValue=""><option value="" disabled>Selecione</option><option>Masculino</option><option>Feminino</option></select></label>
-                  <div className="school-access-submit school-access-wide"><p>O envio solicita acesso apenas à escola selecionada.</p><button className="primary" disabled={busy}>{busy ? "Enviando…" : "Solicitar vínculo"}</button></div>
-                </fieldset>
-              </form>
-            </section>
-          )}
-        </>
+          ) : <p className="school-access-empty">Nenhuma escola disponível para {institutionSlug.toUpperCase()}. Peça à Secretaria para verificar o cadastro da escola.</p>}
+          {!loading && !schools.length && <button className="secondary" onClick={loadSchools}>Tentar carregar escolas novamente</button>}
+        </div>
       )}
       {error && <p className="school-error school-access-error" role="alert">{error}</p>}
       <footer className="school-access-footer"><div><strong>Já teve seu vínculo aprovado?</strong><p>Atualize para verificar a liberação do acesso.</p></div><button className="secondary" onClick={onRefresh} disabled={busy}>Atualizar meu acesso</button></footer>
-      <details className="school-access-help"><summary>Preciso de acesso à Secretaria</summary><p>Peça a um administrador da instituição para vincular sua conta confirmada à equipe da Secretaria. O formulário acima é destinado a responsáveis escolares.</p></details>
+      <details className="school-access-help"><summary>Preciso de acesso à Secretaria</summary><p>Peça a um administrador da instituição para vincular sua conta confirmada à equipe da Secretaria.</p></details>
     </section>
   );
 }

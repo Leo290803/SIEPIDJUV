@@ -88,7 +88,10 @@ export default function ConnectedApp({ session }) {
     return (
       <div className="account-shell">
         <div className="account-pending">
-          <PendingAccess onRefresh={() => setRevision((v) => v + 1)} />
+          <PendingAccess
+            institutionSlug={new URLSearchParams(location.search).get("instituicao")?.trim().toLowerCase() || "idjuv"}
+            onRefresh={() => setRevision((v) => v + 1)}
+          />
           {access.length > 0 && (
             <button
               className="secondary"

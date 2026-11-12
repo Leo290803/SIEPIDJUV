@@ -153,3 +153,11 @@ A autenticação real usa e-mail/senha e PKCE; recuperação volta à raiz com `
 `siep_remove_document(p_document_id)` autoriza pela participação/escola, impede mudança em cadastro enviado/aprovado, marca a versão como superseded e devolve a participação a rascunho. Não apaga objeto/arquivo.
 
 O cliente conectado faz: gravação composta → remoções lógicas → preparar/enviar/finalizar arquivos → concluir participação, quando solicitado. Uma falha de arquivo é reportada como rascunho preservado para revisão, sem sucesso falso. RLS permanece obrigatória em todas as leituras e no Storage.
+
+## Solicitação simplificada de acesso escolar
+
+`siep_school_directory(p_institution_slug)` retorna as escolas ativas para escolha explícita. `siep_request_school_access(p_school_id uuid, p_full_name text)` exige sessão/e-mail confirmado, valida a escola e cria responsável com vínculo pendente. Não recebe papel/situação do cliente e não libera acesso. A Secretaria aprova pelo contrato `siep_decide_school_link` existente. Duplicatas por conta/escola são recusadas e o pedido não mescla identidades pelo nome.
+
+CPF, nascimento e sexo podem estar todos ausentes na identidade inicial do responsável; preenchimento parcial é recusado. Pessoas com vínculo de atleta/profissional ou participação exigem identidade completa, inclusive contra alterações diretas. A RPC antiga com quatro dados permanece compatível. Não são gravados dados civis fictícios.
+
+O portal do IDJUV usa o código `idjuv` automaticamente. Outras instituições podem compartilhar `/acesso-pendente?instituicao=SEU-CODIGO` com contas conectadas; o código apenas consulta o diretório e nunca concede permissão.

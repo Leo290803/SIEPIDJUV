@@ -2,6 +2,14 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Solicitação simplificada com confirmação da escola — atualização mais recente
+
+- Escolas do IDJUV são carregadas automaticamente; não há campo para digitar o código da instituição. O responsável informa somente nome (pré-preenchido do `display_name` da conta quando disponível) e escolhe explicitamente uma escola, sem seleção automática.
+- Um quadro destaca nome completo da escola, instituição e INEP quando cadastrado. A confirmação da escola é obrigatória; mudar a seleção desmarca a confirmação e bloqueia o envio. A confirmação final repete a escola efetivamente enviada.
+- Nova RPC `siep_request_school_access(uuid,text)` aceita apenas conta com e-mail confirmado, grava vínculo pendente e mantém a aprovação pela Secretaria. Nome não concede identidade nem mescla pessoas; a reutilização usa vínculo anterior da própria conta na mesma instituição.
+- Migração `20261112160000_simple_school_access` permite CPF/nascimento/sexo todos ausentes para identidade inicial de responsável, sem valores fictícios. Os dados podem ser completados depois na edição do cadastro. Dados já existentes não são apagados. Atletas, profissionais e participações continuam exigindo identidade completa por gatilhos no banco; não se pode esvaziar os dados de uma identidade esportiva existente.
+- Total: 15 migrações e oito suítes SQL, além dos 64 testes JS e três testes concorrentes. SQL verificado localmente e no Supabase real; navegador verificou seleção, troca/confirmar, envio com escola correta, erro preservando dados e desktop/mobile usando API simulada.
+
 ## Tela de solicitação escolar organizada
 
 A tela de acesso pendente agora separa busca da escola e dados do responsável em duas etapas visuais, com campos alinhados e layout móvel. O código da instituição tem exemplo `idjuv`, distinto do nome da escola. Busca vazia, erros preservando o formulário e confirmação de envio têm mensagens próprias; o botão de atualização fica no rodapé. Não houve mudança nas permissões nem no banco. Chromium verificou busca/seleção/envio/falha e desktop/mobile com API simulada.
