@@ -2,6 +2,10 @@
 
 Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Tela de solicitação escolar organizada
+
+A tela de acesso pendente agora separa busca da escola e dados do responsável em duas etapas visuais, com campos alinhados e layout móvel. O código da instituição tem exemplo `idjuv`, distinto do nome da escola. Busca vazia, erros preservando o formulário e confirmação de envio têm mensagens próprias; o botão de atualização fica no rodapé. Não houve mudança nas permissões nem no banco. Chromium verificou busca/seleção/envio/falha e desktop/mobile com API simulada.
+
 ## Portais separados, autenticação e permissões — atualização mais recente
 
 Esta seção substitui o seletor de área e as contagens das entregas históricas abaixo.
