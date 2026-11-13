@@ -1,6 +1,17 @@
 # Continuidade do SIEP — contexto para o próximo chat
 
-Atualizado em 12/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+Atualizado em 13/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+
+## Foto de identificação em todos os cadastros de pessoas
+
+Atletas (cadastro geral e cadastro no evento), comissão técnica e responsáveis têm foto opcional, com prévia, seleção/substituição, remoção e cancelamento da alteração antes de salvar. PNG/JPEG até 5 MB; o navegador verifica se a imagem pode ser decodificada. A foto fica na identidade reutilizável, compartilhada entre papéis e escolas autorizadas, sem duplicar pessoa ou exigir que a Secretaria configure um documento do evento.
+
+- `PersonPhoto.jsx` mostra somente uma prévia local ou Blob baixado com a sessão. Não salva imagem/base64/URL pública em localStorage ou contato. A foto é enviada somente ao salvar o cadastro; falha preserva os dados já salvos e a foto anterior, com orientação para reabrir/revisar.
+- Migração `20261113150000_person_photos`: tabela pública `person_photos` com RLS (total 30 tabelas públicas) e bucket privado `siep-person-photos`. Preparar → upload autenticado → finalizar verificando existência/MIME/tamanho. Upload pendente não desativa a foto anterior; versões anteriores não são sobrescritas nem apagadas. Substituição e remoção exigem a foto esperada e recusam edição concorrente. Leitura/escrita seguem `can_person` e o escopo institucional/escolar.
+- Cada versão tem ID/caminho próprio, que poderá ser referenciado pelo crachá. **O gerador de crachás ainda não foi implementado**; deverá usar o evento/inscrição autorizados e preservar a versão da foto usada na emissão. Não tratar foto como uma inscrição ou como aprovação do vínculo.
+- As exigências de documentos do evento continuam independentes e preservadas. Uma exigência de anexo chamada Foto não é automaticamente satisfeita pela foto geral sem um contrato explícito de correspondência.
+- Durante os testes foi encontrado um erro da consulta de elegíveis ao avaliar uma pessoa fora do contexto de uma categoria. `20261113145000_safe_candidate_validation` faz o predicado retornar pendência/excluir o candidato em vez de interromper a consulta. As regras esportivas não foram flexibilizadas.
+- Total: 19 migrações. Dez suítes SQL no Supabase real com fixtures desfeitas, 72 testes JS e Chromium com API simulada cobrem upload, substituição, remoção, reutilização entre papéis, recarga, formato inválido e limites/permissões/conflito. Upload real de bytes no domínio do projeto continua dependendo da liberação de rede pendente do ambiente; não afirmar esse teste como realizado.
 
 ## Revisão geral de alinhamento das telas
 

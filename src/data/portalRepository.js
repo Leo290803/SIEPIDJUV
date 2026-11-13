@@ -6,6 +6,7 @@ import {
 export function portalRepository(client) {
   const tables = [
     "people",
+    "person_photos",
     "school_people",
     "event_participations",
     "participation_categories",
@@ -35,7 +36,7 @@ export function portalRepository(client) {
     }
   }
   async function load(tenant) {
-    const data = await Promise.all(tables.map((t) => all(t, tenant)));
+    const data = await Promise.all(tables.map((t) => all(t, tenant, t === "person_photos" ? { is_current: true } : {})));
     return mapPortalData(
       Object.fromEntries(tables.map((t, i) => [t, data[i]])),
     );
@@ -68,6 +69,20 @@ export function portalRepository(client) {
         p_additional_data: additional,
       }),
     );
+    if (options.photo !== undefined) {
+      try {
+        if (options.photo === null) {
+          checked(await client.rpc("siep_remove_person_photo", { p_person_id: result.person_id, p_expected_photo_id: record.photo?.id || null }));
+        } else {
+          const file = options.photo;
+          const metadata = checked(await client.rpc("siep_prepare_person_photo", { p_person_id: result.person_id, p_name: file.name, p_mime_type: file.type, p_size_bytes: file.size, p_expected_photo_id: record.photo?.id || null }));
+          checked(await client.storage.from(metadata.bucket).upload(metadata.path, file, { contentType: file.type, upsert: false }));
+          checked(await client.rpc("siep_finalize_person_photo", { p_photo_id: metadata.id }));
+        }
+      } catch (error) {
+        throw Error("Os dados do cadastro foram salvos, mas a foto não foi atualizada. A foto anterior foi preservada. Reabra o cadastro e tente novamente. " + error.message);
+      }
+    }
     if (!options.event) return result;
     const participation = result.participation.id;
     try {

@@ -1,3 +1,4 @@
+import PersonPhoto from "./PersonPhoto.jsx";
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personDataIssues, normalizeCpf } from "./personData.js";
 import React, { useState, useEffect } from "react";
@@ -73,7 +74,10 @@ export default function TechnicalStaff({
     else setEditing(null);
     setError("");
   }, [routeAction, routeRecordId]);
+  const [photoChange, setPhotoChange] = useState(undefined);
+  useEffect(() => setPhotoChange(undefined), [routeAction, routeRecordId]);
   const closeRecord = () => {
+    setPhotoChange(undefined);
     setEditing(null);
     onCloseRecord?.();
   };
@@ -89,9 +93,9 @@ export default function TechnicalStaff({
         [r.name, r.position, r.email, r.registration, schoolName(r)].join(" "),
       ).includes(normalize(query)),
   );
-  async function persist(next, entry) {
+  async function persist(next, entry, options) {
     try {
-      if (onPersist) await onPersist(entry);
+      if (onPersist) await onPersist(entry, options);
       else localStorage.setItem("siep-staff", JSON.stringify(next));
       setRecords(next);
       setError("");
@@ -168,6 +172,7 @@ export default function TechnicalStaff({
           ? records.map((r) => (r.id === editing.id ? entry : r))
           : [...records, entry],
         entry,
+        { photo: photoChange },
       )
     ) {
       closeRecord();
@@ -370,6 +375,7 @@ export default function TechnicalStaff({
             </h2>
             <p>Campos com * são obrigatórios.</p>
             <form onSubmit={save}>
+              {connected && <PersonPhoto photo={editing.photo} value={photoChange} onChange={setPhotoChange} disabled={busy} />}
               <label>
                 Nome completo *
                 <input

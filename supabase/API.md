@@ -173,3 +173,14 @@ O portal do IDJUV usa o código `idjuv` automaticamente. Outras instituições p
 - `siep_password_change_required()`: própria conta. `siep_initial_password` fica em `raw_app_meta_data`, não em metadado editável pelo usuário. Troca do hash no Auth remove a marca. `is_staff`/`can_school` negam os dados antes da troca.
 
 As funções usam `SUPABASE_SERVICE_ROLE_KEY` somente no servidor. `verify_jwt=false` no gateway permite CPF sem sessão; o endpoint de provisionamento valida o JWT com `/auth/v1/user` e revalida a permissão no banco. As funções têm origens CORS explícitas e não registram credenciais. Deployment: `scripts/deploy_school_access.py`.
+
+## Foto de identificação reutilizável
+
+`person_photos` guarda metadados/versionamento da foto da identidade (`people.id`), compartilhada pelos papéis de atleta, responsável e profissional. Bucket `siep-person-photos` privado, PNG/JPEG até 5 MB. O cliente carrega somente a versão atual (`is_current=true`); versões históricas ficam preservadas para referências futuras em crachás.
+
+- `siep_prepare_person_photo(p_person_id, p_name, p_mime_type, p_size_bytes, p_expected_photo_id default null)` valida a pessoa autorizada, MIME/tamanho, nome e foto corrente esperada. Retorna `{id,bucket,path}` sem desativar a foto anterior.
+- Upload com a própria sessão ao Storage, `upsert:false`. A política exige metadados pendentes preparados por essa conta; objetos não recebem permissão de sobrescrita/exclusão.
+- `siep_finalize_person_photo(p_photo_id)` trava a identidade, verifica o objeto e metadados, recusa conflito e troca a foto atual em transação. Falha mantém a foto anterior.
+- `siep_remove_person_photo(p_person_id,p_expected_photo_id)` retira a foto atual sem apagar o arquivo histórico.
+
+Não há acesso anônimo. A autorização usa `can_person` e exige identidade não arquivada. Bytes são baixados com a sessão e mostrados via URL de Blob temporária. Não persistir URLs assinadas públicas ou imagens em contato/localStorage. O futuro gerador de crachás deverá guardar o ID da foto na emissão por evento/inscrição; este incremento implementa somente a foto e seu histórico.

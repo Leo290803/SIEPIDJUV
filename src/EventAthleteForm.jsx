@@ -1,3 +1,4 @@
+import PersonPhoto from "./PersonPhoto.jsx";
 import React, { useState } from "react";
 import { personDataIssues, validCpf } from "./personData.js";
 import { X, Check } from "lucide-react";
@@ -24,6 +25,7 @@ export default function EventAthleteForm({
   connected = false,
   onDocumentDownload,
 }) {
+  const [photoChange, setPhotoChange] = useState(undefined);
   const profile = athlete.eventProfiles?.[String(event.id)] || {};
   const source = requirementsFor(event);
   const required = { ...source, data: { ...source.data } };
@@ -239,7 +241,7 @@ export default function EventAthleteForm({
             },
           },
         };
-        if (!(await onSave(entry, { event, files, removed, complete })))
+        if (!(await onSave(entry, { event, files, removed, complete, photo: photoChange })))
           setError(
             "Não foi possível concluir. Os dados já gravados continuam preservados; reabra o cadastro para revisar os anexos.",
           );
@@ -331,6 +333,7 @@ export default function EventAthleteForm({
         </div>
         <form onSubmit={save}>
           <h3>1. Dados do atleta</h3>
+          {connected && <PersonPhoto photo={athlete.photo} value={photoChange} onChange={setPhotoChange} disabled={busy} />}
           <label>
             Nome completo *
             <input

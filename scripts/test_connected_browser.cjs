@@ -69,6 +69,7 @@ try {
     school_link_requests: [],
     school_people: [],
     people: [],
+    person_photos: [],
     event_participations: [],
     participation_categories: [],
     participant_documents: [],
@@ -82,6 +83,7 @@ try {
     registration_decisions: [],
   };
   const uploadedPaths = new Set();
+  const portrait = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
   const response = (route, data, status = 200) =>
     route.fulfill({
       status,
@@ -163,21 +165,27 @@ try {
         if (url.pathname.endsWith("/user")) return response(route, user);
       }
       if (url.pathname.startsWith("/storage/v1/object/")) {
-        const path = url.pathname.split("/siep-documents/")[1];
-        if (method === "POST") {
-          uploadedPaths.add(path);
-          return response(route, {
-            Key: "siep-documents/" + path,
-            Id: randomUUID(),
-          });
-        }
-        return route.fulfill({
-          status: 200,
-          body: Buffer.from("test-image"),
-          contentType: "image/png",
-        });
+        const match=url.pathname.match(/\/storage\/v1\/object\/(?:authenticated\/)?(siep-documents|siep-person-photos)\/(.*)/);
+        const bucket=match?.[1],path=match?.[2];
+        if (method === "POST") { uploadedPaths.add(path); return response(route, { Key: bucket+"/"+path, Id: randomUUID() }); }
+        return route.fulfill({ status:200, body:bucket==='siep-person-photos'?portrait:Buffer.from("test-image"),contentType:"image/png" });
       }
       const table = url.pathname.split("/").at(-1);
+      if (table === "siep_prepare_person_photo") {
+        const current=tables.person_photos.find(p=>p.person_id===body.p_person_id&&p.is_current);
+        assert.equal(body.p_expected_photo_id,current?.id||null);
+        const id=randomUUID(),path=tenant+"/"+body.p_person_id+"/"+id+".png";
+        tables.person_photos.push({id,institution_id:tenant,person_id:body.p_person_id,bucket_id:"siep-person-photos",object_path:path,original_name:body.p_name,status:"pending",is_current:false});
+        return response(route,{id,bucket:"siep-person-photos",path});
+      }
+      if (table === "siep_finalize_person_photo") {
+        const photo=tables.person_photos.find(p=>p.id===body.p_photo_id);assert.ok(uploadedPaths.has(photo.object_path));
+        for(const old of tables.person_photos.filter(p=>p.person_id===photo.person_id&&p.is_current)){old.is_current=false;old.status="superseded";}
+        photo.is_current=true;photo.status="uploaded";return response(route,null);
+      }
+      if (table === "siep_remove_person_photo") {
+        const photo=tables.person_photos.find(p=>p.person_id===body.p_person_id&&p.is_current);assert.equal(body.p_expected_photo_id,photo?.id||null);if(photo){photo.is_current=false;photo.status="superseded";}return response(route,null);
+      }
       if (table === "siep_save_connected_person") {
         let link = tables.school_people.find((l) => l.id === body.p_link_id);
         let person = link
@@ -614,6 +622,10 @@ try {
     .getByRole("dialog")
     .locator('select[name="schoolId"]')
     .selectOption(tables.schools[0].id);
+  await page.getByLabel("Foto de identificação",{exact:true}).setInputFiles({name:"invalido.pdf",mimeType:"application/pdf",buffer:Buffer.from("pdf")});
+  await page.getByText("Selecione uma foto PNG ou JPEG de até 5 MB.",{exact:true}).waitFor();
+  await page.getByLabel("Foto de identificação",{exact:true}).setInputFiles({name:"identificacao.png",mimeType:"image/png",buffer:portrait});
+  await page.getByRole("img",{name:"Prévia da foto de identificação"}).waitFor();
   await page
     .getByRole("button", { name: "Salvar atleta", exact: true })
     .click();
@@ -621,6 +633,7 @@ try {
     .getByRole("heading", { name: "Atleta conectado", exact: true })
     .waitFor();
   assert.equal(tables.people.length, 1);
+  assert.equal(tables.person_photos.filter(p=>p.is_current).length,1);
   await page
     .getByRole("button", { name: "Comissão técnica", exact: true })
     .click();
@@ -645,6 +658,10 @@ try {
     .click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   assert.equal(tables.people.length, 1, "Profissão duplicou pessoa");
+  await page.getByRole("button",{name:"Editar Atleta conectado",exact:true}).click();
+  await page.getByRole("img",{name:"Prévia da foto de identificação"}).waitFor();
+  await page.getByRole("button",{name:"Fechar cadastro",exact:true}).click();
+
   assert.equal(
     await page.getByText("Área de trabalho:", { exact: true }).count(),
     0,
@@ -663,6 +680,15 @@ try {
   await page
     .getByRole("button", { name: "Editar Atleta conectado", exact: true })
     .click();
+  await page.getByRole("img",{name:"Prévia da foto de identificação"}).waitFor();
+  await page.getByLabel("Foto de identificação",{exact:true}).setInputFiles({name:"foto-atualizada.png",mimeType:"image/png",buffer:portrait});
+  await page.getByRole("button",{name:"Cancelar alteração",exact:true}).waitFor();
+  await page.screenshot({path:"/tmp/siep-person-photo-desktop.png",fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:"/tmp/siep-person-photo-mobile.png",fullPage:true});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.setViewportSize({width:1440,height:1000});
+
   await page.getByRole("checkbox", { name: /Futsal · 12 a 14 anos/ }).check();
   await page.getByLabel("Anexar Foto", { exact: true }).setInputFiles({
     name: "foto.png",
@@ -674,6 +700,8 @@ try {
     .click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page.getByText("Cadastro completo", { exact: true }).waitFor();
+  assert.equal(tables.person_photos.filter(p=>p.is_current).length,1);
+  assert.equal(tables.person_photos.filter(p=>p.status==='superseded').length,1);
   assert.equal(
     tables.participant_documents.filter((d) => d.status === "uploaded").length,
     1,
@@ -724,6 +752,28 @@ try {
   await page
     .getByText("Nenhuma notificação recebida.", { exact: true })
     .waitFor();
+  await page.getByRole("button",{name:"Responsáveis",exact:true}).click();
+  await page.getByRole("button",{name:"Cadastrar responsável",exact:true}).click();
+  await page.getByLabel("Nome completo *",{exact:true}).fill("Responsável com foto");
+  await page.getByLabel("CPF *",{exact:true}).fill("11144477735");
+  await page.getByLabel("Data de nascimento *",{exact:true}).fill("1990-01-01");
+  await page.locator('select[name="gender"]').selectOption("Masculino");
+  await page.locator('select[name="schoolId"]').selectOption(tables.schools[0].id);
+  await page.getByLabel("Cargo ou função *",{exact:true}).fill("Diretor");
+  await page.getByLabel("Foto de identificação",{exact:true}).setInputFiles({name:"responsavel.png",mimeType:"image/png",buffer:portrait});
+  await page.getByRole("img",{name:"Prévia da foto de identificação"}).waitFor();
+  await page.getByRole("button",{name:"Salvar responsável",exact:true}).click();
+  await page.getByRole("dialog").waitFor({state:"detached"});
+  const responsiblePerson=tables.people.find(p=>p.full_name==='Responsável com foto');
+  assert.ok(tables.person_photos.some(p=>p.person_id===responsiblePerson.id&&p.is_current));
+  await page.getByRole("button",{name:"Editar responsável Responsável com foto",exact:true}).click();
+  await page.getByRole("img",{name:"Prévia da foto de identificação"}).waitFor();
+  await page.getByRole("button",{name:"Remover foto",exact:true}).click();
+  await page.getByRole("button",{name:"Salvar responsável",exact:true}).click();
+  await page.getByRole("dialog").waitFor({state:"detached"});
+  assert.equal(tables.person_photos.some(p=>p.person_id===responsiblePerson.id&&p.is_current),false);
+  assert.ok(tables.person_photos.some(p=>p.person_id===responsiblePerson.id&&p.status==='superseded'));
+  await page.getByRole("button",{name:"Notificações",exact:true}).click();
   const retainedPath = new URL(page.url()).pathname;
   await page.reload();
   await page

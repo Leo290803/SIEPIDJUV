@@ -1,3 +1,4 @@
+import PersonPhoto from "./PersonPhoto.jsx";
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personDataIssues, validCpf } from "./personData.js";
 import React, { useState, useEffect } from "react";
@@ -70,7 +71,10 @@ export default function Athletes({
     else setEditing(null);
     setError("");
   }, [routeAction, routeRecordId]);
+  const [photoChange, setPhotoChange] = useState(undefined);
+  useEffect(() => setPhotoChange(undefined), [routeAction, routeRecordId]);
   const closeRecord = () => {
+    setPhotoChange(undefined);
     setEditing(null);
     onCloseRecord?.();
   };
@@ -168,6 +172,7 @@ export default function Athletes({
           ? records.map((r) => (r.id === editing.id ? entry : r))
           : [...records, entry],
         entry,
+        { photo: photoChange },
       )
     ) {
       closeRecord();
@@ -414,6 +419,7 @@ export default function Athletes({
               solicitados na inscrição de cada evento.
             </p>
             <form onSubmit={save}>
+              {connected && <PersonPhoto photo={editing.photo} value={photoChange} onChange={setPhotoChange} disabled={busy} />}
               <label>
                 Nome completo *
                 <input

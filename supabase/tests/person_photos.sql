@@ -1,0 +1,58 @@
+do $$
+declare tenant uuid:=gen_random_uuid();other_tenant uuid:=gen_random_uuid();school uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();school_user uuid:=gen_random_uuid();stranger uuid:=gen_random_uuid();person uuid:=gen_random_uuid();responsible uuid:=gen_random_uuid();first_photo jsonb;replacement jsonb;stale jsonb;ev uuid:=gen_random_uuid();modality uuid:=gen_random_uuid();category uuid:=gen_random_uuid();
+begin
+ begin
+  if siep_private.candidate_athlete_issues(gen_random_uuid(),gen_random_uuid(),gen_random_uuid(),null) is distinct from '["category_unavailable"]'::jsonb then raise exception 'Contexto ausente não foi recusado';end if;
+  insert into auth.users(id) values(admin_user),(school_user),(stranger);
+  insert into public.institutions(id,name,slug) values(tenant,'Fotos','photos-'||tenant),(other_tenant,'Outro cliente','photos-'||other_tenant);
+  insert into public.institution_memberships(institution_id,user_id,role,status) values(tenant,admin_user,'admin','approved'),(other_tenant,stranger,'admin','approved');
+  insert into public.schools(id,institution_id,name) values(school,tenant,'Escola de fotos');
+  insert into public.events(id,institution_id,name,status) values(ev,tenant,'Evento de teste','open');
+  insert into public.event_modalities(id,institution_id,event_id,name,classification) values(modality,tenant,ev,'Individual','individual');
+  insert into public.event_categories(id,institution_id,event_id,modality_id,name,participation,min_athletes,max_athletes) values(category,tenant,ev,modality,'Categoria','individual',1,1);
+  if siep_private.candidate_athlete_issues(ev,gen_random_uuid(),category,null) is distinct from '["person_unavailable"]'::jsonb then raise exception 'Pessoa fora do contexto não foi recusada';end if;
+
+  insert into public.people(id,institution_id,full_name,birth_date,cpf,gender) values(person,tenant,'Atleta e profissional','2003-08-29','52998224725','Feminino'),(responsible,tenant,'Responsável','1990-01-01','11144477735','Masculino');
+  insert into public.school_people(institution_id,school_id,person_id,role,status,user_id) values(tenant,school,person,'athlete','approved',null),(tenant,school,person,'staff','approved',null),(tenant,school,responsible,'responsible','approved',school_user);
+  perform set_config('request.jwt.claim.sub',school_user::text,true);
+  execute 'set local role authenticated';
+  begin perform public.siep_prepare_person_photo(person,'arquivo.pdf','application/pdf',20);raise exception 'PDF aceito como foto';exception when check_violation then null;end;
+  begin perform public.siep_prepare_person_photo(person,'foto.png','image/png',5242881);raise exception 'Foto maior que limite aceita';exception when check_violation then null;end;
+  first_photo:=public.siep_prepare_person_photo(person,'foto.png','image/png',20);
+  begin perform public.siep_finalize_person_photo((first_photo->>'id')::uuid);raise exception 'Upload ausente finalizado';exception when check_violation then null;end;
+  insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-person-photos',first_photo->>'path',school_user::text,'{"size":21,"mimetype":"image/png"}');
+  begin perform public.siep_finalize_person_photo((first_photo->>'id')::uuid);raise exception 'Tamanho divergente aceito';exception when check_violation then null;end;
+  execute 'reset role';
+  update storage.objects set metadata='{"size":20,"mimetype":"image/png"}' where bucket_id='siep-person-photos' and name=first_photo->>'path';
+  execute 'set local role authenticated';
+  perform public.siep_finalize_person_photo((first_photo->>'id')::uuid);
+  if (select count(*) from public.person_photos where person_id=person and is_current)<>1 then raise exception 'Foto atual ausente';end if;
+  replacement:=public.siep_prepare_person_photo(person,'nova.jpg','image/jpeg',22,(first_photo->>'id')::uuid);
+  stale:=public.siep_prepare_person_photo(person,'concorrente.png','image/png',22,(first_photo->>'id')::uuid);
+  if not exists(select 1 from public.person_photos where id=(first_photo->>'id')::uuid and is_current) then raise exception 'Preparar upload apagou foto atual';end if;
+  insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-person-photos',replacement->>'path',school_user::text,'{"size":22,"mimetype":"image/jpeg"}'),('siep-person-photos',stale->>'path',school_user::text,'{"size":22,"mimetype":"image/png"}');
+  perform public.siep_finalize_person_photo((replacement->>'id')::uuid);
+  begin perform public.siep_finalize_person_photo((stale->>'id')::uuid);raise exception 'Substituição concorrente sobrescreveu foto';exception when serialization_failure then null;end;
+  if not exists(select 1 from public.person_photos where id=(first_photo->>'id')::uuid and status='superseded' and not is_current) then raise exception 'Versão anterior não preservada';end if;
+  begin update public.person_photos set original_name='alterada' where person_id=person;raise exception 'Mutação direta permitida';exception when insufficient_privilege then null;end;
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub',stranger::text,true);
+  execute 'set local role authenticated';
+  if exists(select 1 from public.person_photos where person_id=person) or exists(select 1 from storage.objects where bucket_id='siep-person-photos' and name=replacement->>'path') then raise exception 'Outro cliente leu a foto';end if;
+  begin perform public.siep_remove_person_photo(person,(replacement->>'id')::uuid);raise exception 'Outro cliente removeu foto';exception when insufficient_privilege then null;end;
+  begin insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-person-photos',tenant||'/invalid.jpg',stranger::text,'{}');raise exception 'Upload fora do escopo permitido';exception when insufficient_privilege then null;end;
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub',admin_user::text,true);
+  execute 'set local role authenticated';
+  perform public.siep_remove_person_photo(person,(replacement->>'id')::uuid);
+  if exists(select 1 from public.person_photos where person_id=person and is_current) then raise exception 'Remoção não desativou foto';end if;
+  if not exists(select 1 from storage.objects where bucket_id='siep-person-photos' and name=replacement->>'path') then raise exception 'Remoção apagou arquivo histórico';end if;
+  first_photo:=public.siep_prepare_person_photo(responsible,'responsavel.jpg','image/jpeg',20);
+  execute 'reset role';
+  execute 'set local role anon';
+  begin perform public.siep_prepare_person_photo(person,'anon.png','image/png',20);raise exception 'Anon executou upload';exception when insufficient_privilege then null;end;
+  execute 'reset role';
+  raise exception 'rollback_person_photos' using errcode='ZX001';
+ exception when sqlstate 'ZX001' then null;
+ end;
+end $$;

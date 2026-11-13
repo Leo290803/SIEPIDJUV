@@ -1,3 +1,4 @@
+import PersonPhoto from "./PersonPhoto.jsx";
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personDataIssues, normalizeCpf } from "./personData.js";
 import React, { useState, useEffect } from "react";
@@ -63,13 +64,16 @@ export default function Responsibles({
     else setForm(false);
     setError("");
   }, [routeAction, routeRecordId]);
+  const [photoChange, setPhotoChange] = useState(undefined);
+  useEffect(() => setPhotoChange(undefined), [routeAction, routeRecordId]);
   const closeRecord = () => {
+    setPhotoChange(undefined);
     setForm(false);
     onCloseRecord?.();
   };
-  const persist = async (next, entry) => {
+  const persist = async (next, entry, options) => {
     try {
-      if (onPersist) await onPersist(entry);
+      if (onPersist) await onPersist(entry, options);
       else {
         localStorage.setItem("siep-responsibles", JSON.stringify(next));
         onChange(next);
@@ -155,6 +159,7 @@ export default function Responsibles({
           ? records.map((r) => (r.id === form.id ? record : r))
           : [...records, record],
         record,
+        { photo: photoChange },
       )
     ) {
       closeRecord();
@@ -408,6 +413,7 @@ export default function Responsibles({
               {form.id ? "Editar responsável" : "Cadastrar responsável"}
             </h2>
             <form onSubmit={save}>
+              {connected && <PersonPhoto photo={form.photo} value={photoChange} onChange={setPhotoChange} disabled={busy} />}
               <label>
                 Nome completo *
                 <input

@@ -821,7 +821,7 @@ export default function InstitutionPortal({
                       }
                       onCloseRecord={() => go("Comissão técnica")}
                       schools={schools}
-                      onPersist={(entry) => savePerson("staff", entry)}
+                      onPersist={(entry, options) => savePerson("staff", entry, options)}
                     />
                   )}
                   {page === "Responsáveis" && !schoolArea && (
@@ -839,7 +839,7 @@ export default function InstitutionPortal({
                         }
                         onCloseRecord={() => go("Responsáveis")}
                         schools={schools}
-                        onPersist={(entry) => savePerson("responsible", entry)}
+                        onPersist={(entry, options) => savePerson("responsible", entry, options)}
                         onProvision={async (record) => {
                           const { data: result, error } = await supabase.functions.invoke("provision-school-access", { body: { link_id: record.id } });
                           if (error || result?.error) {

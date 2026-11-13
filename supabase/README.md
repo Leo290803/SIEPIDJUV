@@ -1,5 +1,7 @@
 # Banco SIEP
 
+> Atualização de fotos: 19 migrações, 30 tabelas públicas com RLS e dez suítes SQL. Foto opcional de pessoas no bucket privado `siep-person-photos`, com versões preservadas, autorização por pessoa e controle de concorrência. Gerador de crachás permanece uma próxima etapa.
+
 > **Atualização:** a senha gerada permite entrada direta, sem troca obrigatória no primeiro acesso. Migração `20261112180000_remove_required_initial_password_change`: 17 migrações. Senhas existentes preservadas.
 
 > Estado mais recente: 16 migrações e nove suítes SQL. Cadastro público desativado no Auth e RPCs de solicitação abertas revogadas. Secretaria gera acesso escolar sem e-mail; usuário CPF, senha inicial ano de nascimento + quatro últimos dígitos do CPF, com troca obrigatória antes de acessar dados. Endpoints versionados em `functions/` e implantação em `scripts/deploy_school_access.py`. Detalhes em API.md e ../CONTINUIDADE.md.

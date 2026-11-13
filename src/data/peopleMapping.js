@@ -57,6 +57,7 @@ export function mapPortalData(tables) {
           _contact: p.contact,
           id: link.id,
           personId: p.id,
+          photo: (() => { const photo = (tables.person_photos || []).find(f => f.person_id === p.id && f.is_current && f.status === "uploaded"); return photo ? { id: photo.id, bucket: photo.bucket_id, objectPath: photo.object_path, name: photo.original_name } : null; })(),
           version: link.version,
           personUpdatedAt: p.updated_at,
           name: p.full_name,
