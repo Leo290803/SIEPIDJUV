@@ -36,7 +36,7 @@ export default function PersonPhoto({ photo, value, onChange, disabled = false }
     <div className="person-photo-preview">{preview ? <img src={preview} alt="Prévia da foto de identificação" /> : <Camera size={30} aria-hidden="true" />}</div>
     <div className="person-photo-details">
       <strong>Foto de identificação</strong>
-      <p>Para identificar a pessoa e usar no futuro crachá do evento.</p>
+      <p>Foto usada na identificação da pessoa e nos crachás dos eventos.</p>
       <div className="person-photo-actions">
         <button type="button" className="secondary" disabled={disabled} onClick={() => input.current.click()}>{preview ? "Substituir foto" : "Escolher foto"}</button>
         {(preview || photo && value !== null) && <button type="button" className="text-btn" disabled={disabled} onClick={() => onChange(photo ? null : undefined)}>Remover foto</button>}

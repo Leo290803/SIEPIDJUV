@@ -5,7 +5,7 @@ module.exports = async function audit({page, tenant, schoolId, eventId, registra
  fs.mkdirSync(root,{recursive:true});
  const saved={url:page.url(),viewport:page.viewportSize()};
  const base=area==='secretaria'?`/secretaria/${tenant}`:`/escola/${tenant}/escolas/${schoolId}`;
- const slugs=area==='secretaria'?['painel','eventos','escolas','responsaveis','atletas','comissao-tecnica','inscricoes','relatorios','notificacoes','instituicao','usuarios','competicoes','inscricoes-publicas']:['painel','eventos','atletas','comissao-tecnica','inscricoes','notificacoes','dados'];
+ const slugs=area==='secretaria'?['painel','eventos','escolas','responsaveis','atletas','comissao-tecnica','inscricoes','relatorios','crachas','notificacoes','instituicao','usuarios','competicoes','inscricoes-publicas']:['painel','eventos','atletas','comissao-tecnica','inscricoes','notificacoes','dados'];
  const routes=slugs.map(slug=>[slug,base+'/'+slug]);
  routes.push(['atleta-novo',base+'/atletas/novo'],['profissional-novo',base+'/comissao-tecnica/novo']);
  if(area==='secretaria'){

@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { portalPath, eventTabs, safeReturn } from "./routing/routes.js";
 import AccessState from "./routing/AccessState.jsx";
+import EventBadges from "./EventBadges.jsx";
 import StaffAccounts from "./StaffAccounts.jsx";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -255,14 +256,15 @@ export default function InstitutionPortal({
           [Users, "Responsáveis"],
           [Users, "Atletas"],
           [Users, "Comissão técnica"],
-          [ClipboardList, "Inscrições"],
-          [BarChart3, "Relatórios"],
+          [ClipboardList, "Inscrições e documentos"],
           ...(canAdmin
             ? [
                 [Users, "Usuários da Secretaria"],
               ]
             : []),
         ];
+  const documentPages = ["Inscrições", "Relatórios", "Crachás"];
+  const isDocuments = route.area === "secretaria" && !route.schoolContext && documentPages.includes(page);
   const roleFormSchool = schoolArea ? school?.id : undefined;
   const showPicker =
     schoolArea && !activeEvent && ["Visão geral", "Atletas"].includes(page);
@@ -379,8 +381,8 @@ export default function InstitutionPortal({
           {nav.map(([Icon, label]) => (
             <button
               key={label}
-              className={page === label ? "active" : ""}
-              onClick={() => go(label, { primary: true })}
+              className={page === label || label === "Inscrições e documentos" && isDocuments ? "active" : ""}
+              onClick={() => go(label === "Inscrições e documentos" ? "Inscrições" : label, { primary: true })}
             >
               <Icon size={18} />
               {label}
@@ -553,7 +555,7 @@ export default function InstitutionPortal({
                 <h1>
                   {eventId
                     ? "Gerenciar evento"
-                    : page === "Visão geral"
+                    : isDocuments ? "Inscrições e documentos" : page === "Visão geral"
                       ? "Painel inicial"
                       : page}
                 </h1>
@@ -577,6 +579,10 @@ export default function InstitutionPortal({
                   </button>
                 )}
               </div>
+              {isDocuments && <nav className="documents-tabs" aria-label="Inscrições, relatórios e crachás">
+                {documentPages.map(label=><button key={label} className={page===label?"active":""} aria-current={page===label?"page":undefined} onClick={()=>go(label,{primary:true})}>{label}</button>)}
+              </nav>}
+
               {schoolArea && !school ? (
                 <div className="panel empty">
                   <School size={32} />
@@ -986,6 +992,7 @@ export default function InstitutionPortal({
                       </div>
                     </div>
                   )}
+                  {page === "Crachás" && !schoolArea && <EventBadges events={events} schools={schools} api={api} tenant={tenant} />}
                   {page === "Notificações" && (
                     <div className="panel">
                       <h2>Notificações da minha conta</h2>

@@ -81,6 +81,7 @@ try {
     notifications: [],
     registration_versions: [],
     registration_decisions: [],
+    event_badges: [],
   };
   const uploadedPaths = new Set();
   const portrait = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
@@ -185,6 +186,29 @@ try {
       }
       if (table === "siep_remove_person_photo") {
         const photo=tables.person_photos.find(p=>p.person_id===body.p_person_id&&p.is_current);assert.equal(body.p_expected_photo_id,photo?.id||null);if(photo){photo.is_current=false;photo.status="superseded";}return response(route,null);
+      }
+      if (table === "siep_badge_candidates") {
+        const eligible=new Map();
+        for(const registration of tables.registrations.filter(r=>r.event_id===body.p_event_id&&r.status==='approved'&&(!body.p_school_id||r.school_id===body.p_school_id))){
+          for(const [role,assignments] of [['athlete',tables.registration_athletes],['staff',tables.registration_staff]])for(const assignment of assignments.filter(a=>a.registration_id===registration.id)){
+            if(body.p_role&&body.p_role!==role)continue;
+            const person=tables.people.find(p=>p.id===assignment.person_id),school=tables.schools.find(s=>s.id===registration.school_id),photo=tables.person_photos.find(p=>p.person_id===person.id&&p.is_current);
+            const row={person_id:person.id,school_id:school.id,role,role_label:role==='athlete'?'Atleta':'Comissão técnica',person_name:person.full_name,school_name:school.name,photo_id:photo?.id||null,photo_bucket:photo?.bucket_id,photo_path:photo?.object_path};
+            eligible.set([school.id,person.id,role].join(':'),row);
+          }
+        }
+        return response(route,[...eligible.values()]);
+      }
+      if (table === "siep_issue_event_badges") {
+        const event=tables.events.find(e=>e.id===body.p_event_id),issued=[];
+        for(const entry of body.p_entries){
+          const person=tables.people.find(p=>p.id===entry.person_id),school=tables.schools.find(s=>s.id===entry.school_id),photo=tables.person_photos.find(p=>p.person_id===person.id&&p.is_current);
+          const previous=tables.event_badges.filter(b=>b.event_id===event.id&&b.school_id===school.id&&b.person_id===person.id&&b.role===entry.role);
+          for(const badge of previous)badge.is_current=false;
+          const badge={id:randomUUID(),institution_id:tenant,event_id:event.id,person_id:person.id,school_id:school.id,role:entry.role,photo_id:photo.id,version:previous.length+1,is_current:true,issued_at:new Date().toISOString(),snapshot:{event_name:event.name,edition:event.edition,institution_name:'IDJUV',person_name:person.full_name,school_name:school.name,role_label:entry.role==='athlete'?'Atleta':'Comissão técnica',photo_bucket:photo.bucket_id,photo_path:photo.object_path}};
+          issued.push(badge);tables.event_badges.push(badge);
+        }
+        return response(route,issued);
       }
       if (table === "siep_save_connected_person") {
         let link = tables.school_people.find((l) => l.id === body.p_link_id);
@@ -597,8 +621,7 @@ try {
     "Visão geral",
     "Atletas",
     "Comissão técnica",
-    "Inscrições",
-    "Relatórios",
+    "Inscrições e documentos",
     "Notificações",
   ])
     assert.equal(
@@ -738,12 +761,40 @@ try {
   await page
     .getByRole("button", { name: "← Escolas da instituição", exact: true })
     .click();
-  await page.getByRole("button", { name: "Inscrições", exact: true }).click();
+  await page.getByRole("button", { name: "Inscrições e documentos", exact: true }).click();
   await page.getByRole("button", { name: "Aprovar", exact: true }).click();
   await page.getByLabel("Justificativa *", { exact: true }).fill("Conferido");
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page.getByRole("cell", { name: "Aprovada", exact: true }).waitFor();
+  await page.getByRole("button",{name:"Crachás",exact:true}).click();
+  await page.getByLabel("Evento dos crachás",{exact:true}).selectOption(tables.events[0].id);
+  await page.getByRole("checkbox",{name:"Selecionar Atleta conectado · Atleta",exact:true}).check();
+  const badgePopupPromise=page.waitForEvent('popup');
+  await page.getByRole("button",{name:"Emitir e abrir impressão",exact:true}).click();
+  const badgePopup=await badgePopupPromise;
+  await badgePopup.locator('.event-badge').waitFor();
+  assert.equal(await badgePopup.locator('.event-badge').count(),1);
+  await badgePopup.getByText('Atleta conectado',{exact:true}).waitFor();
+  await badgePopup.getByText('Escola conectada',{exact:true}).waitFor();
+  assert.equal((await badgePopup.locator('body').innerText()).includes('52998224725'),false);
+  await badgePopup.waitForFunction(()=>[...document.images].every(img=>img.complete&&img.naturalWidth>0));
+  await badgePopup.evaluate(()=>{window.print=()=>{window.printInvoked=true;};});
+  await badgePopup.getByRole('button',{name:'Imprimir / Salvar PDF',exact:true}).click();
+  assert.equal(await badgePopup.evaluate(()=>window.printInvoked),true);
+  await badgePopup.screenshot({path:'/tmp/siep-badge-preview.png',fullPage:true});
+  await badgePopup.close();
+  await page.getByRole('button',{name:'Reimprimir',exact:true}).waitFor();
+  await page.screenshot({path:'/tmp/siep-badges-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:'/tmp/siep-badges-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
+  const reprintPopupPromise=page.waitForEvent('popup');
+  await page.getByRole('button',{name:'Reimprimir',exact:true}).click();
+  const reprintPopup=await reprintPopupPromise;
+  await reprintPopup.locator('.event-badge').waitFor();await reprintPopup.close();
+  assert.equal(tables.event_badges.length,1,'Reimprimir criou nova emissão');
   await page.getByRole("button", { name: "Relatórios", exact: true }).click();
   await page
     .getByRole("button", { name: "Exportar inscrições em CSV", exact: true })

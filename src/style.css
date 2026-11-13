@@ -143,3 +143,16 @@
 .person-photo-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:12px 0; }.person-photo-details>small { display:block; font-size:11px; line-height:1.6; color:#72869c; }
 .photo-file-input { position:absolute; width:1px!important; height:1px; min-height:0; opacity:0; overflow:hidden; padding:0; pointer-events:none; }
 @media(max-width:480px){.person-photo-field{gap:14px;align-items:flex-start;flex-wrap:wrap;padding:14px}.person-photo-details{flex-basis:170px}.person-photo-preview{width:78px;height:104px;flex-basis:78px}}
+
+.documents-tabs { display:flex; gap:0; overflow-x:auto; background:white; border:1px solid #d9e3ed; border-radius:6px; margin-bottom:22px; }
+.documents-tabs>button { padding:14px 22px; border-radius:0; border-bottom:3px solid transparent; color:#61768e; white-space:nowrap; }
+.documents-tabs>button.active { border-bottom-color:#255a8b; background:#f1f6fc; color:#214e7c; font-weight:600; border-left:0; }
+.badge-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:24px 0; }
+.badge-filters label,.badge-toolbar label { display:flex; flex-direction:column; gap:8px; min-width:0; font-size:13px; color:#405b78; }.badge-filters select,.badge-toolbar input { width:100%; min-width:0; }
+.badge-toolbar { display:flex; gap:14px; align-items:flex-end; margin:20px 0; }.badge-toolbar label { flex:1; }.badge-toolbar button { flex-shrink:0; }
+.badge-selection-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:20px 0 14px; font-size:12px; color:#6d8096; }
+.badge-history { border-top:1px solid #e0e7f0; margin-top:30px; padding-top:18px; }.badge-history h3 { margin-top:0; }
+.event-badges td input[type=checkbox] { width:17px; min-height:17px; accent-color:#245584; }
+@media(max-width:700px){.badge-filters{grid-template-columns:minmax(0,1fr)}.badge-toolbar{align-items:stretch;flex-direction:column}.documents-tabs>button{padding:12px 18px}}
+
+.connected-sidebar nav button { white-space:normal; line-height:1.5; }

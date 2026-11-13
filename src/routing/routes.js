@@ -8,6 +8,7 @@ const secretary = [
   ["comissao-tecnica", "Comissão técnica"],
   ["inscricoes", "Inscrições"],
   ["relatorios", "Relatórios"],
+  ["crachas", "Crachás"],
   ["notificacoes", "Notificações"],
   ["instituicao", "Instituição", "admin"],
   ["usuarios", "Usuários da Secretaria", "admin"],

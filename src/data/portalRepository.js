@@ -153,6 +153,13 @@ export function portalRepository(client) {
   return {
     load,
     savePerson,
+    badgeCandidates: async (event, school, role) => checked(await client.rpc("siep_badge_candidates", { p_event_id:event, p_school_id:school, p_role:role })),
+    issueBadges: async (event, entries) => checked(await client.rpc("siep_issue_event_badges", { p_event_id:event, p_entries:entries })),
+    badgeHistory: async (tenant, event, school) => {
+      let query=client.from("event_badges").select("*").eq("institution_id",tenant).eq("event_id",event);
+      if(school)query=query.eq("school_id",school);
+      return checked(await query.order("issued_at",{ascending:false}).limit(100));
+    },
     decideLink: async (id, status, reason) =>
       checked(
         await client.rpc("siep_decide_school_link", {

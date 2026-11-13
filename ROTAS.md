@@ -28,7 +28,7 @@ Rotas privadas sem sessão encaminham ao login correspondente, preservando somen
 | `/escola/T/escolas/E` | Responsável aprovado, pessoa e escola ativas, vínculo não arquivado |
 | `/secretaria/T/escolas/E/acompanhamento` | Secretaria acompanhando escola de sua própria instituição |
 
-Na Secretaria, os sufixos são `painel`, `eventos`, `escolas`, `responsaveis`, `atletas`, `comissao-tecnica`, `inscricoes`, `relatorios`, `notificacoes`, `instituicao`, `usuarios`, `competicoes` e `inscricoes-publicas`. **Instituição e usuários exigem admin**; os dois últimos continuam Em breve.
+Na Secretaria, os sufixos são `painel`, `eventos`, `escolas`, `responsaveis`, `atletas`, `comissao-tecnica`, `inscricoes`, `relatorios`, `crachas`, `notificacoes`, `instituicao`, `usuarios`, `competicoes` e `inscricoes-publicas`. **Instituição e usuários exigem admin**; os dois últimos continuam Em breve.
 
 Na Escola e no acompanhamento, os sufixos são `painel`, `eventos`, `atletas`, `comissao-tecnica`, `inscricoes`, `notificacoes` e `dados`. A escola só consulta e altera recursos autorizados no próprio escopo. A Secretaria continua identificada como Secretaria ao acompanhar uma escola. Não existe troca de papel pelo seletor visual.
 
@@ -50,3 +50,7 @@ Metadados editáveis do Auth não concedem papel. A revogação é aplicada no s
 Cadastro/CPF/nascimento/escola são conferidos em Responsáveis. **Gerar acesso** cria a conta sem e-mail: usuário CPF e senha inicial ano + últimos quatro dígitos. O primeiro login por CPF é encaminhado a `/redefinir-senha?primeiro=1`; o banco bloqueia os dados da escola até a troca. Login por e-mail de contas anteriores continua válido. Recuperação por CPF exige atendimento da Secretaria.
 
 A tela de login não oferece seleção de área. A entrada comum identifica os vínculos do banco e abre o portal autorizado, sem conceder direitos pela URL.
+
+## Módulo da Secretaria: Inscrições e documentos
+
+Um único item lateral abre as abas Inscrições, Relatórios e Crachás. URLs preservadas: `/secretaria/T/inscricoes`, `/secretaria/T/relatorios` e nova `/secretaria/T/crachas`. As três exigem associação aprovada da Secretaria (admin/manager). A área escolar não recebe a emissão de crachás. A impressão abre uma prévia local com fotos autenticadas; não usa rota pública nem expõe tokens.

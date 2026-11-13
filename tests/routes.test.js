@@ -135,3 +135,11 @@ test("destino inicial depende dos vínculos aprovados recebidos do banco", () =>
   assert.equal(landingPath([], undefined), "/acesso-pendente");
   assert.equal(landingPath(admin, "escola"), "/acesso-pendente");
 });
+
+test("crachás pertencem à Secretaria, com gestor autorizado e escola recusada",()=>{
+ const route=resolveRoute("/secretaria/tenant-a/crachas");
+ assert.equal(route.page,"Crachás");
+ assert.equal(accessDecision(route,manager).allowed,true);
+ assert.equal(accessDecision(route,school).allowed,false);
+ assert.equal(portalPath("secretaria","tenant-a","Crachás"),"/secretaria/tenant-a/crachas");
+});

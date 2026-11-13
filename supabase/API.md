@@ -184,3 +184,13 @@ As funções usam `SUPABASE_SERVICE_ROLE_KEY` somente no servidor. `verify_jwt=f
 - `siep_remove_person_photo(p_person_id,p_expected_photo_id)` retira a foto atual sem apagar o arquivo histórico.
 
 Não há acesso anônimo. A autorização usa `can_person` e exige identidade não arquivada. Bytes são baixados com a sessão e mostrados via URL de Blob temporária. Não persistir URLs assinadas públicas ou imagens em contato/localStorage. O futuro gerador de crachás deverá guardar o ID da foto na emissão por evento/inscrição; este incremento implementa somente a foto e seu histórico.
+
+## Crachás por evento
+
+`event_badges` tem leitura exclusiva de staff da instituição, sem INSERT/UPDATE/DELETE do cliente. Snapshots imutáveis guardam nome, escola, perfil, instituição/evento/edição e ID/caminho da foto da emissão. Cada emissão tem UUID, versão e autor.
+
+- `siep_badge_candidates(p_event_id uuid, p_school_id uuid default null, p_role text default null)`: só Secretaria. Atletas e profissionais de inscrições aprovadas; responsáveis aprovados de escolas com inscrições aprovadas. Perfil precisa permanecer ativo. Retorna foto atual quando disponível, sem CPF/nascimento.
+- `siep_issue_event_badges(p_event_id uuid, p_entries jsonb)`: array de `{person_id,school_id,role}`, 1 a 50, sem repetição. Revalida os candidatos no servidor, exige foto e evento não arquivado, serializa a emissão pelo evento e grava um lote atomicamente. Um item inválido desfaz todo o lote. Nova emissão incrementa a versão e mantém os snapshots anteriores.
+- Histórico via SELECT em `event_badges`, filtrado por instituição/evento/escola com a sessão da Secretaria. Reimprimir usa os dados e foto do snapshot, sem criar nova emissão. Download histórico da foto fica permitido à Secretaria mesmo se a pessoa for arquivada; uploads continuam exigindo pessoa ativa.
+
+A interface limita a consulta a 100 emissões recentes e os lotes a 50. PDF é produzido pela impressão do navegador (A4, 4 crachás de 86×130 mm por página). Não há serviço de impressão física nem verificação pública de QR.

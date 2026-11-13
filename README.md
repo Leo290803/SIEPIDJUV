@@ -1,5 +1,7 @@
 # SIEP — Sistema de Inscrições em Eventos e Projetos
 
+> A Secretaria reúne **Inscrições e documentos** nas abas Inscrições, Relatórios e Crachás. É possível emitir crachás com foto por evento/escola, imprimir/salvar PDF e reimprimir emissões anteriores. Teste de paginação: `npm run test:badge-print` com o servidor de desenvolvimento ativo.
+
 > **Atualização:** a senha gerada permite entrada direta, sem troca obrigatória no primeiro acesso. Migração `20261112180000_remove_required_initial_password_change`: 17 migrações. Senhas existentes preservadas.
 
 > **Acesso atual:** login único por CPF ou e-mail, com encaminhamento automático conforme as permissões da conta. Cadastro público encerrado. Em Secretaria → Responsáveis, cadastre CPF/nascimento/escola, salve e clique em **Gerar acesso**. O responsável entra com CPF; a senha inicial é ano de nascimento + quatro últimos dígitos do CPF, com troca obrigatória no primeiro acesso. Nenhum e-mail é enviado. Contas existentes por e-mail continuam funcionando. Veja CONTINUIDADE.md para o estado mais recente.
