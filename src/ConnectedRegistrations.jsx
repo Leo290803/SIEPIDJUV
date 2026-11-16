@@ -1,3 +1,4 @@
+import RegistrationReview from "./RegistrationReview.jsx";
 import ServerPagination from "./ServerPagination.jsx";
 import { useServerFilters } from "./data/useServerFilters.js";
 import React, { useEffect, useState } from "react";
@@ -713,14 +714,16 @@ export default function ConnectedRegistrations({
               <fieldset className="form-fields" disabled={busy}>
                 <label>
                   Justificativa *
-                  <input
+                  <textarea
+                    aria-label="Justificativa *"
+                    rows={5}
                     name="reason"
                     required
-                    maxLength={1000}
+                    maxLength={5000}
                     defaultValue={
                       decision.status === "submitted"
                         ? "Envio para análise"
-                        : ""
+                        : decision.reason || ""
                     }
                   />
                 </label>
@@ -751,12 +754,12 @@ export default function ConnectedRegistrations({
         </div>
       )}
       {history && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop" style={decision ? {display:"none"} : undefined}>
           <div
             className="modal athlete-event-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Histórico da inscrição"
+            aria-label="Análise da inscrição"
           >
             <button
               className="close"
@@ -765,39 +768,10 @@ export default function ConnectedRegistrations({
             >
               <X />
             </button>
-            <h2>Histórico da inscrição</h2>
-            <p>
-              {ev(history.r)?.name} · {sc(history.r)?.name}
-            </p>
-            {history.versions
-              .sort((a, b) => b.revision - a.revision)
-              .map((version) => (
-                <details className="panel" key={version.id}>
-                  <summary>
-                    Versão {version.revision} ·{" "}
-                    {registrationStatusLabel[version.status]} ·{" "}
-                    {new Date(version.created_at).toLocaleString("pt-BR")}
-                  </summary>
-                  <h3>Atletas</h3>
-                  {version.snapshot.athletes?.map((a) => (
-                    <p key={a.person.id}>
-                      {a.person.full_name} · Vaga {a.allocation.slot_number}
-                    </p>
-                  ))}
-                  <h3>Comissão técnica</h3>
-                  {version.snapshot.staff?.map((s) => (
-                    <p key={s.person.id}>{s.person.full_name}</p>
-                  ))}
-                </details>
-              ))}
-            {history.decisions
-              .sort((a, b) => a.created_at.localeCompare(b.created_at))
-              .map((d) => (
-                <p key={d.id}>
-                  {new Date(d.created_at).toLocaleString("pt-BR")} ·{" "}
-                  {registrationStatusLabel[d.to_status]}: {d.reason}
-                </p>
-              ))}
+            <h2>Análise da inscrição</h2>
+            <RegistrationReview history={history} event={ev(history.r)} school={sc(history.r)} data={data} api={api} manager={manager}
+              onContinue={() => { const r = history.r; closeRoute(); onRoute ? onRoute({id:r.id}) : setEditing(r); }}
+              onDecision={(status,label,reason) => setDecision({r:history.r,status,label,reason})} />
           </div>
         </div>
       )}

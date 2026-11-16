@@ -2,6 +2,14 @@
 
 Atualizado em 16/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Análise das inscrições pela Secretaria
+
+Em **Inscrições e documentos → Inscrições → Detalhes e histórico**, a janela **Análise da inscrição** tem as abas Conferência e Histórico. Conferência reúne evento/escola/categoria/prova, situação, elenco com CPF/nascimento/sexo/status da participação, foto sob demanda, documentos por exigência do evento e comissão técnica. Dados do responsável legal aparecem somente com política ativa, atleta menor na referência e campos não ocultos. Documentos adicionais já enviados também podem ser baixados. A conferência usa o cadastro atual; versões históricas continuam explicitamente separadas e imutáveis.
+
+Quando enviada, somente a Secretaria recebe campos de observação por pessoa/documento e ações Aprovar/Solicitar correção/Indeferir. As observações identificadas por nome/item preenchem a justificativa editável da solicitação, confirmada com prazo obrigatório. São persistidas na decisão existente, sem nova tabela ou migração; revisão concorrente e autorização continuam na RPC já utilizada. A escola vê a última decisão, justificativa com quebras de linha e prazo, com acesso para continuar a inscrição. Não recebe campos de análise ou ações da Secretaria. Observações ainda não confirmadas são locais; abrir a decisão e voltar preserva o preenchimento.
+
+Arquivos privados são baixados apenas ao clicar, pelo adaptador autenticado existente, com mensagens de falha e limpeza de URLs Blob ao fechar. A lista permanece paginada pelo servidor. Não altera registros existentes, regras de aprovação ou módulos de competições. Testes de navegador usam API simulada, incluindo persistência da justificativa na decisão simulada; não representam teste HTTP real do Supabase. Validação: 102 testes JS, build de produção e fluxo completo no Chromium aprovados, com foto privada sob demanda, preservação das observações ao voltar, orientação visível à escola, ações restritas à Secretaria, histórico/recarregamento e conferência sem overflow em 390px. Capturas em `/tmp/siep-registration-review-desktop.png` e `/tmp/siep-registration-review-mobile.png`.
+
 ## Pendências exibidas somente após tentar concluir
 
 A pedido do usuário, o quadro do cadastro do atleta no evento fica oculto ao abrir/preencher e só aparece após clicar **Concluir cadastro**, se houver pendências. Continua atualizando durante a correção e desaparece quando todas forem resolvidas; não mostra um cartão verde permanente. Salvar rascunho não abre esse quadro. Validações de campos e do banco permanecem. O teste conectado verifica ausência inicial, exibição após tentativa e desaparecimento após preencher.
