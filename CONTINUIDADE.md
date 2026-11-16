@@ -2,6 +2,14 @@
 
 Atualizado em 16/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Atletas de teste na Escola Estadual Monteiro Lobato
+
+A pedido do usuário, criados **somente 12 atletas** na escola existente `ESCOLA ESTADUAL MONTEIRO LOBATO` (`93c5caf0-c457-4b76-9922-16887dc4ca5c`): seis femininos e seis masculinos, anos correspondentes a 12–17 anos e nomes com prefixo **Atleta Teste**. Não foram criados responsáveis, profissionais, contas Auth, participações em evento ou inscrições. Não houve associação/alteração de fotos nesta operação.
+
+Script manual `scripts/seed_school_athletes.py`, padrão rollback, `--apply` para persistir, IDs determinísticos por escola e marcador `siep-school-athletes-v1`. Usa RPC de cadastro e confere que inscrições, contas, outros papéis e participações permanecem com as mesmas contagens. Reexecução preserva edições dos atletas já criados. Validação e aplicação feitas no Supabase; a consulta paginada sob o responsável aprovado da escola retornou os 12 atletas.
+
+O e-mail que o usuário informou para localizar o acesso não foi encontrado em Auth, identidades ou contato das pessoas. Os atletas foram vinculados à escola confirmada, sem criar ou transferir acessos. Essa diferença deve ser comunicada ao usuário; não afirmar associação do lote àquela conta.
+
 ## Validação do fluxo escolar completo
 
 Após autorização do usuário, ampliado e executado o teste conectado no build de produção: a escola completa o cadastro no evento com foto/anexo, cria e envia inscrição; a Secretaria pede correção com prazo; a escola abre Continuar, salva e reenvia; a Secretaria aprova. Uma asserção verifica a sequência e o perfil de cada transição. A escola não recebe ação Aprovar. Histórico/recarga, emissão/reimpressão de crachá com foto e PDF/CSV filtrados também passaram. Teste separado verificou geração de acesso sem e-mail e login CPF com API simulada.
