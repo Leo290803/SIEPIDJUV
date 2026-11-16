@@ -1,3 +1,4 @@
+import ServerPagination from "./ServerPagination.jsx";
 import React, { useEffect, useState } from "react";
 import { Printer, RefreshCw } from "lucide-react";
 import { readableError } from "./data/client.js";
@@ -5,20 +6,20 @@ import { showBadgePrint } from "./BadgePrint.jsx";
 const keyOf = row => [row.school_id,row.person_id,row.role].join(":");
 export default function EventBadges({events,schools,api,tenant}) {
  const [eventId,setEventId]=useState(""),[schoolId,setSchoolId]=useState(""),[role,setRole]=useState(""),[query,setQuery]=useState(""),[rows,setRows]=useState([]),[history,setHistory]=useState([]),[selected,setSelected]=useState([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[refresh,setRefresh]=useState(0);
+ const [offset,setOffset]=useState(0),[total,setTotal]=useState(0);
  const event=events.find(e=>e.id===eventId);
  useEffect(()=>{
-  let active=true;
+  let active=true;const controller=new AbortController();
   setRows([]);setHistory([]);setSelected([]);setError("");setMessage("");
   if(!eventId)return;
   setLoading(true);
-  Promise.all([api.badgeCandidates(eventId,schoolId||null,role||null),api.badgeHistory(tenant,eventId,schoolId||null)])
-   .then(([rows,history])=>{if(active){setRows(rows);setHistory(history);}})
+  const timer=setTimeout(()=>Promise.all([api.badgeCandidates(eventId,schoolId||null,role||null,query,offset,controller.signal),api.badgeHistory(tenant,eventId,schoolId||null)])
+   .then(([result,history])=>{if(active){setRows(result.rows);setTotal(result.total);setHistory(history);}})
    .catch(error=>{if(active)setError(readableError(error));})
-   .finally(()=>{if(active)setLoading(false);});
-  return ()=>{active=false;};
- },[api,tenant,eventId,schoolId,role,refresh]);
- const normalized=query.toLocaleLowerCase("pt-BR");
- const visible=rows.filter(r=>[r.person_name,r.school_name,r.role_label].join(" ").toLocaleLowerCase("pt-BR").includes(normalized));
+   .finally(()=>{if(active)setLoading(false);}),350);
+  return ()=>{active=false;clearTimeout(timer);controller.abort();};
+ },[api,tenant,eventId,schoolId,role,query,offset,refresh]);
+ const visible=rows;
  const chosen=rows.filter(r=>selected.includes(keyOf(r)));
  const available=visible.filter(r=>r.photo_id);
  const filteredHistory=history.filter(b=>!role||b.role===role);
@@ -49,16 +50,18 @@ export default function EventBadges({events,schools,api,tenant}) {
  return <section className="panel event-badges">
   <h2>Crachás do evento</h2><p className="panel-desc">Atletas e comissão técnica de inscrições aprovadas e responsáveis autorizados das escolas participantes. A foto de identificação é obrigatória para emitir.</p>
   <div className="badge-filters">
-   <label>Evento<select aria-label="Evento dos crachás" value={eventId} disabled={busy} onChange={e=>setEventId(e.target.value)}><option value="">Selecione o evento</option>{events.map(e=><option key={e.id} value={e.id}>{e.name} · {e.year}{e.status==='Arquivado'?' · Arquivado':''}</option>)}</select></label>
-   <label>Escola<select aria-label="Escola dos crachás" value={schoolId} disabled={busy} onChange={e=>setSchoolId(e.target.value)}><option value="">Todas as escolas</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-   <label>Perfil<select aria-label="Perfil dos crachás" value={role} disabled={busy} onChange={e=>setRole(e.target.value)}><option value="">Todos</option><option value="athlete">Atletas</option><option value="staff">Comissão técnica</option><option value="responsible">Responsáveis</option></select></label>
+   <label>Evento<select aria-label="Evento dos crachás" value={eventId} disabled={busy} onChange={e=>{setEventId(e.target.value);setOffset(0);}}><option value="">Selecione o evento</option>{events.map(e=><option key={e.id} value={e.id}>{e.name} · {e.year}{e.status==='Arquivado'?' · Arquivado':''}</option>)}</select></label>
+   <label>Escola<select aria-label="Escola dos crachás" value={schoolId} disabled={busy} onChange={e=>{setSchoolId(e.target.value);setOffset(0);}}><option value="">Todas as escolas</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+   <label>Perfil<select aria-label="Perfil dos crachás" value={role} disabled={busy} onChange={e=>{setRole(e.target.value);setOffset(0);}}><option value="">Todos</option><option value="athlete">Atletas</option><option value="staff">Comissão técnica</option><option value="responsible">Responsáveis</option></select></label>
   </div>
   {error&&<p role="alert" className="school-error">{error}</p>}{message&&<p role="status" className="school-success">{message}</p>}
   {!eventId?<div className="empty">Selecione o evento para consultar os crachás disponíveis.</div>:<>
-   <div className="badge-toolbar"><label>Pesquisar pessoa ou escola<input aria-label="Pesquisar crachá" type="search" value={query} onChange={e=>setQuery(e.target.value)} /></label><button type="button" className="secondary" disabled={busy||loading} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={15}/>Atualizar lista</button></div>
+   <div className="badge-toolbar"><label>Pesquisar pessoa ou escola<input aria-label="Pesquisar crachá" type="search" value={query} onChange={e=>{setQuery(e.target.value);setOffset(0);}} /></label><button type="button" className="secondary" disabled={busy||loading} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={15}/>Atualizar lista</button></div>
    {loading?<p role="status">Consultando participantes e emissões…</p>:<>
     <div className="badge-selection-actions"><span>{chosen.length} selecionado(s) · máximo de 50 por lote</span><div className="staff-actions"><button className="secondary" disabled={busy||!available.length||event?.status==='Arquivado'} onClick={selectAll}>Selecionar com foto</button><button className="text-btn" disabled={busy||!selected.length} onClick={()=>setSelected([])}>Limpar seleção</button></div></div>
     <div className="table-scroll"><table><thead><tr><th>Selecionar</th><th>Pessoa</th><th>Escola</th><th>Perfil</th><th>Foto</th></tr></thead><tbody>{visible.map(r=><tr key={keyOf(r)}><td><input type="checkbox" aria-label={`Selecionar ${r.person_name} · ${r.role_label}`} checked={selected.includes(keyOf(r))} disabled={busy||!r.photo_id||event?.status==='Arquivado'||(!selected.includes(keyOf(r))&&selected.length>=50)} onChange={e=>setSelected(e.target.checked?[...selected,keyOf(r)]:selected.filter(k=>k!==keyOf(r)))} /></td><td><strong>{r.person_name}</strong></td><td>{r.school_name}</td><td>{r.role_label}</td><td><span className={'tag '+(r.photo_id?'live':'warning')}>{r.photo_id?'Com foto':'Completar foto'}</span></td></tr>)}{!visible.length&&<tr><td colSpan={5} className="table-empty">Nenhum participante aprovado encontrado para estes filtros.</td></tr>}</tbody></table></div>
+    <ServerPagination total={total} offset={offset} loading={loading||busy} onPage={setOffset} />
+    <p className="form-note">A seleção é feita por página. Emita este lote antes de mudar de página ou de filtros.</p>
     {rows.some(r=>!r.photo_id)&&<p className="form-note">Cadastros sem foto aparecem para conferência. Complete a foto antes de emitir o crachá.</p>}
     <div className="school-form-footer"><button className="primary" disabled={busy||loading||!chosen.length||event?.status==='Arquivado'} onClick={emit}><Printer size={16}/>{busy?'Preparando…':'Emitir e abrir impressão'}</button></div>
    </>}

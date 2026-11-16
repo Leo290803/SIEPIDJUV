@@ -1,3 +1,5 @@
+import ServerPagination from "./ServerPagination.jsx";
+import { useServerFilters } from "./data/useServerFilters.js";
 import PersonPhoto from "./PersonPhoto.jsx";
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personDataIssues, normalizeCpf } from "./personData.js";
@@ -36,6 +38,7 @@ export function readStaff() {
   }
 }
 export default function TechnicalStaff({
+  remote,
   schoolId,
   records: providedRecords,
   schools: providedSchools,
@@ -51,9 +54,9 @@ export default function TechnicalStaff({
   );
   const records = providedRecords || localRecords;
   const [busy, setBusy] = useState(false);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("active");
-  const [schoolFilter, setSchoolFilter] = useState(schoolId || "");
+  const [query, setQuery] = useState(remote?.filters.query || "");
+  const [filter, setFilter] = useState(remote?.filters.status || "active");
+  const [schoolFilter, setSchoolFilter] = useState(remote?.filters.schoolId || schoolId || "");
   const [editing, setEditing] = useState(null);
   const [archiving, setArchiving] = useState(null);
   const [error, setError] = useState("");
@@ -74,6 +77,9 @@ export default function TechnicalStaff({
     else setEditing(null);
     setError("");
   }, [routeAction, routeRecordId]);
+  useEffect(() => {
+    if(routeAction === "edit" && !editing && routeRecordId) setEditing(records.find(r=>r.id===routeRecordId) || null);
+  }, [records,routeAction,routeRecordId]);
   const [photoChange, setPhotoChange] = useState(undefined);
   useEffect(() => setPhotoChange(undefined), [routeAction, routeRecordId]);
   const closeRecord = () => {
@@ -84,7 +90,8 @@ export default function TechnicalStaff({
   const schoolName = (record) =>
     schools.find((s) => s.id === record.schoolId)?.name || record.school;
   const scoped = records.filter((r) => !schoolId || r.schoolId === schoolId);
-  const shown = scoped.filter(
+  useServerFilters(remote, {query, schoolId:schoolFilter, status:filter});
+  const shown = remote ? records : scoped.filter(
     (r) =>
       (!schoolFilter || r.schoolId === schoolFilter) &&
       (filter === "all" ||
@@ -223,8 +230,8 @@ export default function TechnicalStaff({
       <div className="panel">
         <div className="table-toolbar">
           <span className="record-count">
-            {shown.length}{" "}
-            {shown.length === 1 ? "profissional" : "profissionais"}
+            {remote?.total ?? shown.length}{" "}
+            {(remote?.total ?? shown.length) === 1 ? "profissional" : "profissionais"}
           </span>
           <div className="school-tools">
             <button
@@ -355,6 +362,7 @@ export default function TechnicalStaff({
           </table>
         </div>
       </div>
+      {remote && <ServerPagination {...remote} />}
       {editing && (
         <div className="modal-backdrop">
           <div

@@ -2,7 +2,7 @@ export async function createReportPdf({ title, institution, columns, rows, filte
   if (!columns.length || !rows.length) throw Error("Não há resultados ou colunas para exportar.");
   const [{ jsPDF }, { autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
   const direction = orientation === "auto" ? (columns.length > 6 ? "landscape" : "portrait") : orientation;
-  const doc = new jsPDF({ orientation: direction, unit: "mm", format: "a4", putOnlyUsedFonts: true });
+  const doc = new jsPDF({ orientation: direction, unit: "mm", format: "a4", compress: true, putOnlyUsedFonts: true });
   doc.setProperties({ title: `SIEP · ${title}`, subject: filters.join("; "), author: institution });
   const width = doc.internal.pageSize.getWidth(), margin = 14, textWidth = width - margin * 2;
   let y = 16;

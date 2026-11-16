@@ -11,7 +11,9 @@
     "test:browser": "node scripts/test_connected_browser.cjs",
     "test:database": "python scripts/test_database.py",
     "test:access-browser": "node scripts/test_managed_access_browser.cjs",
-    "test:badge-print": "node scripts/test_badge_print.cjs"
+    "test:badge-print": "node scripts/test_badge_print.cjs",
+    "test:scale": "python scripts/test_scale.py",
+    "test:scale-browser": "SIEP_SCALE_BROWSER=1 node scripts/test_connected_browser.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",

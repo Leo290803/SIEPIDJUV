@@ -1,3 +1,4 @@
+const origin=process.env.SIEP_TEST_ORIGIN||'http://localhost:5173';
 // Navegador real + API simulada: não cria contas nem envia e-mails.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -11,6 +12,10 @@ try {
   } = require("/opt/codex/runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
 }
 (async () => {
+  const {mapPortalData}=await import('../src/data/peopleMapping.js');
+  const {fromEvent}=await import('../src/data/eventMapping.js');
+  const {buildReport,groupRows,sortRows,normalize}=await import('../src/reports/model.js');
+  const queryCalls=[];
   const browser = await chromium.launch({
     executablePath:
       process.env.CHROMIUM_PATH ||
@@ -172,6 +177,47 @@ try {
         return route.fulfill({ status:200, body:bucket==='siep-person-photos'?portrait:Buffer.from("test-image"),contentType:"image/png" });
       }
       const table = url.pathname.split("/").at(-1);
+      if(table==='siep_report_page'){
+        queryCalls.push({table,body});
+        const schools=tables.schools.map(s=>({...s,...s.details}));
+        const configKeys=['event_modalities','event_categories','event_proofs','event_rules','event_fields','document_requirements','event_staff_roles'];
+        const events=tables.events.map(e=>fromEvent(e,Object.fromEntries(configKeys.map(k=>[k,tables[k].filter(r=>r.event_id===e.id)]))));
+        const report=buildReport({data:mapPortalData(tables),events,schools},body.p_filters);
+        const rows=sortRows(body.p_group?groupRows(report.rows,body.p_group):report.rows,body.p_sort,body.p_direction);
+        return response(route,{rows:rows.slice(body.p_offset,body.p_offset+body.p_limit),total:rows.length,summary:report.summary,snapshot:'fixture-stable'});
+      }
+      if(table==='siep_portal_page'){
+        queryCalls.push({table,body});
+        const scope=body.p_school_id,filters=body.p_filters||{},mode=body.p_mode;
+        const event=filters.eventId||tables.school_event_contexts.find(c=>c.school_id===scope)?.event_id;
+        const pmap=new Map(tables.people.map(p=>[p.id,p])),smap=new Map(tables.schools.map(s=>[s.id,s]));
+        let links=[],registrations=[],total=0;
+        if(mode==='people'){
+          links=tables.school_people.filter(l=>l.role===body.p_role&&(!scope||l.school_id===scope)&&(!filters.schoolId||l.school_id===filters.schoolId)).filter(l=>{
+            const p=pmap.get(l.person_id),archived=p.archived||l.archived||(['athlete','staff'].includes(l.role)&&l.status!=='approved');
+            const state=filters.status||'all';
+            return (['all','Todos'].includes(state)||state==='active'&&!archived||state==='archived'&&archived||({Pendente:'pending',Aprovado:'approved',Recusado:'refused',Encerrado:'closed'})[state]===l.status)&&normalize([p.full_name,p.cpf,smap.get(l.school_id)?.name,l.position,p.contact?.email].join(' ')).includes(normalize(filters.query||''));
+          }).sort((a,b)=>pmap.get(a.person_id).full_name.localeCompare(pmap.get(b.person_id).full_name));
+          total=links.length;links=links.slice(body.p_offset,body.p_offset+body.p_limit);
+          if(body.p_detail_id&&!links.some(l=>l.id===body.p_detail_id)){const l=tables.school_people.find(l=>l.id===body.p_detail_id);if(l)links.push(l);}
+        }
+        if(mode==='registrations'){
+          registrations=tables.registrations.filter(r=>(!scope||r.school_id===scope)&&(!event||r.event_id===event)&&(!filters.status||filters.status==='all'||r.status===filters.status)&&normalize([tables.events.find(e=>e.id===r.event_id)?.name,smap.get(r.school_id)?.name].join(' ')).includes(normalize(filters.query||'')));
+          total=registrations.length;registrations=registrations.slice(body.p_offset,body.p_offset+body.p_limit);
+          if(body.p_detail_id&&!registrations.some(r=>r.id===body.p_detail_id)){const r=tables.registrations.find(r=>r.id===body.p_detail_id);if(r)registrations.push(r);}
+        }
+        const rids=new Set(registrations.map(r=>r.id));
+        const allocations=tables.registration_athletes.filter(a=>rids.has(a.registration_id)||(mode==='registrations'&&body.p_edit&&a.school_id===scope&&a.event_id===event));
+        const assigned=tables.registration_staff.filter(a=>rids.has(a.registration_id));
+        const pids=new Set([...links.map(l=>l.person_id),...allocations.map(a=>a.person_id),...assigned.map(a=>a.person_id)]);
+        if(mode==='registrations'){
+          if(body.p_edit)for(const l of tables.school_people.filter(l=>l.role==='staff'&&l.school_id===scope))pids.add(l.person_id);
+          links=tables.school_people.filter(l=>pids.has(l.person_id)&&(!scope||l.school_id===scope));
+        }
+        const parts=tables.event_participations.filter(p=>pids.has(p.person_id)&&(!scope||p.school_id===scope)),partids=new Set(parts.map(p=>p.id));
+        const selected={...tables,people:tables.people.filter(p=>pids.has(p.id)),school_people:links,person_photos:tables.person_photos.filter(p=>pids.has(p.person_id)),event_participations:parts,participation_categories:tables.participation_categories.filter(p=>partids.has(p.participation_id)),participant_documents:tables.participant_documents.filter(p=>partids.has(p.participation_id)),membership_decisions:[],registrations,registration_athletes:allocations,registration_staff:assigned,school_event_contexts:tables.school_event_contexts.filter(c=>c.school_id===scope),notifications:mode==='notifications'?tables.notifications:[]};
+        return response(route,{tables:selected,total,summary:{pendingLinks:tables.school_people.filter(l=>l.role==='responsible'&&l.status==='pending').length,submitted:tables.registrations.filter(r=>r.status==='submitted').length,unread:tables.notifications.filter(n=>!n.read_at).length}});
+      }
       if (table === "siep_prepare_person_photo") {
         const current=tables.person_photos.find(p=>p.person_id===body.p_person_id&&p.is_current);
         assert.equal(body.p_expected_photo_id,current?.id||null);
@@ -187,7 +233,7 @@ try {
       if (table === "siep_remove_person_photo") {
         const photo=tables.person_photos.find(p=>p.person_id===body.p_person_id&&p.is_current);assert.equal(body.p_expected_photo_id,photo?.id||null);if(photo){photo.is_current=false;photo.status="superseded";}return response(route,null);
       }
-      if (table === "siep_badge_candidates") {
+      if (table === "siep_badge_page") {
         const eligible=new Map();
         for(const registration of tables.registrations.filter(r=>r.event_id===body.p_event_id&&r.status==='approved'&&(!body.p_school_id||r.school_id===body.p_school_id))){
           for(const [role,assignments] of [['athlete',tables.registration_athletes],['staff',tables.registration_staff]])for(const assignment of assignments.filter(a=>a.registration_id===registration.id)){
@@ -197,7 +243,8 @@ try {
             eligible.set([school.id,person.id,role].join(':'),row);
           }
         }
-        return response(route,[...eligible.values()]);
+        const all=[...eligible.values()].filter(r=>normalize(r.person_name+' '+r.school_name).includes(normalize(body.p_query||'')));
+        return response(route,{rows:all.slice(body.p_offset,body.p_offset+body.p_limit),total:all.length});
       }
       if (table === "siep_issue_event_badges") {
         const event=tables.events.find(e=>e.id===body.p_event_id),issued=[];
@@ -506,11 +553,11 @@ try {
         ]),
       );
   });
-  await page.goto("http://localhost:5173");
+  await page.goto(origin);
   await page.getByRole("heading", { name: "Acessar o SIEP" }).waitFor();
   assert.equal(authCalls, 0);
   assert.equal(await page.getByRole("button", { name: "Abrir demonstração local" }).count(), 0);
-  await page.goto("http://localhost:5173/demonstracao");
+  await page.goto(origin + "/demonstracao");
   await page.getByRole("heading", { name: "Acessar o SIEP" }).waitFor();
   assert.equal(new URL(page.url()).pathname, "/entrar");
   await page.getByRole("button", { name: "Esqueci minha senha" }).click();
@@ -521,7 +568,7 @@ try {
       "Se houver uma conta para este endereço, você receberá as instruções de recuperação.",
     )
     .waitFor();
-  assert.equal(resetRedirect, "http://localhost:5173/?recovery=1");
+  assert.equal(resetRedirect, origin + "/?recovery=1");
   await page.getByRole("button", { name: "Voltar ao acesso" }).click();
   await page.getByLabel(/^(E-mail|CPF ou e-mail)$/).fill(user.email);
   await page.getByLabel("Senha", { exact: true }).fill("senha-de-teste-longa");
@@ -830,6 +877,7 @@ try {
     await page.getByLabel('Tipo de relatório',{exact:true}).selectOption(type);
     await resultTable.waitFor();
   }
+  if(process.env.SIEP_SCALE_BROWSER)await require('./test_scale_browser.cjs')({page,tables,tenant,queryCalls});
   await page.getByRole("button", { name: "Notificações", exact: true }).click();
   await page
     .getByText("Nenhuma notificação recebida.", { exact: true })
@@ -920,35 +968,35 @@ try {
   assert.ok(new URL(page.url()).pathname.startsWith("/escola/"));
   if (process.env.SIEP_LAYOUT_AUDIT) await require("./audit_layout.cjs")({page,tenant,schoolId:tables.schools[0].id,eventId:tables.events[0].id,registrationId:tables.registrations[0]?.id,area:"escola"});
   await page.goto(
-    "http://localhost:5173/secretaria/" + tenant + "/instituicao",
+    origin + "/secretaria/" + tenant + "/instituicao",
   );
   await page
     .getByRole("heading", { name: "Acesso não autorizado", exact: true })
     .waitFor();
   await page.goto(
-    "http://localhost:5173/escola/" +
+    origin + "/escola/" +
       tenant +
       "/escolas/99999999-9999-4999-8999-999999999999/atletas",
   );
   await page
     .getByRole("heading", { name: "Acesso não autorizado", exact: true })
     .waitFor();
-  await page.goto("http://localhost:5173/rota-inexistente");
+  await page.goto(origin + "/rota-inexistente");
   await page
     .getByRole("heading", { name: "Página não encontrada", exact: true })
     .waitFor();
   isManager = true;
-  await page.goto("http://localhost:5173/secretaria/" + tenant + "/usuarios");
+  await page.goto(origin + "/secretaria/" + tenant + "/usuarios");
   await page
     .getByRole("heading", { name: "Acesso não autorizado", exact: true })
     .waitFor();
-  await page.goto("http://localhost:5173/secretaria/" + tenant + "/eventos");
+  await page.goto(origin + "/secretaria/" + tenant + "/eventos");
   await page
     .getByRole("button", { name: "Novo evento", exact: true })
     .waitFor();
   isAdmin = true;
   isManager = false;
-  await page.goto("http://localhost:5173/secretaria/" + tenant + "/usuarios");
+  await page.goto(origin + "/secretaria/" + tenant + "/usuarios");
   await page
     .getByRole("heading", {
       name: "Usuários da Secretaria",
@@ -962,10 +1010,10 @@ try {
     .getByRole("heading", { name: "Acesso não autorizado", exact: true })
     .waitFor();
   await page.goto(
-    "http://localhost:5173/entrar?retorno=https://example.invalid",
+    origin + "/entrar?retorno=https://example.invalid",
   );
   await page.getByRole("button", { name: "Abrir menu", exact: true }).waitFor();
-  assert.equal(new URL(page.url()).origin, "http://localhost:5173");
+  assert.equal(new URL(page.url()).origin, origin);
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await page
     .getByRole("button", { name: "Sair da conta", exact: true })
@@ -982,7 +1030,7 @@ try {
       .count(),
     0,
   );
-  await page.goto("http://localhost:5173/secretaria/" + tenant + "/atletas");
+  await page.goto(origin + "/secretaria/" + tenant + "/atletas");
   await page
     .getByRole("heading", { name: "Acessar o SIEP", exact: true })
     .waitFor();
@@ -1000,7 +1048,7 @@ try {
       .count(),
     0,
   );
-  await page.goto("http://localhost:5173/redefinir-senha");
+  await page.goto(origin + "/redefinir-senha");
   await page
     .getByRole("heading", { name: "Recuperar acesso", exact: true })
     .waitFor();
@@ -1010,7 +1058,7 @@ try {
       { exact: true },
     )
     .waitFor();
-  await page.goto('http://localhost:5173/escola/entrar');
+  await page.goto(origin + '/escola/entrar');
   await page.getByLabel(/^(E-mail|CPF ou e-mail)$/).fill(user.email);
   await page.getByLabel('Senha',{exact:true}).fill('senha-de-teste-longa');
   await page.getByRole('button',{name:'Entrar',exact:true}).click();

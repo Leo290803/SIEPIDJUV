@@ -13,6 +13,7 @@ export const supabase = createClient(
   },
 );
 export function readableError(error) {
+  if (error?.code === "57014") return "A consulta demorou demais. Selecione um evento ou escola e tente novamente.";
   if (
     error?.message?.includes("Refresh Token") ||
     ["PGRST301", "PGRST303"].includes(error?.code)

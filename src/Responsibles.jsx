@@ -1,3 +1,5 @@
+import ServerPagination from "./ServerPagination.jsx";
+import { useServerFilters } from "./data/useServerFilters.js";
 import PersonPhoto from "./PersonPhoto.jsx";
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personDataIssues, normalizeCpf } from "./personData.js";
@@ -29,6 +31,7 @@ export function readResponsibles() {
   }
 }
 export default function Responsibles({
+  remote,
   records,
   onChange,
   schools: providedSchools,
@@ -41,8 +44,8 @@ export default function Responsibles({
   onOpenRecord,
   onCloseRecord,
 }) {
-  const [query, setQuery] = useState(""),
-    [filter, setFilter] = useState("Todos"),
+  const [query, setQuery] = useState(remote?.filters.query || ""),
+    [filter, setFilter] = useState(remote?.filters.status || "Todos"),
     [form, setForm] = useState(false),
     [action, setAction] = useState(null),
     [error, setError] = useState(""),
@@ -64,6 +67,9 @@ export default function Responsibles({
     else setForm(false);
     setError("");
   }, [routeAction, routeRecordId]);
+  useEffect(() => {
+    if(routeAction === "edit" && !form && routeRecordId) setForm(records.find(r=>r.id===routeRecordId) || false);
+  }, [records,routeAction,routeRecordId]);
   const [photoChange, setPhotoChange] = useState(undefined);
   useEffect(() => setPhotoChange(undefined), [routeAction, routeRecordId]);
   const closeRecord = () => {
@@ -238,7 +244,8 @@ export default function Responsibles({
       setMessage("Situação do vínculo atualizada.");
     }
   };
-  const shown = records.filter(
+  useServerFilters(remote, {query, status:filter});
+  const shown = remote ? records : records.filter(
     (r) =>
       (filter === "Todos" || r.status === filter) &&
       normalize([r.name, r.cpf, r.email, schoolName(r)].join(" ")).includes(
@@ -263,7 +270,7 @@ export default function Responsibles({
       <div className="panel">
         <div className="section-title">
           <span className="record-count">
-            {shown.length} {shown.length === 1 ? "responsável" : "responsáveis"}
+            {remote?.total ?? shown.length} {(remote?.total ?? shown.length) === 1 ? "responsável" : "responsáveis"}
           </span>
           <div className="school-tools">
             <button
@@ -393,6 +400,7 @@ export default function Responsibles({
           </div>
         )}
       </div>
+      {remote && <ServerPagination {...remote} />}
       {form && (
         <div className="modal-backdrop">
           <div

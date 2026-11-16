@@ -4,42 +4,29 @@ import {
   issueMessages,
 } from "./peopleMapping.js";
 export function portalRepository(client) {
-  const tables = [
-    "people",
-    "person_photos",
-    "school_people",
-    "event_participations",
-    "participation_categories",
-    "participant_documents",
-    "membership_decisions",
-    "registrations",
-    "registration_athletes",
-    "registration_staff",
-    "school_event_contexts",
-    "notifications",
-  ];
   function checked(result) {
     if (result.error) throw result.error;
     return result.data;
   }
-  async function all(table, tenant, filters = {}) {
-    let rows = [],
-      start = 0;
-    for (;;) {
-      let query = client.from(table).select("*").eq("institution_id", tenant);
-      for (const [key, value] of Object.entries(filters))
-        query = query.eq(key, value);
-      const page = checked(await query.order("id").range(start, start + 499));
-      rows.push(...page);
-      if (page.length < 500) return rows;
-      start += 500;
-    }
+  async function queryPage(name, parameters, signal, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const abort = () => controller.abort(signal.reason);
+    if(signal?.aborted) abort();
+    else signal?.addEventListener("abort",abort,{once:true});
+    const timer = setTimeout(()=>controller.abort(Error("A consulta demorou demais. Selecione mais filtros e tente novamente.")),timeoutMs);
+    try {
+      const result = await client.rpc(name,parameters).abortSignal(controller.signal);
+      if(controller.signal.aborted) throw controller.signal.reason;
+      return checked(result);
+    } finally { clearTimeout(timer);signal?.removeEventListener("abort",abort); }
   }
-  async function load(tenant) {
-    const data = await Promise.all(tables.map((t) => all(t, tenant, t === "person_photos" ? { is_current: true } : {})));
-    return mapPortalData(
-      Object.fromEntries(tables.map((t, i) => [t, data[i]])),
-    );
+  async function load(tenant, options = {}, signal) {
+    const response = await queryPage("siep_portal_page", {
+      p_institution_id: tenant, p_mode: options.mode || "light", p_school_id: options.schoolId || null,
+      p_role: options.role || null, p_filters: options.filters || {}, p_offset: options.offset || 0,
+      p_limit: options.limit || 25, p_detail_id: options.detailId || null, p_edit: !!options.edit,
+    },signal);
+    return { ...mapPortalData(response.tables), total: response.total, summary: response.summary };
   }
   async function savePerson(tenant, role, record, options = {}) {
     const profile = options.event
@@ -152,8 +139,12 @@ export function portalRepository(client) {
   }
   return {
     load,
+    reportPage: async (tenant, options, signal) => queryPage("siep_report_page", {
+      p_institution_id:tenant,p_filters:options.filters,p_group:options.groupBy || "",p_sort:options.sort || "name",
+      p_direction:options.direction || "asc",p_offset:options.offset || 0,p_limit:options.limit || 25,p_snapshot:options.snapshot || null,
+    },signal),
     savePerson,
-    badgeCandidates: async (event, school, role) => checked(await client.rpc("siep_badge_candidates", { p_event_id:event, p_school_id:school, p_role:role })),
+    badgeCandidates: async (event, school, role, query = "", offset = 0, signal) => queryPage("siep_badge_page", { p_event_id:event, p_school_id:school, p_role:role, p_query:query, p_offset:offset, p_limit:25 },signal),
     issueBadges: async (event, entries) => checked(await client.rpc("siep_issue_event_badges", { p_event_id:event, p_entries:entries })),
     badgeHistory: async (tenant, event, school) => {
       let query=client.from("event_badges").select("*").eq("institution_id",tenant).eq("event_id",event);

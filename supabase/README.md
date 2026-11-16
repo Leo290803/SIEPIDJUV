@@ -1,5 +1,7 @@
 # Banco SIEP
 
+> Atualização de escala: 23 migrações, 31 tabelas públicas com RLS, 12 suítes SQL e consultas autenticadas paginadas. Novos índices e RPCs não apagam registros. Evidências locais e limites em [DESEMPENHO.md](../DESEMPENHO.md).
+
 > Atualização: 20 migrações, 31 tabelas públicas com RLS e 11 suítes SQL. Emissão versionada de crachás por evento, exclusiva da Secretaria, com foto e inscrição aprovada. APIs e limites em API.md.
 
 > Atualização de fotos: 19 migrações, 30 tabelas públicas com RLS e dez suítes SQL. Foto opcional de pessoas no bucket privado `siep-person-photos`, com versões preservadas, autorização por pessoa e controle de concorrência. Gerador de crachás permanece uma próxima etapa.

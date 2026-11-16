@@ -1,3 +1,5 @@
+import ServerPagination from "./ServerPagination.jsx";
+import { useServerFilters } from "./data/useServerFilters.js";
 import React, { useEffect, useState } from "react";
 import { X, Plus, ClipboardList } from "lucide-react";
 import {
@@ -359,6 +361,7 @@ export function RegistrationEditor({
   );
 }
 export default function ConnectedRegistrations({
+  remote,
   events,
   schools,
   data,
@@ -372,9 +375,9 @@ export default function ConnectedRegistrations({
   routeRegistrationId,
   onRoute,
 }) {
-  const [query, setQuery] = useState(""),
-    [status, setStatus] = useState("all"),
-    [eventFilter, setEventFilter] = useState(""),
+  const [query, setQuery] = useState(remote?.filters.query || ""),
+    [status, setStatus] = useState(remote?.filters.status || "all"),
+    [eventFilter, setEventFilter] = useState(remote?.filters.eventId || ""),
     [editing, setEditing] = useState(null),
     [starting, setStarting] = useState(false),
     [decision, setDecision] = useState(null),
@@ -412,14 +415,15 @@ export default function ConnectedRegistrations({
     return () => {
       active = false;
     };
-  }, [routeAction, routeRegistrationId]);
+  }, [routeAction, routeRegistrationId, data.registrations]);
   const closeRoute = () => {
     setEditing(null);
     setStarting(false);
     setHistory(null);
     onRoute?.(null);
   };
-  const rows = data.registrations.filter(
+  useServerFilters(remote, {query, status, eventId:eventFilter});
+  const rows = remote ? data.registrations : data.registrations.filter(
     (r) =>
       (!school || r.school_id === school.id) &&
       (!event || r.event_id === event.id) &&
@@ -473,7 +477,7 @@ export default function ConnectedRegistrations({
       )}
       <div className="panel">
         <div className="table-toolbar">
-          <span className="record-count">{rows.length} inscrições</span>
+          <span className="record-count">{remote?.total ?? rows.length} inscrições</span>
           <div className="school-tools">
             <label className="search">
               <input
@@ -633,6 +637,7 @@ export default function ConnectedRegistrations({
           </table>
         </div>
       </div>
+      {remote && <ServerPagination {...remote} />}
       {(starting || editing) && (
         <RegistrationEditor
           key={editing?.id || "new"}

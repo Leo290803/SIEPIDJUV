@@ -1,10 +1,12 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { portalPath, eventTabs, safeReturn } from "./routing/routes.js";
 import AccessState from "./routing/AccessState.jsx";
+import { pagePlan } from "./data/pagePlan.js";
+import ServerPagination from "./ServerPagination.jsx";
 import Reports from "./Reports.jsx";
 import EventBadges from "./EventBadges.jsx";
 import StaffAccounts from "./StaffAccounts.jsx";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -72,32 +74,39 @@ export default function InstitutionPortal({
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [refreshKey, setRefreshKey] = useState(0);
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    Promise.all([repo.events(tenant), repo.schools(tenant), api.load(tenant)])
-      .then(([events, schools, data]) => {
-        if (active) {
-          setEvents(events);
-          setSchools(schools);
-          setData(data);
-          setLoading(false);
-        }
-      })
-      .catch((error) => {
-        if (active) {
-          setError(readableError(error));
-          setLoading(false);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [repo, api, tenant, refreshKey]);
   const page = route.page,
     schoolArea = route.area === "escola" || route.schoolContext,
     schoolId = route.schoolId,
     eventId = route.eventId || "";
+  const [catalogLoading, setCatalogLoading] = useState(true), [dataLoading, setDataLoading] = useState(false);
+  const [listState, setListState] = useState({scope:"", filters:{}, offset:0});
+  const scope = [tenant, page, schoolId || ""].join(":");
+  const list = listState.scope === scope ? listState : {scope,filters:{},offset:0};
+  const loadedScope = useRef(""), loadedPlan = useRef(""), loadSequence = useRef(0);
+  const planKey = JSON.stringify(pagePlan(route,list.filters,list.offset));
+  useEffect(() => {
+    let active = true;
+    setCatalogLoading(true);
+    Promise.all([repo.events(tenant),repo.schools(tenant)]).then(([events,schools])=>{
+      if(active){setEvents(events);setSchools(schools);setCatalogLoading(false);}
+    }).catch(error=>{if(active){setError(readableError(error));setCatalogLoading(false);}});
+    return ()=>{active=false;};
+  },[repo,tenant,refreshKey]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const sequence=++loadSequence.current;
+    let active = true;
+    if(loadedScope.current !== scope) setLoading(true);
+    setDataLoading(true);setError("");
+    api.load(tenant,JSON.parse(planKey),controller.signal).then(data=>{
+      if(active && sequence===loadSequence.current){setData(data);loadedPlan.current=planKey;loadedScope.current=scope;setLoading(false);}
+    }).catch(error=>{if(active && sequence===loadSequence.current){setError(readableError(error));setData({...empty});setLoading(false);}})
+      .finally(()=>{if(active && sequence===loadSequence.current)setDataLoading(false);});
+    return ()=>{active=false;controller.abort();};
+  },[api,tenant,scope,planKey,refreshKey]);
+  const remote = {total:data.total || 0,offset:list.offset,limit:25,loading:dataLoading,filters:list.filters,
+    onFilters:filters=>setListState({scope,filters,offset:0}),
+    onPage:offset=>setListState({...list,scope,offset})};
   const school = schools.find((s) => s.id === schoolId);
   const activeEvent = events.find(
     (e) =>
@@ -113,8 +122,7 @@ export default function InstitutionPortal({
         ? managedEvent
         : null;
   const duplicate = route.action === "duplicateEvent" ? managedEvent : null;
-  const requests = data.responsibles.filter((r) => r.status === "Pendente"),
-    notifications = data.notifications.filter((n) => !n.read_at).length;
+  const notifications = data.summary?.unread || 0;
   const go = (next, { primary = false, action, recordId } = {}) => {
     setMobileMenu(false);
     setMessage("");
@@ -169,14 +177,18 @@ export default function InstitutionPortal({
     navigate("/secretaria/" + tenant + "/eventos/" + value.id + "/duplicar");
   };
   async function refresh() {
+    const sequence=++loadSequence.current;
     const [events, schools, data] = await Promise.all([
       repo.events(tenant),
       repo.schools(tenant),
-      api.load(tenant),
+      api.load(tenant,JSON.parse(planKey)),
     ]);
+    if(sequence!==loadSequence.current)return;
     setEvents(events);
     setSchools(schools);
     setData(data);
+    loadedPlan.current=planKey;loadedScope.current=scope;setLoading(false);
+    setDataLoading(false);
   }
   async function savePerson(role, entry, options) {
     setBusy(true);
@@ -208,17 +220,6 @@ export default function InstitutionPortal({
       setBusy(false);
     }
   }
-  const staffForSchool = data.staff.filter(
-      (p) => p.schoolId === school?.id && !p.archived,
-    ),
-    athletesForSchool = data.athletes.filter(
-      (p) => p.schoolId === school?.id && !p.archived,
-    );
-  const ownRegistrations = data.registrations.filter(
-    (r) =>
-      (!schoolArea || r.school_id === school?.id) &&
-      (!schoolArea || !activeEvent || r.event_id === activeEvent.id),
-  );
   const nav =
     route.area === "escola"
       ? [
@@ -263,7 +264,7 @@ export default function InstitutionPortal({
     Responsáveis: data.responsibles,
   };
   if (
-    !loading &&
+    !loading && !catalogLoading && !dataLoading && loadedPlan.current===planKey &&
     ((eventId && !managedEvent) ||
       (schoolId && !school) ||
       (route.recordId &&
@@ -510,10 +511,11 @@ export default function InstitutionPortal({
               {message}
             </p>
           )}
-          {loading ? (
+          {loading || catalogLoading ? (
             <p role="status">Carregando dados da instituição…</p>
           ) : (
             <>
+              {dataLoading && <p role="status">Atualizando registros…</p>}
               {showActive && (
                 <div className="event-context-line">
                   <CalendarDays size={17} />
@@ -582,21 +584,19 @@ export default function InstitutionPortal({
                               [
                                 Users,
                                 "Atletas no evento",
-                                athletesForSchool.filter(
-                                  (a) => a.eventProfiles[activeEvent?.id],
-                                ).length,
+                                data.summary?.athletesInEvent || 0,
                                 "Atletas",
                               ],
                               [
                                 ClipboardList,
                                 "Inscrições neste evento",
-                                ownRegistrations.length,
+                                data.summary?.registrationsInEvent || 0,
                                 "Minhas inscrições",
                               ],
                               [
                                 Users,
                                 "Profissionais da escola",
-                                staffForSchool.length,
+                                data.summary?.schoolStaff || 0,
                                 "Comissão técnica",
                               ],
                             ]
@@ -618,15 +618,13 @@ export default function InstitutionPortal({
                               [
                                 Users,
                                 "Vínculos pendentes",
-                                requests.length,
+                                data.summary?.pendingLinks || 0,
                                 "Responsáveis",
                               ],
                               [
                                 ClipboardList,
                                 "Inscrições para análise",
-                                data.registrations.filter(
-                                  (r) => r.status === "submitted",
-                                ).length,
+                                data.summary?.submitted || 0,
                                 "Inscrições",
                               ],
                             ]
@@ -766,6 +764,7 @@ export default function InstitutionPortal({
                   )}
                   {page === "Atletas" && !showPicker && (
                     <Athletes
+                      remote={remote}
                       key={
                         (roleFormSchool || "all") +
                         "-" +
@@ -793,6 +792,7 @@ export default function InstitutionPortal({
                   )}
                   {page === "Comissão técnica" && (
                     <TechnicalStaff
+                      remote={remote}
                       key={roleFormSchool || "all"}
                       connected
                       schoolId={roleFormSchool}
@@ -813,6 +813,7 @@ export default function InstitutionPortal({
                   {page === "Responsáveis" && !schoolArea && (
                     <>
                       <Responsibles
+                        remote={remote}
                         connected
                         records={data.responsibles}
                         routeAction={route.action}
@@ -859,6 +860,7 @@ export default function InstitutionPortal({
                   {(page === "Inscrições" || page === "Minhas inscrições") &&
                     !showPicker && (
                       <ConnectedRegistrations
+                        remote={remote}
                         key={
                           (roleFormSchool || "all") +
                           "-" +
@@ -893,8 +895,9 @@ export default function InstitutionPortal({
                         onChanged={refresh}
                       />
                     )}
-                  {page === "Relatórios" && !schoolArea && <Reports data={data} events={events} schools={schools} institution={institution} />}
+                  {page === "Relatórios" && !schoolArea && <Reports api={api} events={events} schools={schools} institution={institution} />}
                   {page === "Crachás" && !schoolArea && <EventBadges events={events} schools={schools} api={api} tenant={tenant} />}
+                  {page === "Notificações" && <ServerPagination {...remote} />}
                   {page === "Notificações" && (
                     <div className="panel">
                       <h2>Notificações da minha conta</h2>

@@ -14,21 +14,25 @@ export const registrationStatusLabel = {
 };
 export function mapPortalData(tables) {
   const people = new Map(tables.people.map((p) => [p.id, p]));
+  const index = (rows, key) => {
+    const result = new Map();
+    for (const row of rows) { const id = key(row); if (!result.has(id)) result.set(id, []); result.get(id).push(row); }
+    return result;
+  };
+  const participations = index(tables.event_participations, p => `${p.person_id}:${p.school_id}`);
+  const documentsByParticipation = index(tables.participant_documents.filter(d => d.status === "uploaded"), d => d.participation_id);
+  const categories = index(tables.participation_categories, c => c.participation_id);
+  const decisions = index(tables.membership_decisions, d => d.school_person_id);
+  const photos = new Map((tables.person_photos || []).filter(f => f.is_current && f.status === "uploaded").map(f => [f.person_id, f]));
   const mapRole = (role) =>
     tables.school_people
       .filter((l) => l.role === role && people.has(l.person_id))
       .map((link) => {
         const p = people.get(link.person_id);
         const eventProfiles = {};
-        for (const part of tables.event_participations.filter(
-          (ep) => ep.person_id === p.id && ep.school_id === link.school_id,
-        )) {
+        for (const part of (participations.get(`${p.id}:${link.school_id}`) || [])) {
           const documents = Object.fromEntries(
-            tables.participant_documents
-              .filter(
-                (d) =>
-                  d.participation_id === part.id && d.status === "uploaded",
-              )
+            (documentsByParticipation.get(part.id) || [])
               .map((d) => [
                 d.requirement_id,
                 {
@@ -43,8 +47,7 @@ export function mapPortalData(tables) {
           );
           eventProfiles[part.event_id] = {
             participationId: part.id,
-            categoryIds: tables.participation_categories
-              .filter((c) => c.participation_id === part.id)
+            categoryIds: (categories.get(part.id) || [])
               .map((c) => c.category_id),
             documents,
             status: part.status,
@@ -57,7 +60,7 @@ export function mapPortalData(tables) {
           _contact: p.contact,
           id: link.id,
           personId: p.id,
-          photo: (() => { const photo = (tables.person_photos || []).find(f => f.person_id === p.id && f.is_current && f.status === "uploaded"); return photo ? { id: photo.id, bucket: photo.bucket_id, objectPath: photo.object_path, name: photo.original_name } : null; })(),
+          photo: (() => { const photo = photos.get(p.id); return photo ? { id: photo.id, bucket: photo.bucket_id, objectPath: photo.object_path, name: photo.original_name } : null; })(),
           version: link.version,
           personUpdatedAt: p.updated_at,
           name: p.full_name,
@@ -74,8 +77,7 @@ export function mapPortalData(tables) {
           status: linkStatusLabel[link.status],
           userId: link.user_id,
           eventProfiles,
-          history: tables.membership_decisions
-            .filter((d) => d.school_person_id === link.id)
+          history: (decisions.get(link.id) || [])
             .map((d) => ({
               date: d.created_at,
               status: linkStatusLabel[d.status],

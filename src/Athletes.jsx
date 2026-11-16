@@ -1,3 +1,5 @@
+import ServerPagination from "./ServerPagination.jsx";
+import { useServerFilters } from "./data/useServerFilters.js";
 import PersonPhoto from "./PersonPhoto.jsx";
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personDataIssues, validCpf } from "./personData.js";
@@ -25,6 +27,7 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 export default function Athletes({
+  remote,
   schoolId,
   event,
   records: providedRecords,
@@ -46,9 +49,9 @@ export default function Athletes({
         return [];
       }
     }),
-    [query, setQuery] = useState(""),
-    [schoolFilter, setSchoolFilter] = useState(schoolId || ""),
-    [status, setStatus] = useState("active"),
+    [query, setQuery] = useState(remote?.filters.query || ""),
+    [schoolFilter, setSchoolFilter] = useState(remote?.filters.schoolId || schoolId || ""),
+    [status, setStatus] = useState(remote?.filters.status || "active"),
     [editing, setEditing] = useState(null),
     [archive, setArchive] = useState(null),
     [error, setError] = useState(""),
@@ -71,6 +74,9 @@ export default function Athletes({
     else setEditing(null);
     setError("");
   }, [routeAction, routeRecordId]);
+  useEffect(() => {
+    if(routeAction === "edit" && !editing && routeRecordId) setEditing(records.find(r=>r.id===routeRecordId) || null);
+  }, [records,routeAction,routeRecordId]);
   const [photoChange, setPhotoChange] = useState(undefined);
   useEffect(() => setPhotoChange(undefined), [routeAction, routeRecordId]);
   const closeRecord = () => {
@@ -202,7 +208,8 @@ export default function Athletes({
     setBusy(false);
   };
   const scoped = records.filter((r) => !schoolId || r.schoolId === schoolId);
-  const shown = scoped.filter(
+  useServerFilters(remote, {query, schoolId:schoolFilter, status});
+  const shown = remote ? records : scoped.filter(
     (r) =>
       (!schoolFilter || r.schoolId === schoolFilter) &&
       (status === "all" ||
@@ -227,7 +234,7 @@ export default function Athletes({
       <div className="panel">
         <div className="section-title">
           <span className="record-count">
-            {shown.length} {shown.length === 1 ? "atleta" : "atletas"}
+            {remote?.total ?? shown.length} {(remote?.total ?? shown.length) === 1 ? "atleta" : "atletas"}
           </span>
           <div className="school-tools">
             <button
@@ -362,6 +369,7 @@ export default function Athletes({
           </div>
         )}
       </div>
+      {remote && <ServerPagination {...remote} />}
       {editing && event && (
         <EventAthleteForm
           connected={connected}

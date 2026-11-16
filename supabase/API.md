@@ -6,6 +6,18 @@
 
 O portal conectado já consome os contratos de cadastro, arquivos, inscrições e análise descritos aqui. Chamadas do portal usam uma sessão real de Supabase Auth. Não usar o token administrativo do ambiente no cliente. Usuário sem vínculo aprovado pode somente solicitar/acompanhá-lo e consultar o diretório mínimo de escolas.
 
+## Consultas paginadas (16/11/2026)
+
+Todas usam sessão Auth e verificam a autorização no servidor. Não aceitar instituição/papel informados pelo cliente como autorização.
+
+| RPC | Parâmetros e resultado |
+| --- | --- |
+| `siep_portal_page` | `p_institution_id`, `p_mode` (`light`, `dashboard`, `people`, `registrations`, `notifications`), `p_school_id`, `p_role`, `p_filters`, `p_offset`, `p_limit` (1–100), `p_detail_id`, `p_edit`. Retorna `{tables,total,summary}`. Escola exige escola explícita autorizada; responsáveis globais exigem Secretaria. `tables` contém somente os registros/contexto da página/detalhe. |
+| `siep_report_page` | `p_institution_id`, `p_filters`, `p_group`, `p_sort`, `p_direction`, `p_offset`, `p_limit` (1–500), `p_snapshot` opcional. Exclusiva da Secretaria. Retorna `{rows,total,summary,snapshot}`; linhas têm `{key,cells}`. Datas comparadas em America/Manaus, contagens distintas. Tipos/filtros correspondem a `src/reports/model.js`. Grupo/ordenação são dados parametrizados, sem interpolação SQL. Mudança no marcador da auditoria institucional durante uma exportação retorna `40001`. |
+| `siep_badge_page` | `p_event_id`, `p_school_id`, `p_role`, `p_query`, `p_offset`, `p_limit` (1–100). Exclusiva da Secretaria. Retorna `{rows,total}` com candidatos autorizados/aprovados, inclusive pendência de foto. Emissão aceita somente candidatos com foto. |
+
+O cliente usa 25 registros nas listas e até 500 por lote de exportação. Limites de arquivo, worker e evidências locais: [DESEMPENHO.md](../DESEMPENHO.md). Endpoints anteriores de escrita e emissão continuam compatíveis; não há novo endpoint público/anon de relatórios.
+
 ## Leitura e configuração
 
 SELECT das tabelas públicas passa por RLS: secretaria da instituição ou responsável aprovado da escola. Contas sem esse vínculo não recebem pessoas, documentos nem inscrições. Metadados de solicitação ficam em `school_link_requests`, visíveis apenas ao solicitante e à secretaria.

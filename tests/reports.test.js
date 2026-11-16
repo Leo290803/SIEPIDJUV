@@ -47,7 +47,7 @@ test('PDF real com filtros e paginação exporta todas as linhas e omite CPF por
  const r=report({gender:'Feminino'}),columns=r.columns.filter(c=>c.visible);assert.ok(!columns.some(c=>c.key==='cpf'));
  const rows=Array.from({length:120},(_,i)=>({...r.rows[0],key:String(i),cells:{...r.rows[0].cells,name:`Ana ${i}`}}));
  const doc=await createReportPdf({title:'Atletas nas inscrições',institution:'IDJUV',columns,rows,filters:['Sexo: Feminino','Escola: Escola Árvore'],summary:{...r.summary,records:120}});
- assert.ok(doc.getNumberOfPages()>1);assert.ok(doc.output().startsWith('%PDF'));assert.ok(doc.output().includes('Ana 119'));
+ assert.ok(doc.getNumberOfPages()>1);assert.ok(doc.output().startsWith('%PDF'));assert.ok(doc.internal.pages.flat().join(' ').includes('Ana 119'));
  await assert.rejects(createReportPdf({columns:[],rows:[]}),/resultados/);
 });
 
