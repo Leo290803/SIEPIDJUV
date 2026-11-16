@@ -67,6 +67,7 @@ export function fromEvent(row, config = {}) {
       enabled: r.enabled,
     })),
     requirements: {
+      guardian: row.settings?.guardian,
       data: Object.fromEntries(
         (config.event_fields || []).map((f) => [f.field_key, f.requirement]),
       ),
@@ -146,6 +147,7 @@ export function sectionPayload(
     };
   if (section === "requirements")
     return {
+      ...(event.requirements.guardian ? {guardian:event.requirements.guardian} : {}),
       fields: Object.entries(event.requirements.data).map(
         ([field_key, requirement]) => ({
           id:

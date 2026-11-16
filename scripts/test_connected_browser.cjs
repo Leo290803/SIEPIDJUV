@@ -355,6 +355,7 @@ try {
             p.person_id === body.p_person_id && p.event_id === body.p_event_id,
         );
         part.status = body.p_complete ? "complete" : "draft";
+        part.additional_data=body.p_additional_data;
         return response(route, {
           id: part.id,
           status: part.status,
@@ -500,12 +501,10 @@ try {
           documents: "document_requirements",
           roles: "event_staff_roles",
         };
-        for (const [key, rows] of Object.entries(body.p_payload))
-          tables[names[key]] = rows.map((r) => ({
-            ...r,
-            event_id: ev.id,
-            institution_id: tenant,
-          }));
+        for (const [key, rows] of Object.entries(body.p_payload)) {
+          if(key==='guardian'){ev.settings={...ev.settings,guardian:rows};continue;}
+          tables[names[key]] = rows.map((r) => ({...r,event_id: ev.id,institution_id: tenant}));
+        }
         ev.configuration_version++;
         return response(route, ev.configuration_version);
       }
@@ -652,6 +651,9 @@ try {
     .getByRole("button", { name: "Adicionar documento", exact: true })
     .click();
   await page.getByLabel("Documento 1", { exact: true }).fill("Foto");
+  await page.getByRole('checkbox',{name:'Solicitar dados do responsável somente para menores de 18 anos',exact:true}).check();
+  await page.getByLabel('Data de início do evento para calcular a idade',{exact:true}).fill('2026-12-01');
+  await page.getByLabel('Exigência de E-mail do responsável',{exact:true}).selectOption('optional');
   await page
     .getByRole("button", {
       name: "Salvar formulário e documentos",
@@ -661,6 +663,11 @@ try {
   await page
     .getByText("Configuração salva no banco.", { exact: true })
     .waitFor();
+  await page.screenshot({path:'/tmp/siep-guardian-settings-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:'/tmp/siep-guardian-settings-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
   await page
     .getByRole("button", { name: "Editar informações do evento", exact: true })
     .click();
@@ -768,6 +775,34 @@ try {
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.setViewportSize({width:1440,height:1000});
 
+  const guardianSection=page.getByRole('region',{name:'Dados do responsável legal',exact:true});
+  await guardianSection.waitFor();
+  const beforeIncomplete=tables.event_participations.length;
+  await page.getByRole('button',{name:'Concluir cadastro',exact:true}).click();
+  assert.equal(tables.event_participations.length,beforeIncomplete,'Cadastro incompleto foi enviado ao servidor');
+  assert.equal(await page.locator('input[name=guardian_name]').getAttribute('aria-invalid'),'true');
+  await page.getByRole('button',{name:'Preencha nome completo do responsável.',exact:true}).click();
+  await page.waitForFunction(()=>document.activeElement.name==='guardian_name');
+  const pendingModal=page.getByRole('dialog');
+  await pendingModal.evaluate(el=>el.scrollTop=0);
+  await page.screenshot({path:'/tmp/siep-guardian-pending-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:'/tmp/siep-guardian-pending-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
+  const originalBirth=await page.getByLabel('Data de nascimento *',{exact:true}).inputValue();
+  await page.getByLabel('Data de nascimento *',{exact:true}).fill('2008-12-01');
+  await guardianSection.waitFor({state:'detached'});
+  assert.equal(await page.getByRole('button',{name:'Preencha nome completo do responsável.',exact:true}).count(),0);
+  await page.getByLabel('Data de nascimento *',{exact:true}).fill(originalBirth);
+  await guardianSection.waitFor();
+  await page.getByLabel('Nome completo do responsável *',{exact:true}).fill('Maria de Oliveira');
+  await page.getByLabel('CPF do responsável *',{exact:true}).fill('52998224725');
+  assert.equal(await page.locator('input[name=guardian_cpf]').getAttribute('aria-invalid'),'true');
+  await page.getByLabel('CPF do responsável *',{exact:true}).fill('11144477735');
+  await page.getByLabel('Parentesco *',{exact:true}).selectOption('Mãe');
+  await page.getByLabel('Telefone do responsável *',{exact:true}).fill('(95) 99999-8888');
+  assert.equal(await page.getByLabel('Nome completo *',{exact:true}).inputValue(),'Atleta conectado');
   await page.getByRole("checkbox", { name: /Futsal · 12 a 14 anos/ }).check();
   await page.getByLabel("Anexar Foto", { exact: true }).setInputFiles({
     name: "foto.png",
@@ -779,6 +814,9 @@ try {
     .click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page.getByText("Cadastro completo", { exact: true }).waitFor();
+  assert.equal(tables.event_participations[0].additional_data.guardian_name,'Maria de Oliveira');
+  assert.equal(tables.event_participations[0].additional_data.guardian_cpf,'11144477735');
+  assert.equal(tables.people[0].contact?.guardian_name,undefined);
   assert.equal(tables.person_photos.filter(p=>p.is_current).length,1);
   assert.equal(tables.person_photos.filter(p=>p.status==='superseded').length,1);
   assert.equal(

@@ -1,3 +1,4 @@
+import {guardianPolicy,guardianIssues,guardianFields} from "./guardianRequirements.js";
 import { personDataIssues } from "./personData.js";
 import { categoryAcceptsBirth } from "./categoryEligibility.js";
 export const baseDataFields = [
@@ -28,6 +29,7 @@ export function requirementsFor(event) {
   const configured = event.requirements || defaults;
   return {
     ...configured,
+    guardian: guardianPolicy(event),
     data: {
       ...defaults.data,
       ...configured.data,
@@ -51,6 +53,7 @@ export function athleteEventPending(athlete, event) {
       !(profile.additionalData?.[key] ?? athlete[key])
     )
       pending.push(label);
+  pending.push(...guardianIssues({...athlete,...Object.fromEntries(guardianFields.map(([key])=>[key,profile.additionalData?.[key] ?? athlete[key]]))},event).map(issue=>issue.message));
   if (
     !(profile.categoryIds || []).some((id) =>
       (event.categories || []).some((c) => c.id === id && c.enabled !== false),

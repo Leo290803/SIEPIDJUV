@@ -1,5 +1,7 @@
 # Banco SIEP
 
+> Responsável legal: 25 migrações, 31 tabelas públicas com RLS e 14 suítes SQL. Política por evento para menores na data explícita de início; dados privados na participação, com validação de conclusão/envio/aprovação no servidor. Nenhum evento anterior é ativado automaticamente. Contrato em API.md.
+
 > Fotos fictícias: 24 migrações, 31 tabelas públicas com RLS e 13 suítes SQL. Dois retratos sintéticos foram associados aos 45 cadastros de exemplo, servidos por RPC autenticada a partir de bytes privados compartilhados. Uploads de fotos reais continuam no Storage. Detalhes em CONTINUIDADE.md e API.md.
 
 > Atualização de escala: 23 migrações, 31 tabelas públicas com RLS, 12 suítes SQL e consultas autenticadas paginadas. Novos índices e RPCs não apagam registros. Evidências locais e limites em [DESEMPENHO.md](../DESEMPENHO.md).

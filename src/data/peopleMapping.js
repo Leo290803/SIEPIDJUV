@@ -1,3 +1,4 @@
+import {guardianFields} from "../guardianRequirements.js";
 export const linkStatusLabel = {
   pending: "Pendente",
   approved: "Aprovado",
@@ -123,6 +124,8 @@ export function issueMessages(issues, event) {
     school_archived: "A escola está arquivada.",
     category_disabled: "A categoria está desativada.",
     proof_disabled: "A prova está desativada.",
+    guardian_birth_after_event: "O nascimento deve ser anterior ou igual ao início do evento.",
+    guardian_person_unavailable: "Confira os dados do atleta para verificar o responsável legal.",
   };
   return [
     ...new Set(
@@ -153,11 +156,11 @@ export function issueMessages(issues, event) {
               "o documento exigido") +
             "."
           );
+        if(kind === "guardian_invalid")return "Revise "+(guardianFields.find(([key])=>key===id)?.[1]?.toLocaleLowerCase('pt-BR')||"os dados do responsável legal")+".";
         if (kind === "field_required")
           return (
             "Preencha o dado obrigatório: " +
-            ({ email: "e-mail", phone: "telefone", address: "endereço" }[id] ||
-              id) +
+            ({ email: "e-mail", phone: "telefone", address: "endereço" }[id] || guardianFields.find(([key])=>key===id)?.[1]?.toLocaleLowerCase('pt-BR') || id) +
             "."
           );
         if (kind === "participation_incomplete")

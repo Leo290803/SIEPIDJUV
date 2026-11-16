@@ -177,3 +177,13 @@
 @media(max-width:1050px){.report-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.report-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.report-filter-grid,.report-column-grid{grid-template-columns:minmax(0,1fr)}.report-export-actions{width:100%}.report-export-actions>button{flex:1;min-width:0}.report-stat-grid{gap:10px}.report-stat-grid>div{padding:15px}.report-results .table-pagination{flex-wrap:wrap}.report-results .table-pagination>div{flex-wrap:wrap}}
 .report-progress { display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;background:#edf3fa;padding:12px 15px;border-radius:4px;color:#315b85;margin-bottom:15px;font-size:12px; }
+/* Pendências e responsável legal: orientação no próprio cadastro. */
+.form-issues { padding:17px 18px; margin:18px 0 24px; border:1px solid #e1b879; border-radius:6px; background:#fff9ed; color:#745124; }
+.form-issues-heading { display:flex; gap:11px; align-items:flex-start; }.form-issues-heading>svg { flex-shrink:0; margin-top:1px; }.form-issues-heading strong { display:block; font-size:14px; }.form-issues-heading p { font-size:12px; line-height:1.6; margin:6px 0 0; }
+.form-issues ul { padding-left:20px; margin:12px 0; }.form-issues li { margin:4px 0; }.form-issues li button { text-align:left; justify-content:flex-start; line-height:1.5; padding:4px 0; font-size:12px; text-decoration:underline; color:#745124; }.form-issues li button svg { flex:0 0 13px; }.form-issues>.secondary { background:#fff; font-size:12px; }
+.form-issues.is-ready { background:#edf7f2; border-color:#b0d5c3; color:#286345; }
+.modal .field-error { display:block; color:#a42d32; font-size:12px; line-height:1.5; font-weight:400; margin-top:4px; }
+.athlete-event-modal [aria-invalid=true] { border-color:#b9474d; background:#fff8f8; }.athlete-event-modal [id] { scroll-margin:24px 0 95px; }
+.guardian-fields,.guardian-settings { padding:18px; border:1px solid #cfdeee; background:#f7fafd; border-radius:5px; margin:24px 0; min-width:0; }.guardian-fields h3,.guardian-settings h3 { margin-top:0; }.guardian-fields>.event-data-fields { margin:0; }.guardian-fields label { min-width:0; }
+.guardian-reference { display:flex; flex-direction:column; gap:8px; font-size:12px; max-width:560px; margin:20px 0; }.guardian-reference input { max-width:280px; }.guardian-reference small { color:#667e98; font-size:11px; line-height:1.6; }
+@media(max-width:520px){.form-issues,.guardian-fields,.guardian-settings{padding:14px}.guardian-reference input{max-width:100%;width:100%}.form-issues>.secondary{width:100%}}

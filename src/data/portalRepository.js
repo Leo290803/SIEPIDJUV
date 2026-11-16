@@ -147,7 +147,7 @@ export function portalRepository(client) {
       throw Error(
         "O cadastro foi preservado como rascunho. Não foi possível concluir: " +
           error.message +
-          " Reabra o cadastro para revisar os anexos e tentar novamente.",
+          " Reabra o cadastro para revisar os dados e os anexos e tentar novamente.",
       );
     }
   }

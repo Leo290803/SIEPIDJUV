@@ -6,6 +6,20 @@
 
 O portal conectado já consome os contratos de cadastro, arquivos, inscrições e análise descritos aqui. Chamadas do portal usam uma sessão real de Supabase Auth. Não usar o token administrativo do ambiente no cliente. Usuário sem vínculo aprovado pode somente solicitar/acompanhá-lo e consultar o diretório mínimo de escolas.
 
+## Responsável legal do atleta por evento
+
+A seção `requirements` de `siep_save_event_configuration` aceita `guardian` junto de `fields`/`documents`:
+
+```json
+{"enabled":true,"referenceDate":"2026-12-01","fields":{"guardian_name":"required","guardian_cpf":"required","guardian_relationship":"required","guardian_phone":"required","guardian_email":"optional"}}
+```
+
+Política salva em `events.settings.guardian` com a mesma autorização/versão da configuração. `referenceDate` é a data de início do evento, não das inscrições. As cinco escolhas são `hidden`, `optional` ou `required`; enabled exige data válida e pelo menos um campo solicitado. O trigger `check_guardian_settings` também valida escrita direta no evento. Payload antigo sem guardian preserva a política existente; ausência de política significa desativado.
+
+Dados são strings em `event_participations.additional_data` com as cinco chaves acima. `siep_private.guardian_issues` é privado e integrado à validação de participação já chamada ao concluir, enviar e aprovar. Referência fixa, menor até a véspera do aniversário de 18; 29/02 é ajustado para 28/02 em ano não bissexto. Dados ocultos e dados de adultos não criam exigência. Valores preservados não são apagados ao desativar ou ao mudar a data/nascimento.
+
+Códigos: `field_required:guardian_*`, `guardian_invalid:guardian_*`, `guardian_birth_after_event`. Não há RPC de criar acesso escolar neste fluxo nem transferência dos valores para `people.contact`. Snapshots aprovados incluem a participação e seus dados, como antes. Duplicação limpa a data e desativa a política na cópia, preservando os campos escolhidos.
+
 ## Imagens de exemplo para desenvolvimento
 
 `siep_read_development_photo(p_path text)` retorna `{mime_type,base64}` somente com sessão e autorização de leitura da pessoa. É usado pelo namespace lógico `siep-development-photos`. Os bytes ficam em tabelas privadas, são compartilhados entre os exemplos e não têm URL pública. Nenhuma permissão de escrita nessas tabelas é concedida a anon/authenticated. Fotos normais e documentos continuam usando Storage. A migração de suporte é `20261116160000_development_photo_assets`; este recurso não é o backend recomendado para imagens reais/em volume.

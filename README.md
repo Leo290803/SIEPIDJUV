@@ -1,5 +1,7 @@
 # SIEP — Sistema de Inscrições em Eventos e Projetos
 
+> Responsável legal: cada evento pode solicitar dados somente de menores de 18 anos na data de início configurada. O cadastro do atleta agora mostra pendências com acesso direto aos campos. Configuração em **Formulário e documentos**; detalhes em CONTINUIDADE.md.
+
 > Correção: **Detalhes e histórico** voltou a consultar as revisões da inscrição. Os 45 cadastros de exemplo também receberam retratos fictícios para testar crachás. As imagens de desenvolvimento têm leitura autenticada; fotos normais continuam no Storage.
 
 > Atualização de escala: consultas por tela e paginação real, relatórios filtrados no banco, PDF/CSV em worker e teste local com 10.000 atletas/20.000 inscrições. Limites, evidências e execução em [DESEMPENHO.md](DESEMPENHO.md).
@@ -123,13 +125,13 @@ Cadastros antigos não são apagados quando faltar um dado obrigatório. Revise-
 
 ## Estrutura Supabase
 
-O banco tem 24 migrações aplicadas e verificadas, 31 tabelas com RLS, validações no servidor e fluxos de inscrição/análise documentados. Modelo, executor, testes, segurança e integrações pendentes: [supabase/README.md](supabase/README.md). O portal conectado usa os módulos já construídos; competições e inscrições públicas continuam Em breve. Os dados anteriores dos navegadores permanecem na demonstração.
+O banco tem 25 migrações aplicadas e verificadas, 31 tabelas com RLS, validações no servidor e fluxos de inscrição/análise documentados. Modelo, executor, testes, segurança e integrações pendentes: [supabase/README.md](supabase/README.md). O portal conectado usa os módulos já construídos; competições e inscrições públicas continuam Em breve. Os dados anteriores dos navegadores permanecem na demonstração.
 
 ## Testar a integração
 
 - `npm test`: regras do produto e mapeamento relacional dos eventos.
 - `npm run build`: aplicação de produção, com demonstração carregada separadamente.
-- `npm run test:database`: PostgreSQL descartável, 13 suítes SQL e três cenários de concorrência.
+- `npm run test:database`: PostgreSQL descartável, 14 suítes SQL e três cenários de concorrência.
 - Com `npm run dev` em execução, `npm run test:browser`: Chromium + API simulada, sem criar contas ou enviar mensagens. Requer Chromium do sistema ou `npx playwright install chromium`; `CHROMIUM_PATH` permite outro executável.
 
 O teste de navegador cobre acesso, recuperação, navegação completa, persistência remota simulada, falhas sem falso sucesso, atleta/profissional sem duplicação de pessoa, upload e cadastro na edição, inscrição/envio/aprovação, relatórios/notificações, preservação da demonstração, recarga, permissões visuais e layout móvel. Ele não comprova entrega de e-mail nem autenticação real com o provedor.

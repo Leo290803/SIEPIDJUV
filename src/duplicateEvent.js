@@ -11,5 +11,6 @@ export function duplicateEvent(source,{name,year,start='',end=''},createId=()=>c
   copy.categories=groups.flatMap(g=>g.categories.map(category=>({...structuredClone(category),id:remap(categoryIds,category.id),modalityId:remap(modalityIds,g.id),modality:g.name,classification:g.classification,proofs:(category.proofs||[]).map(proof=>({...structuredClone(proof),id:remap(proofIds,proof.id)}))})));
   copy.validationRules=(source.validationRules||[]).map(rule=>{const copied={...structuredClone(rule),id:createId()};if(rule.categoryId)copied.categoryId=remap(categoryIds,rule.categoryId);if(rule.proofId)copied.proofId=remap(proofIds,rule.proofId);return copied});
   if(source.requirements)copy.requirements={...structuredClone(source.requirements),documents:(source.requirements.documents||[]).map(document=>({...structuredClone(document),id:remap(documentIds,document.id)}))};
+  if(copy.requirements?.guardian)copy.requirements.guardian={...copy.requirements.guardian,enabled:false,referenceDate:''};
   return copy;
 }
