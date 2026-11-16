@@ -165,7 +165,12 @@ export default function EventAthleteForm({
     const complete=e.nativeEvent.submitter?.value==='complete';
     setAttempted(complete?'complete':'draft');
     const blocking=issues.filter(issue=>complete||issue.blockingDraft);
-    if(blocking.length){setError('');goTo(blocking[0].key);return;}
+    if(blocking.length){
+      setError('');
+      if(complete)requestAnimationFrame(()=>{const summary=document.getElementById(fieldId('issues'));summary?.scrollIntoView({block:'start',behavior:'auto'});summary?.focus({preventScroll:true});});
+      else goTo(blocking[0].key);
+      return;
+    }
     const values={...liveValues,name:String(liveValues.name||'').trim(),cpf:String(liveValues.cpf||'').replace(/\D/g,'')};
     const personValues={...values};
     for(const [key] of guardianFields)delete personValues[key];
@@ -291,7 +296,7 @@ export default function EventAthleteForm({
           </div>
         </div>
         <form onSubmit={save} noValidate>
-          <FormIssues issues={issues} onGo={goTo} disabled={busy}/>
+          {attempted==='complete'&&issues.length>0&&<FormIssues id={fieldId('issues')} issues={issues} onGo={goTo} disabled={busy}/>}
           <h3>1. Dados do atleta</h3>
           {connected && <PersonPhoto photo={athlete.photo} value={photoChange} onChange={setPhotoChange} disabled={busy} />}
           <label>Nome completo *<input {...attributes('name')} aria-label="Nome completo *" autoFocus name="name" required maxLength={150} disabled={busy} value={values.name||''} onChange={e=>changeValue('name',e.target.value)}/>{inline('name')}</label>

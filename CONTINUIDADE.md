@@ -2,6 +2,10 @@
 
 Atualizado em 16/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Pendências exibidas somente após tentar concluir
+
+A pedido do usuário, o quadro do cadastro do atleta no evento fica oculto ao abrir/preencher e só aparece após clicar **Concluir cadastro**, se houver pendências. Continua atualizando durante a correção e desaparece quando todas forem resolvidas; não mostra um cartão verde permanente. Salvar rascunho não abre esse quadro. Validações de campos e do banco permanecem. O teste conectado verifica ausência inicial, exibição após tentativa e desaparecimento após preencher.
+
 ## Responsável legal para menores e pendências navegáveis
 
 Implementada a opção na aba **Formulário e documentos → Responsável legal do atleta**. A Secretaria ativa **Solicitar dados do responsável somente para menores de 18 anos**, informa a **Data de início do evento** e escolhe Não solicitar/Opcional/Obrigatório para nome, CPF, parentesco, telefone e e-mail. Os quatro primeiros começam como obrigatórios e o e-mail como opcional quando a opção é ativada. Eventos existentes continuam desativados por padrão.

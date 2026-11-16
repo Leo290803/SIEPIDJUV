@@ -778,7 +778,10 @@ try {
   const guardianSection=page.getByRole('region',{name:'Dados do responsável legal',exact:true});
   await guardianSection.waitFor();
   const beforeIncomplete=tables.event_participations.length;
+  assert.equal(await page.getByRole('region',{name:'Pendências do cadastro',exact:true}).count(),0,'Resumo apareceu antes de tentar concluir');
   await page.getByRole('button',{name:'Concluir cadastro',exact:true}).click();
+  await page.getByRole('region',{name:'Pendências do cadastro',exact:true}).waitFor();
+  await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Pendências do cadastro');
   assert.equal(tables.event_participations.length,beforeIncomplete,'Cadastro incompleto foi enviado ao servidor');
   assert.equal(await page.locator('input[name=guardian_name]').getAttribute('aria-invalid'),'true');
   await page.getByRole('button',{name:'Preencha nome completo do responsável.',exact:true}).click();
@@ -809,6 +812,7 @@ try {
     mimeType: "image/png",
     buffer: Buffer.from("fake-image"),
   });
+  await page.getByRole('region',{name:'Pendências do cadastro',exact:true}).waitFor({state:'detached'});
   await page
     .getByRole("button", { name: "Concluir cadastro", exact: true })
     .click();
