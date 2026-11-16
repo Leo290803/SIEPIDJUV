@@ -2,6 +2,17 @@
 
 Atualizado em 16/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Exemplos persistidos para explorar o sistema em desenvolvimento
+
+A pedido do usuário, foram inseridos exemplos no IDJUV pelo script operacional `scripts/seed_development.py`, sem reintroduzir a tela de demonstração/login público e sem alterar cadastros anteriores. O usuário confirmou que o sistema ainda está em desenvolvimento, sem público externo.
+
+- Evento aberto **Exemplo — Jogos Escolares de Desenvolvimento**, ID `2e80033a-625b-517d-bcde-62c0bc5eef2f`, edição do ano da criação. Três escolas fictícias: Horizonte (Boa Vista), Estrela do Norte (Pacaraima) e Caminho do Sol (Rorainópolis), todas com prefixo “Exemplo”. Cada escola tem esse evento selecionado como contexto de trabalho.
+- 36 atletas (12 por escola, masculino/feminino e faixas 12–14/15–17), seis profissionais e três responsáveis pendentes, sem conta Auth criada. Não foram geradas senhas nem enviados e-mails. Os responsáveis podem ser usados depois para testar **Gerar acesso**, se desejado. CPFs são sintéticos com dígitos validadores; não usar estes dados como cadastros pessoais reais.
+- Futsal, atletismo e badminton; seis categorias por faixa/sexo e quatro provas de atletismo (100 metros e salto em distância para cada sexo). Regras limitam duas modalidades por atleta, uma individual e uma coletiva.
+- 24 inscrições criadas pelas RPCs reais de salvar/transicionar, quatro em cada situação: rascunho, enviada, aprovada, correção solicitada, indeferida e cancelada. Elencos, comissão, revisões, decisões e snapshots correspondem ao fluxo real. Sem anexos/fotos fictícios nem exigências documentais inventadas.
+- Relatório geral do evento tem 42 linhas de participação em inscrições, 30 pessoas distintas, 24 inscrições e três escolas. Seis dos 36 atletas estão cadastrados sem inscrição, permitindo testar esse caso. Filtro feminino retorna 21 linhas e 15 atletas distintos.
+- Script não integra as migrações nem roda automaticamente: padrão valida com rollback; `--apply` persiste. IDs/versão determinísticos e trava transacional evitam duplicação; ao encontrar o evento já criado, não regrava alterações feitas pelo usuário. Teste `python scripts/test_development_seed.py` cria banco local descartável e verifica validação com rollback, persistência, reexecução e seis situações. Validação, aplicação e consultas das RPCs como `authenticated` foram conferidas também no Supabase real.
+
 ## Escala: carregamento por tela, consultas paginadas e exportação isolada
 
 Preparado o caminho de leitura para eventos com mais de 10 mil atletas. `siep_portal_page` substitui o carregamento completo das tabelas no portal; páginas reais de 25 para atletas, comissão, responsáveis e inscrições, contagens no painel e notificações limitadas. Detalhes fora da página são consultados por ID com o mesmo escopo. Participações/documentos restringem-se aos registros e evento necessários. Catálogos de escolas e configurações continuam completos. Respostas obsoletas são ignoradas; busca tem espera de 350 ms e cancelamento de consultas substituídas. `mapPortalData` usa índices em memória, sem varrer todos os relacionamentos para cada pessoa.

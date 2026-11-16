@@ -149,3 +149,18 @@ Contratos e exemplos: [API.md](API.md).
 Uploads seguem o protocolo de preparação/Storage/finalização já previsto. A gravação do arquivo não pode participar da mesma transação PostgreSQL; falha parcial mantém o cadastro em rascunho e o cliente informa isso explicitamente. `siep_remove_document` remove logicamente a referência atual, preservando o objeto/versões para histórico.
 
 Um revezamento em categoria individual usa seu mínimo próprio em vez do elenco unitário da categoria individual. Categorias de equipe e regras explícitas de elenco continuam aplicando seus limites cumulativamente. Testes cobrem um revezamento real de quatro pessoas e a rejeição quando um limite explícito de equipe é excedido.
+
+## Exemplos de desenvolvimento
+
+Para explorar as telas, o IDJUV já recebeu o evento **Exemplo — Jogos Escolares de Desenvolvimento**, com três escolas, 36 atletas, seis profissionais, três responsáveis sem login e 24 inscrições em seis situações. Não faz parte das migrações nem da entrada do sistema.
+
+```sh
+# Teste totalmente local, sem Supabase/token.
+python scripts/test_development_seed.py
+# Validação remota com rollback, sem persistir exemplos.
+python scripts/seed_development.py --project-ref oshzcmmbhxvmchjgxztp
+# Execução manual solicitada para desenvolvimento. Reexecutar não duplica nem repõe edições.
+python scripts/seed_development.py --project-ref oshzcmmbhxvmchjgxztp --apply
+```
+
+O script exige instituição existente e administrador aprovado, usa as RPCs de cadastro/inscrição/análise e não cria contas Auth, senhas ou mensagens. Os nomes e metadados identificam os exemplos. Os CPFs são sintéticos; detalhes em CONTINUIDADE.md.
