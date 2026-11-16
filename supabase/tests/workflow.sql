@@ -161,11 +161,15 @@ begin
   execute 'reset role';
   perform set_config('request.jwt.claim.sub',school_user::text,true);
   execute 'set local role authenticated';
-  result:=public.siep_transition_registration(registration,3,'submitted','Corrigido');
+  -- A escola salva efetivamente o elenco/comissão durante a correção antes de reenviar.
+  result:=public.siep_save_registration(ev,school,cat,proof,jsonb_build_array(jsonb_build_object('participation_id',part,'slot_number',1)),jsonb_build_array(jsonb_build_object('person_id',person2,'staff_role_id',staff_role)),registration,3);
+  if result->>'revision'<>'4' or result->'issues'<>'[]'::jsonb then raise exception 'Correção não foi salva corretamente: %',result;end if;
+  result:=public.siep_transition_registration(registration,4,'submitted','Corrigido');
   execute 'reset role';
   perform set_config('request.jwt.claim.sub',admin_user::text,true);
   execute 'set local role authenticated';
-  result:=public.siep_transition_registration(registration,4,'approved','Aprovado');
+  result:=public.siep_transition_registration(registration,5,'approved','Aprovado');
+  if not exists(select 1 from public.registration_versions where registration_id=registration and revision=6 and status='approved' and jsonb_array_length(snapshot->'staff')=1) then raise exception 'Aprovação perdeu a comissão corrigida';end if;
   cloned:=public.siep_duplicate_event(ev,'Nova edição','2027');
   if exists(select 1 from public.registrations where event_id=cloned) or exists(select 1 from public.event_participations where event_id=cloned) then raise exception 'Duplicação copiou pessoas/inscrições'; end if;
   if not exists(select 1 from public.events where id=cloned and status='draft' and registration_start is null and registration_end is null) then raise exception 'Duplicação não zerou datas/situação'; end if;

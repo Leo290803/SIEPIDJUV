@@ -44,6 +44,7 @@ try {
     resetRedirect = "",
     authCalls = 0;
   let isManager = false;
+  const registrationTransitions=[];
   const tables = {
     institutions: [
       {
@@ -456,7 +457,10 @@ try {
         const r = tables.registrations.find(
           (r) => r.id === body.p_registration_id,
         );
+        if(!isAdmin&&!isManager&&['approved','rejected','correction_requested'].includes(body.p_status))return response(route,{code:'42501',message:'Somente a Secretaria pode analisar'},403);
+        registrationTransitions.push({from:r.status,to:body.p_status,actor:isAdmin||isManager?'secretaria':'escola'});
         r.status = body.p_status;
+        r.correction_deadline=body.p_correction_deadline||r.correction_deadline;
         r.revision++;
         return response(route, r);
       }
@@ -748,9 +752,10 @@ try {
   await page
     .getByRole("button", { name: "Trocar evento", exact: true })
     .waitFor();
-  await page
-    .getByRole("button", { name: "Atletas da escola", exact: true })
-    .click();
+  isAdmin=false;
+  await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/atletas');
+  await page.getByRole('button',{name:'Dados da escola',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Usuários da Secretaria',exact:true}).count(),0);
   await page
     .getByRole("button", { name: "Editar Atleta conectado", exact: true })
     .click();
@@ -785,7 +790,7 @@ try {
     null,
   );
   await page
-    .getByRole("button", { name: "Inscrições da escola", exact: true })
+    .getByRole("button", { name: "Minhas inscrições", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Nova inscrição neste evento", exact: true })
@@ -809,15 +814,41 @@ try {
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page.getByRole("cell", { name: "Enviada", exact: true }).waitFor();
-  await page
-    .getByRole("button", { name: "← Escolas da instituição", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Inscrições e documentos", exact: true }).click();
+  isAdmin=true;
+  await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');
+  await page.getByRole('button',{name:'Solicitar correção',exact:true}).click();
+  await page.getByLabel('Justificativa *',{exact:true}).fill('Conferir elenco e reenviar para análise');
+  const future=new Date(Date.now()+7*86400000).toISOString().slice(0,16);
+  await page.getByLabel('Prazo para correção *',{exact:true}).fill(future);
+  await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'detached'});
+  await page.getByRole('cell',{name:'Correção solicitada',exact:true}).waitFor();
+  isAdmin=false;
+  await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/inscricoes');
+  await page.getByRole('cell',{name:'Correção solicitada',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Aprovar',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Continuar',exact:true}).click();
+  await page.getByLabel('Atleta 1',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Salvar rascunho no banco',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'detached'});
+  await page.getByRole('button',{name:'Enviar para análise',exact:true}).click();
+  await page.getByLabel('Justificativa *',{exact:true}).fill('Elenco conferido e inscrição corrigida');
+  await page.getByRole('button',{name:'Confirmar',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'detached'});
+  await page.getByRole('cell',{name:'Enviada',exact:true}).waitFor();
+  isAdmin=true;
+  await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');
   await page.getByRole("button", { name: "Aprovar", exact: true }).click();
   await page.getByLabel("Justificativa *", { exact: true }).fill("Conferido");
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page.getByRole("cell", { name: "Aprovada", exact: true }).waitFor();
+  assert.deepEqual(registrationTransitions,[
+    {from:'draft',to:'submitted',actor:'escola'},
+    {from:'submitted',to:'correction_requested',actor:'secretaria'},
+    {from:'correction_requested',to:'submitted',actor:'escola'},
+    {from:'submitted',to:'approved',actor:'secretaria'},
+  ]);
   const registration=tables.registrations[0];
   tables.registration_versions.push({id:randomUUID(),institution_id:tenant,registration_id:registration.id,revision:registration.revision,status:'approved',created_at:new Date().toISOString(),snapshot:{athletes:[{person:{id:tables.people[0].id,full_name:'Atleta conectado'},allocation:{slot_number:1}}],staff:[]}});
   tables.registration_decisions.push({id:randomUUID(),institution_id:tenant,registration_id:registration.id,to_status:'approved',reason:'Conferido no histórico',created_at:new Date().toISOString()});
@@ -850,6 +881,7 @@ try {
   await badgePopup.getByRole('button',{name:'Imprimir / Salvar PDF',exact:true}).click();
   assert.equal(await badgePopup.evaluate(()=>window.printInvoked),true);
   await badgePopup.screenshot({path:'/tmp/siep-badge-preview.png',fullPage:true});
+  await badgePopup.pdf({path:'/tmp/siep-roundtrip-badge.pdf',preferCSSPageSize:true,printBackground:true});
   await badgePopup.close();
   await page.getByRole('button',{name:'Reimprimir',exact:true}).waitFor();
   await page.screenshot({path:'/tmp/siep-badges-desktop.png',fullPage:true});
@@ -1089,7 +1121,7 @@ try {
   assert.equal(await page.getByRole('button',{name:'Cadastrar atleta',exact:true}).count(),0);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: navegação completa, login/recuperação, escola, atleta/profissional sem duplicação, documento privado, cadastro na edição, inscrição, envio, aprovação, relatórios, notificações, recarga, permissões, mobile e demo preservada; URLs, recarga, acesso negado, gestor/admin, vínculo escolar, revogação, logout/voltar e redirect seguro; API simulada.",
+    "PASS: navegação completa, login/recuperação, escola, atleta/profissional sem duplicação, documento privado, cadastro na edição, inscrição pela escola, envio, correção pela Secretaria, reenvio pela escola, aprovação, relatórios, notificações, recarga, permissões, mobile e demo preservada; URLs, recarga, acesso negado, gestor/admin, vínculo escolar, revogação, logout/voltar e redirect seguro; API simulada.",
   );
   await browser.close();
 })().catch((error) => {

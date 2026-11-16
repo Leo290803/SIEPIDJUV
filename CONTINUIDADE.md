@@ -2,6 +2,14 @@
 
 Atualizado em 16/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Validação do fluxo escolar completo
+
+Após autorização do usuário, ampliado e executado o teste conectado no build de produção: a escola completa o cadastro no evento com foto/anexo, cria e envia inscrição; a Secretaria pede correção com prazo; a escola abre Continuar, salva e reenvia; a Secretaria aprova. Uma asserção verifica a sequência e o perfil de cada transição. A escola não recebe ação Aprovar. Histórico/recarga, emissão/reimpressão de crachá com foto e PDF/CSV filtrados também passaram. Teste separado verificou geração de acesso sem e-mail e login CPF com API simulada.
+
+A suíte SQL `workflow.sql` agora também salva efetivamente a comissão durante a correção e verifica o snapshot aprovado na revisão 6. As 13 suítes passaram no PostgreSQL local e no Supabase real com rollback, sem migrações pendentes e sem alterar os exemplos. Nenhuma conta Auth real foi criada nesta rodada. Evidências, comandos e limites: [VALIDACAO_FLUXO.md](VALIDACAO_FLUXO.md).
+
+Continua pendente o HTTP real de login/upload: a conexão de saúde do Auth foi tentada novamente e recusada por 403 do proxy. Não afirmar teste real completo ou confundir os mocks do navegador com essa validação. Nenhuma mudança de produto foi necessária nesta rodada.
+
 ## Correção do histórico e fotos fictícias nos exemplos
 
 Corrigido o erro **“all is not defined”** ao clicar **Detalhes e histórico**: a leitura do histórico ainda referenciava o antigo carregador geral removido na paginação. `portalRepository.history` agora consulta somente versões/decisões da instituição e inscrição escolhidas, em lotes de 500, com ordenação estável, prazo de consulta e cancelamento ao sair. Testes cobrem escopo, histórico vazio, mais de 500 revisões, falha de permissão e cancelamento. Chromium no build de produção verificou abertura, conteúdo, recarga da URL de histórico e fechamento.
