@@ -2,6 +2,16 @@
 
 Atualizado em 16/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Fila compacta e conferência contínua
+
+A listagem de inscrições usa **10 registros por página no servidor** (demais listas continuam em 25), com `remote.limit` vindo do `pagePlan`. Na Secretaria há atalhos Aguardando análise/Em correção/Todas as inscrições que reutilizam o filtro de situação enviado à RPC paginada. Cada linha mostra Conferir inscrição ou Ver inscrição; demais operações ficam em Mais ações, exibido apenas se houver operações disponíveis. A escola conserva suas ações e permissões.
+
+Na análise, a fila oferece inscrição anterior/próxima entre as enviadas da página atual, sem voltar à lista. Quando há outra inscrição enviada, a confirmação de aprovação/correção/indeferimento oferece **Confirmar e próxima inscrição**: decide somente a inscrição atual usando a revisão esperada e abre a próxima; não há aprovação em lote. O fim da página permite ir à próxima página da listagem, respeitando os filtros. Controles desnecessários ficam ocultos quando só existe um item.
+
+O elenco mostra **um atleta por vez**, com seletor e anterior/próximo, conservando observações ao alternar atletas e inscrições. Rascunhos das observações ficam somente na memória da página e são limpos ao confirmar a decisão; recarregar/sair não persiste observações não enviadas. Fotos e anexos do atleta selecionado carregam automaticamente com acesso privado: imagem ou PDF têm prévia na própria tela, além do download dos documentos. Arquivos de outros atletas não são baixados antecipadamente; URLs Blob são liberadas ao trocar/fechar e existe repetição em caso de falha. Comissão técnica fica recolhida, carregando suas fotos ao expandir. Histórico permanece separado; a mensagem genérica de envio deixa de ocupar um cartão na conferência. No celular as ações ficam no fluxo para não cobrir os campos.
+
+Nenhuma alteração de banco ou de cadastros existentes. Não muda a validação/autorização das decisões. Testes de navegador usam API simulada; incluem paginação real do fixture (13 inscrições/10 por página), filtro enviado à RPC, navegação entre inscrições, confirmação e avanço, fotos automáticas e fluxo escola/Secretaria. Captura da lista: `/tmp/siep-registration-queue-desktop.png`. Validação final: **103 testes JS**, build e fluxo completo Chromium aprovados. O navegador também verificou que só há um cartão de atleta por vez, observações preservadas ao alternar atletas e inscrições e nenhuma decisão automática sobre a próxima inscrição. Desktop e 390px sem overflow.
+
 ## Análise das inscrições pela Secretaria
 
 Em **Inscrições e documentos → Inscrições → Detalhes e histórico**, a janela **Análise da inscrição** tem as abas Conferência e Histórico. Conferência reúne evento/escola/categoria/prova, situação, elenco com CPF/nascimento/sexo/status da participação, foto sob demanda, documentos por exigência do evento e comissão técnica. Dados do responsável legal aparecem somente com política ativa, atleta menor na referência e campos não ocultos. Documentos adicionais já enviados também podem ser baixados. A conferência usa o cadastro atual; versões históricas continuam explicitamente separadas e imutáveis.

@@ -859,7 +859,7 @@ try {
   await page.getByRole("cell", { name: "Enviada", exact: true }).waitFor();
   isAdmin=true;
   await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');
-  await page.getByRole('button',{name:'Detalhes e histórico',exact:true}).click();
+  await page.getByRole('button',{name:/^(Detalhes e histórico|Conferir inscrição|Ver inscrição)$/}).click();
   const reviewDialog=page.getByRole('dialog',{name:'Análise da inscrição',exact:true});
   await reviewDialog.getByRole('tab',{name:'Conferência',exact:true}).waitFor();
   await page.screenshot({path:'/tmp/siep-registration-review-desktop.png',fullPage:true});
@@ -867,7 +867,6 @@ try {
   await page.screenshot({path:'/tmp/siep-registration-review-mobile.png',fullPage:true});
   assert.equal(await reviewDialog.evaluate(el => el.scrollWidth > el.clientWidth+1),false);
   await page.setViewportSize({width:1440,height:1000});
-  await reviewDialog.getByRole('button',{name:'Ver foto',exact:true}).first().click();
   await reviewDialog.getByAltText('Foto de identificação do cadastro').waitFor();
   await reviewDialog.getByLabel('O que precisa de correção em Atleta conectado?',{exact:true}).fill('Conferir elenco e reenviar para análise');
   await reviewDialog.getByRole('button',{name:'Solicitar correção',exact:true}).click();
@@ -885,7 +884,7 @@ try {
   await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/inscricoes');
   await page.getByRole('cell',{name:'Correção solicitada',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Aprovar',exact:true}).count(),0);
-  await page.getByRole('button',{name:'Detalhes e histórico',exact:true}).click();
+  await page.getByRole('button',{name:/^(Detalhes e histórico|Conferir inscrição|Ver inscrição)$/}).click();
   const schoolReview=page.getByRole('dialog',{name:'Análise da inscrição',exact:true});
   await schoolReview.getByText('Atleta conectado: Conferir elenco e reenviar para análise',{exact:true}).waitFor();
   assert.equal(await schoolReview.locator('textarea').count(),0);
@@ -901,10 +900,12 @@ try {
   await page.getByRole('cell',{name:'Enviada',exact:true}).waitFor();
   isAdmin=true;
   await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');
+  await page.getByRole("button", { name: "Conferir inscrição", exact: true }).click();
   await page.getByRole("button", { name: "Aprovar", exact: true }).click();
   await page.getByLabel("Justificativa *", { exact: true }).fill("Conferido");
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
-  await page.getByRole("dialog").waitFor({ state: "detached" });
+  await page.getByRole("dialog",{name:"Aprovar",exact:true}).waitFor({state:"detached"});
+  await page.getByRole("button",{name:"Fechar histórico",exact:true}).click();
   await page.getByRole("cell", { name: "Aprovada", exact: true }).waitFor();
   assert.deepEqual(registrationTransitions,[
     {from:'draft',to:'submitted',actor:'escola'},
@@ -915,7 +916,7 @@ try {
   const registration=tables.registrations[0];
   tables.registration_versions.push({id:randomUUID(),institution_id:tenant,registration_id:registration.id,revision:registration.revision,status:'approved',created_at:new Date().toISOString(),snapshot:{athletes:[{person:{id:tables.people[0].id,full_name:'Atleta conectado'},allocation:{slot_number:1}}],staff:[]}});
   tables.registration_decisions.push({id:randomUUID(),institution_id:tenant,registration_id:registration.id,to_status:'approved',reason:'Conferido no histórico',created_at:new Date().toISOString()});
-  await page.getByRole('button',{name:'Detalhes e histórico',exact:true}).click();
+  await page.getByRole('button',{name:/^(Detalhes e histórico|Conferir inscrição|Ver inscrição)$/}).click();
   const historyDialog=page.getByRole('dialog',{name:'Análise da inscrição',exact:true});
   await historyDialog.waitFor();
   await historyDialog.getByText('Conferido no histórico',{exact:false}).waitFor();
@@ -927,6 +928,47 @@ try {
   await page.getByRole('dialog',{name:'Análise da inscrição',exact:true}).getByText('Conferido no histórico',{exact:false}).waitFor();
   await page.getByRole('button',{name:'Fechar histórico',exact:true}).click();
   await page.getByRole('dialog',{name:'Análise da inscrição',exact:true}).waitFor({state:'detached'});
+  // Fila curta, filtro no servidor e avanço sem voltar à listagem.
+  const queueFixtures=Array.from({length:12},(_,index)=>({...registration,id:randomUUID(),status:index<2?'submitted':'cancelled',revision:1}));
+  tables.registrations.push(...queueFixtures);
+  const queuePerson={...tables.people[0],id:randomUUID(),full_name:'Segundo atleta da fila'};
+  const queueLink={...tables.school_people.find(p=>p.role==='athlete'),id:randomUUID(),person_id:queuePerson.id};
+  const queuePart={...tables.event_participations[0],id:randomUUID(),person_id:queuePerson.id};
+  const queueAllocations=[{...tables.registration_athletes[0],id:randomUUID(),registration_id:queueFixtures[0].id},{...tables.registration_athletes[0],id:randomUUID(),registration_id:queueFixtures[0].id,person_id:queuePerson.id,participation_id:queuePart.id,slot_number:2}];
+  tables.people.push(queuePerson);tables.school_people.push(queueLink);tables.event_participations.push(queuePart);tables.registration_athletes.push(...queueAllocations);
+  await page.reload();
+  await page.getByText('1 a 10 de 13',{exact:true}).waitFor();
+  assert.equal(await page.locator('.registration-compact-list tbody tr').count(),10);
+  await page.screenshot({path:'/tmp/siep-registration-queue-desktop.png',fullPage:true});
+  await page.getByRole('button',{name:'Aguardando análise',exact:true}).click();
+  await page.getByText('1 a 2 de 2',{exact:true}).waitFor();
+  assert.ok(queryCalls.some(call=>call.table==='siep_portal_page'&&call.body.p_mode==='registrations'&&call.body.p_limit===10&&call.body.p_filters.status==='submitted'));
+  await page.getByRole('button',{name:'Conferir inscrição',exact:true}).first().click();
+  const queueReview=page.getByRole('dialog',{name:'Análise da inscrição',exact:true});
+  await queueReview.getByLabel('O que precisa de correção em Atleta conectado?',{exact:true}).fill('Conferir documento');
+  await queueReview.getByRole('button',{name:'Próximo atleta',exact:true}).click();
+  await queueReview.getByRole('heading',{name:'Segundo atleta da fila · Vaga 2',exact:true}).waitFor();
+  assert.equal(await queueReview.locator('.review-person').count(),1);
+  await queueReview.getByRole('button',{name:'Atleta anterior',exact:true}).click();
+  assert.equal(await queueReview.getByLabel('O que precisa de correção em Atleta conectado?',{exact:true}).inputValue(),'Conferir documento');
+  await queueReview.getByRole('button',{name:'Próxima inscrição',exact:true}).click();
+  await page.waitForURL('**/'+queueFixtures[1].id+'/historico');
+  await queueReview.getByRole('button',{name:'Inscrição anterior',exact:true}).click();
+  await page.waitForURL('**/'+queueFixtures[0].id+'/historico');
+  assert.equal(await queueReview.getByLabel('O que precisa de correção em Atleta conectado?',{exact:true}).inputValue(),'Conferir documento');
+  await queueReview.getByRole('button',{name:'Aprovar',exact:true}).click();
+  await page.getByLabel('Justificativa *',{exact:true}).fill('Conferência da fila concluída');
+  await page.getByRole('button',{name:'Confirmar e próxima inscrição',exact:true}).click();
+  await page.waitForURL('**/'+queueFixtures[1].id+'/historico');
+  await queueReview.waitFor();
+  assert.equal(queueFixtures[0].status,'approved');
+  assert.equal(queueFixtures[1].status,'submitted');
+  await page.getByRole('button',{name:'Fechar histórico',exact:true}).click();
+  const queueIds=new Set(queueFixtures.map(r=>r.id));
+  tables.registrations=tables.registrations.filter(r=>!queueIds.has(r.id));
+  tables.registration_decisions=tables.registration_decisions.filter(r=>!queueIds.has(r.registration_id));
+  tables.registration_athletes=tables.registration_athletes.filter(r=>!queueIds.has(r.registration_id));
+  tables.people=tables.people.filter(p=>p.id!==queuePerson.id);tables.school_people=tables.school_people.filter(p=>p.id!==queueLink.id);tables.event_participations=tables.event_participations.filter(p=>p.id!==queuePart.id);
   const examplePhoto=tables.person_photos.find(p=>p.is_current&&p.person_id===tables.people[0].id);
   examplePhoto.bucket_id='siep-development-photos';examplePhoto.object_path='development/'+examplePhoto.id+'.png';
   await page.getByRole("button",{name:"Crachás",exact:true}).click();

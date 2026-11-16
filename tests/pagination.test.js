@@ -30,3 +30,9 @@ test('cancelamento impede novas consultas e processamento do lote recebido',asyn
  await assert.rejects(exportPages({options:{},signal:controller.signal,fetchPage:async()=>{calls++;controller.abort();return response([{}]);},onBatch:()=>batches++}),{name:'AbortError'});
  assert.equal(calls,1);assert.equal(batches,0);
 });
+
+test("fila de inscrições usa páginas curtas sem reduzir páginas de pessoas",()=>{
+ assert.equal(pagePlan({page:"Inscrições"}).limit,10);
+ assert.equal(pagePlan({page:"Minhas inscrições"}).limit,10);
+ assert.equal(pagePlan({page:"Atletas"}).limit,25);
+});

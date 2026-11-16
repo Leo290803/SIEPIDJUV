@@ -383,6 +383,7 @@ export default function ConnectedRegistrations({
     [starting, setStarting] = useState(false),
     [decision, setDecision] = useState(null),
     [history, setHistory] = useState(null),
+    [reviewNotes, setReviewNotes] = useState({}),
     [warnings, setWarnings] = useState(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -444,6 +445,21 @@ export default function ConnectedRegistrations({
   );
   const ev = (r) => events.find((e) => e.id === r.event_id),
     sc = (r) => schools.find((s) => s.id === r.school_id);
+  async function openReview(r) {
+    if (onRoute) { onRoute({id:r.id,history:true}); return; }
+    setBusy(true); setError("");
+    try { setHistory({r,...(await api.history(tenant,r.id))}); }
+    catch(error) { setError(readableError(error)); }
+    finally { setBusy(false); }
+  }
+  const queueRows = rows.filter(r => !manager || r.status === "submitted");
+  const queueIndex = history ? queueRows.findIndex(r => r.id === history.r.id) : -1;
+  const currentRowIndex = history ? rows.findIndex(r => r.id === history.r.id) : -1;
+  const adjacent = direction => {
+    if (currentRowIndex < 0) return null;
+    const candidates = direction > 0 ? rows.slice(currentRowIndex+1) : rows.slice(0,currentRowIndex).reverse();
+    return candidates.find(r => !manager || r.status === "submitted");
+  };
   function actions(r) {
     return [
       ...(["draft", "correction_requested"].includes(r.status)
@@ -480,7 +496,11 @@ export default function ConnectedRegistrations({
           {error}
         </p>
       )}
-      <div className="panel">
+      {manager && <div className="registration-queue-toolbar">
+        <div><strong>Fila de conferência</strong><p>Filtre as inscrições enviadas e avance pela fila dentro da análise.</p></div>
+        <div className="staff-actions">{[["submitted","Aguardando análise"],["correction_requested","Em correção"],["all","Todas as inscrições"]].map(([value,label]) => <button key={value} className={status === value ? "primary" : "secondary"} aria-pressed={status === value} onClick={() => setStatus(value)}>{label}</button>)}</div>
+      </div>}
+      <div className="panel registration-compact-list">
         <div className="table-toolbar">
           <span className="record-count">{remote?.total ?? rows.length} inscrições</span>
           <div className="school-tools">
@@ -579,7 +599,7 @@ export default function ConnectedRegistrations({
                     </td>
                     <td>
                       <div className="staff-actions">
-                        {["draft", "correction_requested"].includes(
+                        {!manager && ["draft", "correction_requested"].includes(
                           r.status,
                         ) && (
                           <button
@@ -593,29 +613,13 @@ export default function ConnectedRegistrations({
                         )}
                         <button
                           className="secondary"
-                          onClick={async () => {
-                            if (onRoute) {
-                              onRoute({ id: r.id, history: true });
-                              return;
-                            }
-                            setBusy(true);
-                            setError("");
-                            try {
-                              setHistory({
-                                r,
-                                ...(await api.history(tenant, r.id)),
-                              });
-                            } catch (error) {
-                              setError(readableError(error));
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
+                          onClick={() => openReview(r)}
                           disabled={busy}
                         >
-                          Detalhes e histórico
+                          {manager ? r.status === "submitted" ? "Conferir inscrição" : "Ver inscrição" : "Detalhes e histórico"}
                         </button>
-                        {actions(r).map(([label, value]) => (
+                        {manager && actions(r).length > 0 && <details className="registration-more"><summary>Mais ações</summary><div>{["draft","correction_requested"].includes(r.status) && <button className="secondary" onClick={() => onRoute ? onRoute({id:r.id}) : setEditing(r)}>Continuar</button>}{actions(r).map(([label,value]) => <button key={value} className="secondary" onClick={() => setDecision({r,status:value,label})}>{label}</button>)}</div></details>}
+                        {!manager && actions(r).map(([label, value]) => (
                           <button
                             className="secondary"
                             key={value}
@@ -684,6 +688,7 @@ export default function ConnectedRegistrations({
                 setBusy(true);
                 setError("");
                 const f = new FormData(e.currentTarget);
+                const next = e.nativeEvent.submitter?.value === "next" ? adjacent(1) : null;
                 try {
                   await api.transition(
                     decision.r,
@@ -696,6 +701,8 @@ export default function ConnectedRegistrations({
                   await onChanged();
                   setWarnings(null);
                   setDecision(null);
+                  setReviewNotes(current => { const remaining = {...current}; delete remaining[decision.r.id]; return remaining; });
+                  if (next) await openReview(next);
                 } catch (error) {
                   let issues = [];
                   try {
@@ -747,6 +754,7 @@ export default function ConnectedRegistrations({
                     Voltar
                   </button>
                   <button className="primary">Confirmar</button>
+                  {manager && history && adjacent(1) && ["approved","rejected","correction_requested"].includes(decision.status) && <button className="primary" name="after" value="next">Confirmar e próxima inscrição</button>}
                 </div>
               </fieldset>
             </form>
@@ -769,7 +777,8 @@ export default function ConnectedRegistrations({
               <X />
             </button>
             <h2>Análise da inscrição</h2>
-            <RegistrationReview history={history} event={ev(history.r)} school={sc(history.r)} data={data} api={api} manager={manager}
+            <RegistrationReview key={history.r.id} history={history} savedNotes={reviewNotes[history.r.id]} onNotesChange={notes => setReviewNotes(current => ({...current,[history.r.id]:notes}))} event={ev(history.r)} school={sc(history.r)} data={data} api={api} manager={manager}
+              navigation={manager && (queueRows.length > 1 || remote && remote.offset+remote.limit < remote.total) && <div className="review-queue-navigation"><strong>{queueIndex >= 0 ? `Inscrição ${queueIndex+1} de ${queueRows.length} nesta página da fila` : "Inscrição fora da fila de análise"}</strong><div className="staff-actions"><button className="secondary" disabled={busy || !adjacent(-1)} onClick={() => openReview(adjacent(-1))}>Inscrição anterior</button><button className="primary" disabled={busy || !adjacent(1)} onClick={() => openReview(adjacent(1))}>Próxima inscrição</button>{remote && remote.offset+remote.limit < remote.total && <button className="secondary" onClick={() => {closeRoute();remote.onPage(remote.offset+remote.limit);}}>Próxima página da fila</button>}</div></div>}
               onContinue={() => { const r = history.r; closeRoute(); onRoute ? onRoute({id:r.id}) : setEditing(r); }}
               onDecision={(status,label,reason) => setDecision({r:history.r,status,label,reason})} />
           </div>
