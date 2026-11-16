@@ -1,5 +1,7 @@
 # Banco SIEP
 
+> Fotos fictícias: 24 migrações, 31 tabelas públicas com RLS e 13 suítes SQL. Dois retratos sintéticos foram associados aos 45 cadastros de exemplo, servidos por RPC autenticada a partir de bytes privados compartilhados. Uploads de fotos reais continuam no Storage. Detalhes em CONTINUIDADE.md e API.md.
+
 > Atualização de escala: 23 migrações, 31 tabelas públicas com RLS, 12 suítes SQL e consultas autenticadas paginadas. Novos índices e RPCs não apagam registros. Evidências locais e limites em [DESEMPENHO.md](../DESEMPENHO.md).
 
 > Atualização: 20 migrações, 31 tabelas públicas com RLS e 11 suítes SQL. Emissão versionada de crachás por evento, exclusiva da Secretaria, com foto e inscrição aprovada. APIs e limites em API.md.
@@ -164,3 +166,11 @@ python scripts/seed_development.py --project-ref oshzcmmbhxvmchjgxztp --apply
 ```
 
 O script exige instituição existente e administrador aprovado, usa as RPCs de cadastro/inscrição/análise e não cria contas Auth, senhas ou mensagens. Os nomes e metadados identificam os exemplos. Os CPFs são sintéticos; detalhes em CONTINUIDADE.md.
+
+As fotos fictícias dos exemplos podem ser associadas manualmente com:
+
+```sh
+python scripts/seed_development_photos.py --project-ref oshzcmmbhxvmchjgxztp --male /caminho/retrato-masculino.png --female /caminho/retrato-feminino.png
+```
+
+O script valida PNG/5 MB, envia blocos com retomada, confere SHA-256 e preserva fotos existentes. Imagens ficam em duas tabelas privadas; `siep_read_development_photo` faz a leitura autorizada. Não usar este mecanismo para importar fotos reais em massa.

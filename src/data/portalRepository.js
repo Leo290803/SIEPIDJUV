@@ -1,3 +1,4 @@
+import {downloadAttachment} from "./downloadAttachment.js";
 import {
   mapPortalData,
   personPayload,
@@ -8,17 +9,30 @@ export function portalRepository(client) {
     if (result.error) throw result.error;
     return result.data;
   }
-  async function queryPage(name, parameters, signal, timeoutMs = 15000) {
+  async function readQuery(query, signal, timeoutMs = 15000) {
     const controller = new AbortController();
     const abort = () => controller.abort(signal.reason);
     if(signal?.aborted) abort();
     else signal?.addEventListener("abort",abort,{once:true});
     const timer = setTimeout(()=>controller.abort(Error("A consulta demorou demais. Selecione mais filtros e tente novamente.")),timeoutMs);
     try {
-      const result = await client.rpc(name,parameters).abortSignal(controller.signal);
+      const result = await query.abortSignal(controller.signal);
       if(controller.signal.aborted) throw controller.signal.reason;
       return checked(result);
     } finally { clearTimeout(timer);signal?.removeEventListener("abort",abort); }
+  }
+  function queryPage(name, parameters, signal) {
+    return readQuery(client.rpc(name,parameters),signal);
+  }
+  async function historyRows(table, tenant, registrationId, signal) {
+    const rows=[];
+    for(let offset=0;;offset+=500) {
+      const page=await readQuery(client.from(table).select("*")
+        .eq("institution_id",tenant).eq("registration_id",registrationId)
+        .order("id").range(offset,offset+499),signal);
+      rows.push(...page);
+      if(page.length<500)return rows;
+    }
   }
   async function load(tenant, options = {}, signal) {
     const response = await queryPage("siep_portal_page", {
@@ -164,12 +178,7 @@ export function portalRepository(client) {
           p_reason: reason || "Vínculo aprovado após análise",
         }),
       ),
-    download: async (attachment) =>
-      checked(
-        await client.storage
-          .from(attachment.bucket || "siep-documents")
-          .download(attachment.objectPath),
-      ),
+    download: attachment => downloadAttachment(client,attachment),
     setActiveEvent: async (school, event) =>
       checked(
         await client.rpc("siep_set_active_event", {
@@ -201,14 +210,14 @@ export function portalRepository(client) {
           p_correction_deadline: deadline || null,
         }),
       ),
-    history: async (tenant, id) => ({
-      versions: await all("registration_versions", tenant, {
-        registration_id: id,
-      }),
-      decisions: await all("registration_decisions", tenant, {
-        registration_id: id,
-      }),
-    }),
+    history: async (tenant, id, signal) => {
+      if(!tenant || !id)throw Error("Selecione uma inscrição para consultar o histórico.");
+      const [versions,decisions]=await Promise.all([
+        historyRows("registration_versions",tenant,id,signal),
+        historyRows("registration_decisions",tenant,id,signal),
+      ]);
+      return {versions,decisions};
+    },
     markRead: async (id) =>
       checked(
         await client.rpc("siep_mark_notification_read", {

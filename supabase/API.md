@@ -6,6 +6,10 @@
 
 O portal conectado já consome os contratos de cadastro, arquivos, inscrições e análise descritos aqui. Chamadas do portal usam uma sessão real de Supabase Auth. Não usar o token administrativo do ambiente no cliente. Usuário sem vínculo aprovado pode somente solicitar/acompanhá-lo e consultar o diretório mínimo de escolas.
 
+## Imagens de exemplo para desenvolvimento
+
+`siep_read_development_photo(p_path text)` retorna `{mime_type,base64}` somente com sessão e autorização de leitura da pessoa. É usado pelo namespace lógico `siep-development-photos`. Os bytes ficam em tabelas privadas, são compartilhados entre os exemplos e não têm URL pública. Nenhuma permissão de escrita nessas tabelas é concedida a anon/authenticated. Fotos normais e documentos continuam usando Storage. A migração de suporte é `20261116160000_development_photo_assets`; este recurso não é o backend recomendado para imagens reais/em volume.
+
 ## Consultas paginadas (16/11/2026)
 
 Todas usam sessão Auth e verificam a autorização no servidor. Não aceitar instituição/papel informados pelo cliente como autorização.

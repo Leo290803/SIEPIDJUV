@@ -218,6 +218,10 @@ try {
         const selected={...tables,people:tables.people.filter(p=>pids.has(p.id)),school_people:links,person_photos:tables.person_photos.filter(p=>pids.has(p.person_id)),event_participations:parts,participation_categories:tables.participation_categories.filter(p=>partids.has(p.participation_id)),participant_documents:tables.participant_documents.filter(p=>partids.has(p.participation_id)),membership_decisions:[],registrations,registration_athletes:allocations,registration_staff:assigned,school_event_contexts:tables.school_event_contexts.filter(c=>c.school_id===scope),notifications:mode==='notifications'?tables.notifications:[]};
         return response(route,{tables:selected,total,summary:{pendingLinks:tables.school_people.filter(l=>l.role==='responsible'&&l.status==='pending').length,submitted:tables.registrations.filter(r=>r.status==='submitted').length,unread:tables.notifications.filter(n=>!n.read_at).length}});
       }
+      if(table==='siep_read_development_photo'){
+        assert.ok(tables.person_photos.some(p=>p.bucket_id==='siep-development-photos'&&p.object_path===body.p_path));
+        return response(route,{mime_type:'image/png',base64:portrait.toString('base64')});
+      }
       if (table === "siep_prepare_person_photo") {
         const current=tables.person_photos.find(p=>p.person_id===body.p_person_id&&p.is_current);
         assert.equal(body.p_expected_photo_id,current?.id||null);
@@ -814,6 +818,22 @@ try {
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page.getByRole("cell", { name: "Aprovada", exact: true }).waitFor();
+  const registration=tables.registrations[0];
+  tables.registration_versions.push({id:randomUUID(),institution_id:tenant,registration_id:registration.id,revision:registration.revision,status:'approved',created_at:new Date().toISOString(),snapshot:{athletes:[{person:{id:tables.people[0].id,full_name:'Atleta conectado'},allocation:{slot_number:1}}],staff:[]}});
+  tables.registration_decisions.push({id:randomUUID(),institution_id:tenant,registration_id:registration.id,to_status:'approved',reason:'Conferido no histórico',created_at:new Date().toISOString()});
+  await page.getByRole('button',{name:'Detalhes e histórico',exact:true}).click();
+  const historyDialog=page.getByRole('dialog',{name:'Histórico da inscrição',exact:true});
+  await historyDialog.waitFor();
+  await historyDialog.getByText('Conferido no histórico',{exact:false}).waitFor();
+  await historyDialog.getByText(/^Versão /).click();
+  await historyDialog.getByText('Atleta conectado · Vaga 1',{exact:true}).waitFor();
+  assert.equal(await page.getByText('all is not defined',{exact:true}).count(),0);
+  await page.reload();
+  await page.getByRole('dialog',{name:'Histórico da inscrição',exact:true}).getByText('Conferido no histórico',{exact:false}).waitFor();
+  await page.getByRole('button',{name:'Fechar histórico',exact:true}).click();
+  await page.getByRole('dialog',{name:'Histórico da inscrição',exact:true}).waitFor({state:'detached'});
+  const examplePhoto=tables.person_photos.find(p=>p.is_current&&p.person_id===tables.people[0].id);
+  examplePhoto.bucket_id='siep-development-photos';examplePhoto.object_path='development/'+examplePhoto.id+'.png';
   await page.getByRole("button",{name:"Crachás",exact:true}).click();
   await page.getByLabel("Evento dos crachás",{exact:true}).selectOption(tables.events[0].id);
   await page.getByRole("checkbox",{name:"Selecionar Atleta conectado · Atleta",exact:true}).check();

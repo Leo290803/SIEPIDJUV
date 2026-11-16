@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Camera } from "lucide-react";
+import {downloadAttachment} from "./data/downloadAttachment.js";
 import { supabase } from "./data/client.js";
 export default function PersonPhoto({ photo, value, onChange, disabled = false }) {
   const input = useRef(null);
@@ -10,9 +11,8 @@ export default function PersonPhoto({ photo, value, onChange, disabled = false }
     if (value instanceof File) { url = URL.createObjectURL(value); setPreview(url); }
     else if (value !== null && photo?.objectPath) {
       setLoading(true);
-      supabase.storage.from(photo.bucket).download(photo.objectPath).then(({ data, error }) => {
+      downloadAttachment(supabase,photo).then(data => {
         if (!active) return;
-        if (error) throw error;
         url = URL.createObjectURL(data); setPreview(url);
       }).catch(() => { if (active) setError("Não foi possível carregar a foto. Reabra o cadastro para tentar novamente."); }).finally(() => { if (active) setLoading(false); });
     }

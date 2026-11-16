@@ -388,6 +388,9 @@ export default function ConnectedRegistrations({
   useEffect(() => {
     if (!onRoute) return;
     let active = true;
+    const controller=new AbortController();
+    setError("");
+    setBusy(false);
     setStarting(routeAction === "newRegistration");
     setEditing(
       routeAction === "editRegistration"
@@ -400,7 +403,7 @@ export default function ConnectedRegistrations({
       if (r) {
         setBusy(true);
         api
-          .history(tenant, r.id)
+          .history(tenant, r.id, controller.signal)
           .then((result) => {
             if (active) setHistory({ r, ...result });
           })
@@ -414,6 +417,7 @@ export default function ConnectedRegistrations({
     }
     return () => {
       active = false;
+      controller.abort();
     };
   }, [routeAction, routeRegistrationId, data.registrations]);
   const closeRoute = () => {
