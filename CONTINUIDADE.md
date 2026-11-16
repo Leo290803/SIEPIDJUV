@@ -1,10 +1,20 @@
 # Continuidade do SIEP — contexto para o próximo chat
 
-Atualizado em 13/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+Atualizado em 16/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+
+## Relatórios detalhados, filtros e exportação PDF/CSV
+
+Na Secretaria → **Inscrições e documentos → Relatórios**, a antiga tela de totais foi substituída por oito listagens: inscrições, atletas nas inscrições, cadastro de atletas, cadastro da comissão técnica, comissão nas inscrições, responsáveis escolares, escolas e eventos. Os filtros combinam evento, escola, sexo, município, modalidade, categoria, prova, situação da inscrição, pesquisa por nome/escola/CPF, período de criação da inscrição, ano de nascimento e presença de foto. Cadastros permitem também situação do vínculo e inclusão de arquivados.
+
+- Apresentação detalhada ou agrupamentos por escola, sexo, categoria, modalidade, prova, município, situação ou foto, conforme as colunas do tipo escolhido. Colunas selecionáveis, ordenação, paginação e orientação do PDF. CPF, nascimento e contatos ficam desmarcados por padrão.
+- **Exportar PDF** baixa arquivo A4 diretamente com jsPDF/AutoTable carregados sob demanda, cabeçalho institucional, filtros, ordenação, totais e numeração de páginas; tabelas extensas quebram vertical/horizontalmente. **Exportar CSV** usa UTF-8/BOM, ponto e vírgula, aspas e proteção contra fórmulas. Ambos incluem todas as linhas filtradas e as colunas escolhidas, não somente a página visível. Planilhas podem aplicar sua própria formatação aos campos numéricos; importar CPF como texto preserva zeros iniciais.
+- Uma pessoa em duas inscrições gera duas linhas em “Atletas nas inscrições”, mas uma pessoa distinta. Inscrições mistas com filtro por sexo mostram o número de atletas encontrados; “Total do elenco” é uma coluna opcional separada. Sexo da comissão/responsáveis filtra a própria pessoa. Responsáveis relacionados a evento são responsáveis de escolas com inscrições, não inscrições pessoais inventadas. Datas de criação são comparadas pelo dia em America/Manaus.
+- Implementação em `src/Reports.jsx` e `src/reports/`. Usa os dados já carregados sob RLS e as rotas/permissões existentes; não altera banco nem migrações. Exportação é local no navegador e não cria um endpoint público.
+- Validação: 82 testes JS, build de produção e fluxo completo Chromium com API simulada. Navegador verificou combinação escola/sexo/categoria, resultado vazio, agrupamentos, downloads reais PDF/CSV e todos os tipos. Capturas desktop/390px sem transbordamento externo; PDF inspecionado com `pdfinfo`/`pdftotext`, incluindo filtros, escola, nome e acentos. PDF com 120 linhas também testado. Não representa teste HTTP do Supabase real nem implantação publicada.
 
 ## Inscrições, relatórios e crachás unidos na Secretaria
 
-A Secretaria agora tem um único item **Inscrições e documentos**, com abas roteadas **Inscrições**, **Relatórios** e **Crachás**. As URLs existentes `/secretaria/T/inscricoes` e `/secretaria/T/relatorios` continuam funcionando; nova `/secretaria/T/crachas`. A escola mantém seu portal anterior. Exportações CSV existentes foram preservadas.
+A Secretaria agora tem um único item **Inscrições e documentos**, com abas roteadas **Inscrições**, **Relatórios** e **Crachás**. As URLs existentes `/secretaria/T/inscricoes` e `/secretaria/T/relatorios` continuam funcionando; nova `/secretaria/T/crachas`. A escola mantém seu portal anterior. As exportações de eventos e inscrições continuam disponíveis pelo seletor de tipo na nova tela de relatórios.
 
 - Crachás: seleção por evento, escola e perfil (atleta, comissão técnica ou responsável), pesquisa e lotes de até 50. Atletas/profissionais precisam constar em inscrições aprovadas do evento. Responsáveis precisam de vínculo aprovado/conta associada e escola com inscrição aprovada. Foto de identificação obrigatória para a emissão; cadastros sem foto ficam visíveis como pendência.
 - A emissão abre prévia com foto, nome, escola, perfil, instituição, evento/edição, identificador e versão. CPF e nascimento não são impressos. Botão **Imprimir / Salvar PDF** usa a impressão do navegador; A4, quatro crachás por página, formato 86×130 mm. Não houve acionamento de impressora real nos testes.

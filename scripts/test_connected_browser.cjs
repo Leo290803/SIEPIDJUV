@@ -796,9 +796,40 @@ try {
   await reprintPopup.locator('.event-badge').waitFor();await reprintPopup.close();
   assert.equal(tables.event_badges.length,1,'Reimprimir criou nova emissão');
   await page.getByRole("button", { name: "Relatórios", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Exportar inscrições em CSV", exact: true })
-    .waitFor();
+  const resultTable=page.getByRole('table',{name:'Resultado do relatório'});
+  await resultTable.getByText('Atleta conectado',{exact:true}).first().waitFor();
+  await page.getByLabel('Evento do relatório',{exact:true}).selectOption(tables.events[0].id);
+  await page.getByLabel('Escola do relatório',{exact:true}).selectOption(tables.schools[0].id);
+  await page.getByLabel('Sexo',{exact:true}).selectOption('Masculino');
+  await resultTable.getByText(/Nenhum registro encontrado/).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Exportar PDF',exact:true}).isDisabled(),true);
+  await page.getByLabel('Sexo',{exact:true}).selectOption('Feminino');
+  await resultTable.getByText('Atleta conectado',{exact:true}).first().waitFor();
+  await page.getByLabel('Categoria',{exact:true}).selectOption(tables.registrations[0].category_id);
+  await resultTable.getByText('Atleta conectado',{exact:true}).first().waitFor();
+  assert.equal(await resultTable.getByRole('columnheader',{name:'CPF',exact:true}).count(),0);
+  const csvDownload=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Exportar CSV',exact:true}).click();
+  await (await csvDownload).saveAs('/tmp/siep-relatorio.csv');
+  assert.ok(fs.readFileSync('/tmp/siep-relatorio.csv','utf8').includes('Atleta conectado'));
+  const pdfDownload=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Exportar PDF',exact:true}).click();
+  await (await pdfDownload).saveAs('/tmp/siep-relatorio.pdf');
+  assert.equal(fs.readFileSync('/tmp/siep-relatorio.pdf').subarray(0,4).toString(),'%PDF');
+  await page.getByLabel('Apresentação do relatório',{exact:true}).selectOption('gender');
+  await resultTable.getByText('Feminino',{exact:true}).waitFor();
+  await page.getByLabel('Apresentação do relatório',{exact:true}).selectOption('school');
+  await resultTable.getByText('Escola conectada',{exact:true}).waitFor();
+  await page.getByLabel('Apresentação do relatório',{exact:true}).selectOption('');
+  await page.screenshot({path:'/tmp/siep-reports-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:'/tmp/siep-reports-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
+  for (const type of ['registrations','athletes','staff','staffEntries','responsibles','schools','events']) {
+    await page.getByLabel('Tipo de relatório',{exact:true}).selectOption(type);
+    await resultTable.waitFor();
+  }
   await page.getByRole("button", { name: "Notificações", exact: true }).click();
   await page
     .getByText("Nenhuma notificação recebida.", { exact: true })

@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { portalPath, eventTabs, safeReturn } from "./routing/routes.js";
 import AccessState from "./routing/AccessState.jsx";
+import Reports from "./Reports.jsx";
 import EventBadges from "./EventBadges.jsx";
 import StaffAccounts from "./StaffAccounts.jsx";
 import React, { useEffect, useMemo, useState } from "react";
@@ -46,27 +47,6 @@ const empty = {
   contexts: [],
   notifications: [],
 };
-export function exportCsv(name, headers, rows) {
-  const cell = (value) => {
-    let text = String(value ?? "");
-    if (/^[=+@\-\t\r]/.test(text)) text = "'" + text;
-    return '"' + text.replaceAll('"', '""') + '"';
-  };
-  const url = URL.createObjectURL(
-    new Blob(
-      [
-        "\ufeff" +
-          [headers, ...rows].map((row) => row.map(cell).join(";")).join("\n"),
-      ],
-      { type: "text/csv;charset=utf-8;" },
-    ),
-  );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 export default function InstitutionPortal({
   session,
   institution,
@@ -913,85 +893,7 @@ export default function InstitutionPortal({
                         onChanged={refresh}
                       />
                     )}
-                  {page === "Relatórios" && !schoolArea && (
-                    <div className="panel">
-                      <h2>Relatórios da instituição</h2>
-                      <p className="panel-desc">
-                        Resumo dos registros do banco da instituição atual.
-                      </p>
-                      <dl className="school-data">
-                        {[
-                          ["Escolas", schools.length],
-                          [
-                            "Atletas",
-                            data.athletes.filter((a) => !a.archived).length,
-                          ],
-                          [
-                            "Profissionais",
-                            data.staff.filter((a) => !a.archived).length,
-                          ],
-                          ["Inscrições", data.registrations.length],
-                        ].map(([label, count]) => (
-                          <div key={label}>
-                            <dt>{label}</dt>
-                            <dd>{count}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                      <div className="staff-actions">
-                        <button
-                          className="secondary"
-                          onClick={() =>
-                            exportCsv(
-                              "siep-eventos.csv",
-                              ["Evento", "Edição", "Situação"],
-                              events.map((e) => [e.name, e.year, e.status]),
-                            )
-                          }
-                        >
-                          Exportar eventos em CSV
-                        </button>
-                        <button
-                          className="secondary"
-                          onClick={() =>
-                            exportCsv(
-                              "siep-inscricoes.csv",
-                              [
-                                "Evento",
-                                "Escola",
-                                "Categoria",
-                                "Prova",
-                                "Situação",
-                                "Atletas",
-                              ],
-                              data.registrations.map((r) => {
-                                const e = events.find(
-                                    (e) => e.id === r.event_id,
-                                  ),
-                                  c = e?.categories.find(
-                                    (c) => c.id === r.category_id,
-                                  );
-                                return [
-                                  e?.name,
-                                  schools.find((s) => s.id === r.school_id)
-                                    ?.name,
-                                  c?.name,
-                                  c?.proofs.find((p) => p.id === r.proof_id)
-                                    ?.name || "",
-                                  registrationStatusLabel[r.status],
-                                  data.allocations.filter(
-                                    (a) => a.registration_id === r.id,
-                                  ).length,
-                                ];
-                              }),
-                            )
-                          }
-                        >
-                          Exportar inscrições em CSV
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  {page === "Relatórios" && !schoolArea && <Reports data={data} events={events} schools={schools} institution={institution} />}
                   {page === "Crachás" && !schoolArea && <EventBadges events={events} schools={schools} api={api} tenant={tenant} />}
                   {page === "Notificações" && (
                     <div className="panel">
