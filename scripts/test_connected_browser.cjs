@@ -16,6 +16,7 @@ try {
   const {fromEvent}=await import('../src/data/eventMapping.js');
   const {buildReport,groupRows,sortRows,normalize}=await import('../src/reports/model.js');
   const queryCalls=[];
+  const staffReviews=new Map();
   let notificationFailure=false;
   const browser = await chromium.launch({
     executablePath:
@@ -179,6 +180,33 @@ try {
         return route.fulfill({ status:200, body:bucket==='siep-person-photos'?portrait:Buffer.from("test-image"),contentType:"image/png" });
       }
       const table = url.pathname.split("/").at(-1);
+      if(['siep_staff_conference_page','siep_staff_conference_detail','siep_review_staff'].includes(table)){
+        queryCalls.push({table,body});
+        if(body.p_institution_id!==tenant)return response(route,{message:'Acesso negado'},403);
+        const candidates=new Map();
+        for(const a of tables.registration_staff){
+          const key=[a.event_id,a.school_id,a.person_id].join(':');
+          if(candidates.has(key))continue;
+          const p=tables.people.find(p=>p.id===a.person_id),link=tables.school_people.find(l=>l.person_id===a.person_id&&l.school_id===a.school_id&&l.role==='staff');
+          if(!p||!link)continue;
+          const assignments=tables.registration_staff.filter(x=>x.person_id===a.person_id&&x.school_id===a.school_id&&x.event_id===a.event_id);
+          const roles=[...new Set(assignments.map(x=>x.staff_role_id))].map(id=>({id,name:tables.event_staff_roles.find(r=>r.id===id)?.name||'Técnico'}));
+          const f=tables.person_photos.find(f=>f.person_id===p.id&&f.is_current),photo=f?{id:f.id,bucket:f.bucket_id,objectPath:f.object_path,name:f.original_name}:null;
+          const fingerprint=JSON.stringify([p,photo,roles]),review=staffReviews.get(key);
+          candidates.set(key,{event_id:a.event_id,school_id:a.school_id,person_id:p.id,link_id:link.id,person:p,roles,photo,fingerprint,event_name:tables.events.find(e=>e.id===a.event_id)?.name,school_name:tables.schools.find(s=>s.id===a.school_id)?.name,registration_count:new Set(assignments.map(x=>x.registration_id)).size,active:!p.archived&&!link.archived&&link.status==='approved',revision:review?.revision||0,status:review?.fingerprint===fingerprint?review.status:'pending',outdated:!!review&&review.fingerprint!==fingerprint,last_reason:review?.last_reason,history:review?.history||[]});
+        }
+        if(table==='siep_staff_conference_page'){
+          const f=body.p_filters||{};let rows=[...candidates.values()].filter(r=>(!body.p_school_id||r.school_id===body.p_school_id)&&(!f.eventId||r.event_id===f.eventId)&&(!f.schoolId||r.school_id===f.schoolId)&&(!f.status||f.status==='all'||r.status===f.status)&&(!f.query||[r.person.full_name,r.person.cpf,r.school_name].join(' ').toLowerCase().includes(f.query.toLowerCase())));
+          return response(route,{total:rows.length,rows:rows.slice(body.p_offset,body.p_offset+body.p_limit)});
+        }
+        const key=[body.p_event_id,body.p_school_id,body.p_person_id].join(':'),row=candidates.get(key);
+        if(!row)return response(route,{message:'Profissional indisponível'},404);
+        if(table==='siep_staff_conference_detail')return response(route,row);
+        if(!isAdmin&&!isManager)return response(route,{message:'Somente a Secretaria pode decidir'},403);
+        if(body.p_expected_revision!==row.revision||body.p_fingerprint!==row.fingerprint)return response(route,{code:'40001',message:'Cadastro alterado; recarregue a conferência'},409);
+        const review={...row,revision:row.revision+1,status:body.p_status,last_reason:body.p_reason,history:[{id:randomUUID(),revision:row.revision+1,status:body.p_status,reason:body.p_reason,snapshot:structuredClone(row),created_at:new Date().toISOString()},...row.history]};
+        staffReviews.set(key,review);return response(route,review);
+      }
       if(table==='siep_notification_center'){
         if(notificationFailure)return response(route,{message:'Falha simulada'},503);
         const rows=tables.notifications.filter(n=>!n.audience||n.audience===(isAdmin||isManager?'secretaria':'escola')).sort((a,b)=>b.created_at.localeCompare(a.created_at));
@@ -1009,6 +1037,40 @@ try {
   tables.registration_decisions=tables.registration_decisions.filter(r=>!queueIds.has(r.registration_id));
   tables.registration_athletes=tables.registration_athletes.filter(r=>!queueIds.has(r.registration_id));
   tables.people=tables.people.filter(p=>p.id!==queuePerson.id);tables.school_people=tables.school_people.filter(p=>p.id!==queueLink.id);tables.event_participations=tables.event_participations.filter(p=>p.id!==queuePart.id);
+  // A mesma pessoa em duas inscrições tem uma única conferência técnica.
+  const originalAssignments=[...tables.registration_staff],extraStaffRegistration={...registration,id:randomUUID()};
+  tables.registrations.push(extraStaffRegistration);
+  const staffRole=tables.event_staff_roles[0]||{id:randomUUID(),event_id:registration.event_id,institution_id:tenant,name:'Técnico'};
+  if(!tables.event_staff_roles.some(r=>r.id===staffRole.id))tables.event_staff_roles.push(staffRole);
+  tables.registration_staff.push(...[registration.id,extraStaffRegistration.id].map(id=>({id:randomUUID(),institution_id:tenant,event_id:registration.event_id,school_id:registration.school_id,person_id:tables.people[0].id,staff_role_id:staffRole.id,registration_id:id})));
+  await page.getByLabel('Tipo de conferência',{exact:true}).selectOption('comissao');
+  await page.getByText('1 profissionais no evento e escola',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('region',{name:'Conferência da comissão técnica',exact:true}).locator('tbody tr').count(),1);
+  await page.getByText('Vinculado a 2 inscrições',{exact:true}).waitFor();
+  await page.getByLabel('Evento da comissão técnica',{exact:true}).selectOption(registration.event_id);
+  await page.getByLabel('Escola da comissão técnica',{exact:true}).selectOption(registration.school_id);
+  await page.getByRole('button',{name:'Conferir profissional',exact:true}).click();
+  const staffDialog=page.getByRole('dialog',{name:'Conferência do profissional',exact:true});
+  await staffDialog.getByRole('img',{name:'Foto de identificação do cadastro',exact:true}).waitFor();
+  await staffDialog.getByRole('button',{name:'Aprovar profissional',exact:true}).click();
+  await staffDialog.getByLabel('Justificativa da conferência *',{exact:true}).fill('Profissional conferido separadamente');
+  await staffDialog.getByRole('button',{name:'Confirmar decisão do profissional',exact:true}).click();
+  await staffDialog.getByText('Aprovado',{exact:true}).waitFor();
+  assert.equal(registration.status,'approved');
+  assert.equal(registration.revision,tables.registrations[0].revision);
+  await page.reload();
+  await staffDialog.getByText('Aprovado',{exact:true}).waitFor();
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'/tmp/siep-staff-conference-mobile.png',fullPage:true});
+  assert.equal(await staffDialog.evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('button',{name:'Fechar conferência técnica',exact:true}).click();
+  await page.getByLabel('Situação da conferência técnica',{exact:true}).selectOption('approved');
+  await page.getByRole('button',{name:'Conferir profissional',exact:true}).waitFor();
+  await page.getByLabel('Buscar profissional na conferência',{exact:true}).fill('ninguém com esse nome');
+  await page.getByText('Nenhum profissional vinculado a inscrições com estes filtros.',{exact:true}).waitFor();
+  await page.getByLabel('Tipo de conferência',{exact:true}).selectOption('atletas');
+  tables.registration_staff=originalAssignments;tables.registrations=tables.registrations.filter(r=>r.id!==extraStaffRegistration.id);
   const examplePhoto=tables.person_photos.find(p=>p.is_current&&p.person_id===tables.people[0].id);
   examplePhoto.bucket_id='siep-development-photos';examplePhoto.object_path='development/'+examplePhoto.id+'.png';
   await page.getByRole("button",{name:"Crachás",exact:true}).click();

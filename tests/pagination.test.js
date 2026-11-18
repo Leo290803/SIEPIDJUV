@@ -36,3 +36,5 @@ test("fila de inscrições usa páginas curtas sem reduzir páginas de pessoas",
  assert.equal(pagePlan({page:"Minhas inscrições"}).limit,10);
  assert.equal(pagePlan({page:"Atletas"}).limit,25);
 });
+
+test('filtro da escola na Secretaria mantém prioridade da escola autorizada na rota',()=>{assert.equal(pagePlan({page:'Inscrições'},{schoolId:'filter'}).schoolId,'filter');assert.equal(pagePlan({page:'Minhas inscrições',schoolId:'authorized'},{schoolId:'other'}).schoolId,'authorized');});

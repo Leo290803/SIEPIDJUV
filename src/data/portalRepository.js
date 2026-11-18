@@ -218,6 +218,9 @@ export function portalRepository(client) {
       ]);
       return {versions,decisions};
     },
+    staffPage: (tenant,school,filters,offset,signal) => queryPage("siep_staff_conference_page",{p_institution_id:tenant,p_school_id:school||null,p_filters:filters,p_offset:offset,p_limit:10},signal),
+    staffDetail: (tenant,event,school,person,signal) => queryPage("siep_staff_conference_detail",{p_institution_id:tenant,p_event_id:event,p_school_id:school,p_person_id:person},signal),
+    reviewStaff: (tenant,row,status,reason) => queryPage("siep_review_staff",{p_institution_id:tenant,p_event_id:row.event_id,p_school_id:row.school_id,p_person_id:row.person_id,p_expected_revision:row.revision,p_fingerprint:row.fingerprint,p_status:status,p_reason:reason}),
     notifications: (tenant,signal) => queryPage("siep_notification_center",{p_institution_id:tenant},signal),
     markRead: async (id) =>
       checked(

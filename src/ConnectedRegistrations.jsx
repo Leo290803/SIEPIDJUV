@@ -381,6 +381,7 @@ export default function ConnectedRegistrations({
   const [query, setQuery] = useState(remote?.filters.query || ""),
     [status, setStatus] = useState(remote?.filters.status || "all"),
     [eventFilter, setEventFilter] = useState(remote?.filters.eventId || ""),
+    [schoolFilter, setSchoolFilter] = useState(remote?.filters.schoolId || ""),
     [editing, setEditing] = useState(null),
     [starting, setStarting] = useState(false),
     [decision, setDecision] = useState(null),
@@ -433,12 +434,13 @@ export default function ConnectedRegistrations({
     setHistory(null);
     onRoute?.(null);
   };
-  useServerFilters(remote, {query, status, eventId:eventFilter});
+  useServerFilters(remote, {query, status, eventId:eventFilter,schoolId:schoolFilter});
   const rows = remote ? data.registrations : data.registrations.filter(
     (r) =>
       (!school || r.school_id === school.id) &&
       (!event || r.event_id === event.id) &&
       (!eventFilter || r.event_id === eventFilter) &&
+      (!schoolFilter || r.school_id === schoolFilter) &&
       (status === "all" || r.status === status) &&
       [
         events.find((e) => e.id === r.event_id)?.name,
@@ -517,6 +519,7 @@ export default function ConnectedRegistrations({
                 onChange={(e) => setQuery(e.target.value)}
               />
             </label>
+            {manager && !school && <select aria-label="Escola das inscrições" value={schoolFilter} onChange={e=>setSchoolFilter(e.target.value)}><option value="">Todas as escolas</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>}
             {!event && (
               <select
                 aria-label="Evento das inscrições"

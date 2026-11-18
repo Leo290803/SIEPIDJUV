@@ -5,7 +5,7 @@ import {guardianFields as guardianFieldPairs, guardianPolicy, isMinorAt} from ".
 
 const guardianFields = guardianFieldPairs.map(([key,label]) => ({key,label}));
 
-function PrivateFile({attachment, api, photo = false}) {
+export function PrivateFile({attachment, api, photo = false}) {
   const [url, setUrl] = useState(""), [type, setType] = useState(""), [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -26,7 +26,7 @@ function PrivateFile({attachment, api, photo = false}) {
 }
 
 export default function RegistrationReview({history, event, school, data, api, manager, onDecision, onContinue, navigation, savedNotes, onNotesChange, onCorrect, onResend}) {
-  const [tab, setTab] = useState("review"), [notes, setNotes] = useState(savedNotes || {}), [athleteIndex, setAthleteIndex] = useState(0), [staffOpen, setStaffOpen] = useState(false);
+  const [tab, setTab] = useState("review"), [notes, setNotes] = useState(savedNotes || {}), [athleteIndex, setAthleteIndex] = useState(0);
   const r = history.r;
   const category = event?.categories.find(c => c.id === r.category_id);
   const proof = category?.proofs.find(p => p.id === r.proof_id);
@@ -72,13 +72,7 @@ export default function RegistrationReview({history, event, school, data, api, m
           {policy?.enabled && isMinorAt(person.birth, policy.referenceDate) && guardianFields.some(field => policy.fields[field.key] !== "hidden" && profile?.additionalData?.[field.key]) && <><h4>Responsável legal informado</h4><dl className="review-data">{guardianFields.map(field => policy.fields[field.key] !== "hidden" && profile?.additionalData?.[field.key] && <div key={field.key}><dt>{field.label}</dt><dd>{profile.additionalData[field.key]}</dd></div>)}</dl></>}
         </section>;
       })}
-      <details className="review-staff" onToggle={e => setStaffOpen(e.currentTarget.open)}><summary>Comissão técnica · {data.registrationStaff.filter(s => s.registration_id === r.id).length}</summary>
-      {staffOpen && data.registrationStaff.filter(s => s.registration_id === r.id).map(assignment => {
-        const person = data.staff.find(p => p.personId === assignment.person_id && p.schoolId === r.school_id);
-        return <section className="panel" key={assignment.id || assignment.person_id}><strong>{person?.name || "Profissional indisponível"}</strong><p>{event?._staffRoles?.find(role => role.id === assignment.staff_role_id)?.name}</p>{person?.photo && <PrivateFile key={person.photo.id} attachment={person.photo} api={api} photo />}{person && note(person.name)}</section>;
-      })}
-      {!data.registrationStaff.some(s => s.registration_id === r.id) && <p>Nenhum profissional vinculado.</p>}
-      </details>
+      {data.registrationStaff.some(s => s.registration_id === r.id) && <p className="info-box">Profissionais vinculados: {data.registrationStaff.filter(s => s.registration_id === r.id).map(a => {const p=data.staff.find(p=>p.personId===a.person_id&&p.schoolId===r.school_id);const role=event?._staffRoles?.find(role=>role.id===a.staff_role_id);return `${p?.name || 'Profissional'}${role ? ' ('+role.name+')' : ''}`;}).join(', ')}. A conferência dos profissionais fica no tipo Comissão técnica.</p>}
       {canReview && <div className="review-decisions"><p>As orientações serão enviadas à escola na justificativa. Confira e confirme a decisão na próxima etapa.</p><div className="staff-actions"><button className="primary" onClick={() => onDecision("approved", "Aprovar")}>Aprovar</button><button className="secondary" onClick={() => onDecision("correction_requested", "Solicitar correção", correctionReason)}>Solicitar correção</button><button className="secondary" onClick={() => onDecision("rejected", "Indeferir")}>Indeferir</button></div></div>}
     </div> : <div role="tabpanel" aria-label="Histórico">
       <p>As versões abaixo preservam os dados enviados em cada etapa. A conferência mostra o cadastro atual.</p>
