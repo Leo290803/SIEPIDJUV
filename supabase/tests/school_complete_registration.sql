@@ -1,0 +1,48 @@
+do $$
+declare tenant uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();school_user uuid:=gen_random_uuid();school uuid:=gen_random_uuid();other_school uuid:=gen_random_uuid();ev uuid:=gen_random_uuid();sport uuid:=gen_random_uuid();cat uuid:=gen_random_uuid();p1 uuid:=gen_random_uuid();p2 uuid:=gen_random_uuid();responsible uuid:=gen_random_uuid();part1 uuid;part2 uuid;request1 uuid:=gen_random_uuid();request2 uuid:=gen_random_uuid();request3 uuid:=gen_random_uuid();r uuid;payload1 jsonb;payload2 jsonb;result jsonb;replay jsonb;rev integer;denied boolean;
+begin
+ begin
+ insert into auth.users(id) values(admin_user),(school_user);
+ insert into public.institutions(id,name,slug) values(tenant,'Conclusão escolar','complete-'||tenant);
+ insert into public.institution_memberships(institution_id,user_id,role,status) values(tenant,admin_user,'admin','approved');
+ insert into public.schools(id,institution_id,name) values(school,tenant,'Escola'),(other_school,tenant,'Outra escola');
+ insert into public.events(id,institution_id,name,status) values(ev,tenant,'Evento','open');
+ insert into public.event_modalities(id,institution_id,event_id,name,classification) values(sport,tenant,ev,'Futsal','collective');
+ insert into public.event_categories(id,institution_id,event_id,modality_id,name,participation,min_athletes,max_athletes) values(cat,tenant,ev,sport,'Categoria','team',2,2);
+ insert into public.people(id,institution_id,full_name,birth_date,cpf,gender) values(p1,tenant,'Atleta 1','2010-01-01','52998224725','Feminino'),(p2,tenant,'Atleta 2','2010-01-01','12345678909','Feminino'),(responsible,tenant,'Responsável','1990-01-01','11144477735','Feminino');
+ insert into public.school_people(institution_id,school_id,person_id,role,status,user_id) values(tenant,school,p1,'athlete','approved',null),(tenant,school,p2,'athlete','approved',null),(tenant,school,responsible,'responsible','approved',school_user);
+ perform set_config('request.jwt.claim.sub',school_user::text,true);execute 'set local role authenticated';
+ result:=public.siep_save_participation(ev,school,p1,array[cat],'{}',true);part1:=(result->>'id')::uuid;
+ result:=public.siep_save_participation(ev,school,p2,array[cat],'{}',true);part2:=(result->>'id')::uuid;
+ payload1:=jsonb_build_array(jsonb_build_object('participation_id',part1,'slot_number',1));payload2:=payload1||jsonb_build_array(jsonb_build_object('participation_id',part2,'slot_number',2));
+ result:=public.siep_complete_registration(request1,ev,school,cat,null,payload1,'[]');r:=(result->>'id')::uuid;
+ if (result->>'submitted')::boolean or result->>'status'<>'draft' or result->'issues'='[]'::jsonb then raise exception 'Inscrição incompleta foi enviada: %',result;end if;
+ replay:=public.siep_complete_registration(request1,ev,school,cat,null,payload1,'[]');if replay<>result then raise exception 'Repetição não retornou o mesmo resultado';end if;
+ denied:=false;begin perform public.siep_complete_registration(request1,ev,school,cat,null,payload2,'[]');exception when invalid_parameter_value then denied:=true;end;if not denied then raise exception 'Identificador foi reutilizado com outros dados';end if;
+ execute 'reset role';if (select count(*) from public.registrations where institution_id=tenant)<>1 then raise exception 'Tentativa duplicou inscrição';end if;
+ if (select count(*) from public.registration_athletes where registration_id=r)<>1 or exists(select 1 from public.registration_decisions where registration_id=r) then raise exception 'Rascunho não foi preservado corretamente';end if;
+ execute 'set local role authenticated';
+ result:=public.siep_complete_registration(request2,ev,school,cat,null,payload2,'[]',r,1);rev:=(result->>'revision')::integer;
+ if (result->>'submitted')::boolean is not true or result->>'status'<>'submitted' then raise exception 'Conclusão válida não enviou: %',result;end if;
+ replay:=public.siep_complete_registration(request2,ev,school,cat,null,payload2,'[]',r,1);if replay<>result then raise exception 'Retry após sucesso não foi idempotente';end if;
+ denied:=false;begin perform public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,payload2,'[]',r,1);exception when serialization_failure then denied:=true;end;if not denied then raise exception 'Revisão antiga aceita';end if;
+ denied:=false;begin perform public.siep_complete_registration(gen_random_uuid(),ev,other_school,cat,null,payload2,'[]');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Inscrição enviada para outra escola';end if;
+ execute 'reset role';
+ if (select count(*) from public.registration_decisions where registration_id=r)<>1 then raise exception 'Reenvio de rede duplicou decisão';end if;
+ if (select count(*) from public.notifications where institution_id=tenant and kind='registration_submitted')<>1 then raise exception 'Aviso da Secretaria duplicado ou ausente';end if;
+ if exists(select 1 from public.registrations where id=r and status='approved') then raise exception 'Escola aprovou inscrição';end if;
+ perform set_config('request.jwt.claim.sub',admin_user::text,true);execute 'set local role authenticated';result:=public.siep_transition_registration(r,rev,'correction_requested','Corrigir',now()+interval '1 day');rev:=(result->>'revision')::integer;execute 'reset role';
+ perform set_config('request.jwt.claim.sub',school_user::text,true);execute 'set local role authenticated';result:=public.siep_complete_registration(request3,ev,school,cat,null,payload2,'[]',r,rev);rev:=(result->>'revision')::integer;
+ if (result->>'submitted')::boolean is not true then raise exception 'Correção válida não foi reenviada';end if;execute 'reset role';
+ perform set_config('request.jwt.claim.sub',admin_user::text,true);execute 'set local role authenticated';result:=public.siep_transition_registration(r,rev,'correction_requested','Novo pedido',now()+interval '1 day');rev:=(result->>'revision')::integer;execute 'reset role';
+ update public.registrations set correction_deadline=now()-interval '1 minute' where id=r;
+ perform set_config('request.jwt.claim.sub',school_user::text,true);execute 'set local role authenticated';denied:=false;begin perform public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,payload2,'[]',r,rev);exception when check_violation then denied:=true;end;if not denied then raise exception 'Prazo vencido contornado';end if;execute 'reset role';
+ if (select revision from public.registrations where id=r)<>rev or (select count(*) from public.registration_athletes where registration_id=r)<>2 then raise exception 'Falha de prazo alterou inscrição';end if;
+ update public.events set status='closed' where id=ev;
+ execute 'set local role authenticated';result:=public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,payload2,'[]');execute 'reset role';
+ if (result->>'saved')::boolean is not true or (result->>'submitted')::boolean or result->>'status'<>'draft' or result->>'submission_error' is null then raise exception 'Evento fechado perdeu rascunho ou informou envio: %',result;end if;
+ if has_function_privilege('anon','public.siep_complete_registration(uuid,uuid,uuid,uuid,uuid,jsonb,jsonb,uuid,integer)','execute') or has_table_privilege('authenticated','siep_private.registration_completion_requests','select') then raise exception 'Permissão excessiva';end if;
+ raise exception 'rollback_school_complete_registration' using errcode='ZX001';
+ exception when sqlstate 'ZX001' then null;
+ end;
+end $$;

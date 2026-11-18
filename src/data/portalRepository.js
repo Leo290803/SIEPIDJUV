@@ -196,6 +196,7 @@ export function portalRepository(client) {
           p_registration_id: registration || null,
         }),
       ),
+    completeRegistration: (input,requestId) => queryPage("siep_complete_registration",{...input,p_request_id:requestId}),
     saveRegistration: async (input) =>
       checked(await client.rpc("siep_save_registration", input)),
     preview: async (input) =>

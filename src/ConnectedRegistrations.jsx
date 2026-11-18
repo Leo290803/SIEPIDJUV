@@ -2,7 +2,7 @@ import EventAthleteForm from "./EventAthleteForm.jsx";
 import RegistrationReview from "./RegistrationReview.jsx";
 import ServerPagination from "./ServerPagination.jsx";
 import { useServerFilters } from "./data/useServerFilters.js";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { X, Plus, ClipboardList } from "lucide-react";
 import {
   registrationStatusLabel,
@@ -17,7 +17,11 @@ export function RegistrationEditor({
   api,
   onSaved,
   onClose,
+  schoolWorkflow = false,
 }) {
+  const [savedRegistration,setSavedRegistration]=useState(registration ? {id:registration.id,revision:registration.revision} : null);
+  const completionRequest=useRef(null),schoolIssues=useRef(null);
+  const currentId=savedRegistration?.id;
   const [categoryId, setCategoryId] = useState(registration?.category_id || ""),
     [proofId, setProofId] = useState(registration?.proof_id || ""),
     [slots, setSlots] = useState(() =>
@@ -39,6 +43,9 @@ export function RegistrationEditor({
     [loading, setLoading] = useState(false),
     [error, setError] = useState(""),
     [issues, setIssues] = useState([]);
+  useEffect(()=>{
+    if(schoolWorkflow && (issues.length || error))requestAnimationFrame(()=>{schoolIssues.current?.scrollIntoView({block:'center',behavior:'auto'});schoolIssues.current?.focus({preventScroll:true});});
+  },[schoolWorkflow,issues,error]);
   const category = event.categories.find((c) => c.id === categoryId),
     proof = category?.proofs?.find((p) => p.id === proofId);
   const capacity = proof ? proof.slotsPerSchool : category?.max || 1;
@@ -49,7 +56,7 @@ export function RegistrationEditor({
       a.event_id === event.id &&
       a.school_id === school.id &&
       a.proof_id === proofId &&
-      a.registration_id !== registration?.id,
+      a.registration_id !== currentId,
   );
   const professionals = data.staff.filter(
     (p) =>
@@ -64,7 +71,7 @@ export function RegistrationEditor({
     if (!categoryId || ((category?.proofs || []).length && !proofId)) return;
     setLoading(true);
     api
-      .eligible(event.id, school.id, categoryId, proofId, registration?.id)
+      .eligible(event.id, school.id, categoryId, proofId, currentId)
       .then((rows) => {
         if (active) setEligible(rows);
       })
@@ -77,7 +84,7 @@ export function RegistrationEditor({
     return () => {
       active = false;
     };
-  }, [api, event.id, school.id, categoryId, proofId, registration?.id]);
+  }, [api, event.id, school.id, categoryId, proofId, currentId]);
   const input = () => ({
     p_event_id: event.id,
     p_school_id: school.id,
@@ -92,24 +99,28 @@ export function RegistrationEditor({
     p_staff: Object.entries(staff)
       .filter(([, role]) => role)
       .map(([person_id, staff_role_id]) => ({ person_id, staff_role_id })),
-    p_registration_id: registration?.id || null,
-    p_expected_revision: registration?.revision || null,
+    p_registration_id: currentId || null,
+    p_expected_revision: savedRegistration?.revision || null,
   });
   async function submit(e) {
     e.preventDefault();
     if (busy) return;
-    setBusy(true);
-    setError("");
+    setBusy(true);setError("");if(schoolWorkflow)setIssues([]);
+    const complete=schoolWorkflow && e.nativeEvent.submitter?.value!=='draft';
+    const payload=input(),signature=JSON.stringify(payload);
+    if(complete && completionRequest.current?.signature!==signature)completionRequest.current={signature,id:crypto.randomUUID()};
     try {
-      const result = await api.saveRegistration(input());
+      const result=complete ? await api.completeRegistration(payload,completionRequest.current.id) : await api.saveRegistration(payload);
+      completionRequest.current=null;
+      setSavedRegistration({id:result.id,revision:result.revision});
+      setIssues(result.issues || []);
+      if(result.submission_error)setError(result.submission_error);
       await onSaved(result);
-      onClose();
-    } catch (error) {
-      setError(readableError(error));
-    } finally {
-      setBusy(false);
-    }
+      if(!complete || result.submitted)onClose();
+    } catch(error) {setError(readableError(error));}
+    finally {setBusy(false);}
   }
+
   return (
     <div className="modal-backdrop">
       <div
@@ -129,8 +140,10 @@ export function RegistrationEditor({
         <h2>Inscrição · {event.name}</h2>
         <p>
           {school.name} ·{" "}
-          {registration ? "Continuar inscrição" : "Novo rascunho"}
+          {currentId ? "Continuar inscrição" : "Novo rascunho"}
         </p>
+        {schoolWorkflow && <p className="form-note">O envio só estará confirmado quando aparecer a mensagem de sucesso. Use a ação de conclusão para validar, salvar e enviar.</p>}
+        {schoolWorkflow && (issues.length>0 || error) && <div className="participation-issues" role="alert" tabIndex={-1} ref={schoolIssues}><strong>{issues.length ? "A inscrição ainda não foi enviada" : "Não foi possível confirmar a conclusão"}</strong>{issues.length>0 && <ul>{issueMessages(issues,event).map(message=><li key={message}>{message}</li>)}</ul>}{error&&<p>{error}</p>}<p>{issues.length ? "Os dados preenchidos foram mantidos. Resolva as pendências antes de concluir." : "Os dados preenchidos continuam na tela. Tente novamente; a operação evita inscrições duplicadas."}</p></div>}
         <form onSubmit={submit}>
           <fieldset className="form-fields" disabled={busy}>
             <label>
@@ -138,7 +151,7 @@ export function RegistrationEditor({
               <select
                 required
                 value={categoryId}
-                disabled={!!registration}
+                disabled={!!currentId}
                 onChange={(e) => {
                   setCategoryId(e.target.value);
                   setProofId("");
@@ -162,7 +175,7 @@ export function RegistrationEditor({
                 <select
                   required
                   value={proofId}
-                  disabled={!!registration}
+                  disabled={!!currentId}
                   onChange={(e) => {
                     setProofId(e.target.value);
                     setSlots({});
@@ -310,9 +323,9 @@ export function RegistrationEditor({
                 )}
               </>
             )}
-            {issues.length > 0 && (
+            {!schoolWorkflow && issues.length > 0 && (
               <div className="participation-issues">
-                <strong>Pendências da prévia</strong>
+                <strong>{schoolWorkflow ? "Pendências para concluir a inscrição" : "Pendências da prévia"}</strong>
                 <ul>
                   {issueMessages(issues, event).map((message) => (
                     <li key={message}>{message}</li>
@@ -320,14 +333,13 @@ export function RegistrationEditor({
                 </ul>
               </div>
             )}
-            {error && (
+            {!schoolWorkflow && error && (
               <p className="school-error" role="alert">
                 {error}
               </p>
             )}
             <p className="form-note">
-              Salvar rascunho preserva pendências para correção. Enviar para
-              análise exige resolver todas as pendências.
+              {schoolWorkflow ? "Salvar rascunho mantém a inscrição como não enviada. Concluir inscrição valida, salva e envia à Secretaria em uma única ação." : "Salvar rascunho preserva pendências para correção. Enviar para análise exige resolver todas as pendências."}
             </p>
             <div className="school-form-footer">
               <button
@@ -348,13 +360,16 @@ export function RegistrationEditor({
               >
                 Verificar pendências
               </button>
+              {schoolWorkflow && <button className="primary" type="submit" value="complete" disabled={!categoryId || loading}>{registration?.status==='correction_requested' ? "Salvar correções e reenviar" : "Concluir inscrição"}</button>}
               <button
-                className="primary"
+                className={schoolWorkflow ? "secondary" : "primary"}
                 type="submit"
+                value="draft"
                 disabled={!categoryId || loading}
               >
-                Salvar rascunho no banco
+                {schoolWorkflow ? "Salvar rascunho" : "Salvar rascunho no banco"}
               </button>
+
             </div>
           </fieldset>
         </form>
@@ -389,6 +404,7 @@ export default function ConnectedRegistrations({
     [history, setHistory] = useState(null),
     [reviewNotes, setReviewNotes] = useState({}),
     [warnings, setWarnings] = useState(null),
+    [successMessage,setSuccessMessage] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -426,7 +442,7 @@ export default function ConnectedRegistrations({
       controller.abort();
     };
   }, [routeAction, routeRegistrationId, data.registrations]);
-  useEffect(() => {setCorrecting(null);}, [routeAction,routeRegistrationId]);
+  useEffect(() => {setCorrecting(null);if(routeAction)setSuccessMessage("");}, [routeAction,routeRegistrationId]);
   const closeRoute = () => {
     setCorrecting(null);
     setEditing(null);
@@ -467,9 +483,11 @@ export default function ConnectedRegistrations({
     const candidates = direction > 0 ? rows.slice(currentRowIndex+1) : rows.slice(0,currentRowIndex).reverse();
     return candidates.find(r => !manager || r.status === "submitted");
   };
+  const schoolCompletionRequest=useRef(null),correctedSave=useRef(null);
+  useEffect(()=>{correctedSave.current=null;},[correcting?.athlete.id]);
   function actions(r) {
     return [
-      ...(["draft", "correction_requested"].includes(r.status)
+      ...(manager && ["draft", "correction_requested"].includes(r.status)
         ? [["Enviar para análise", "submitted"]]
         : []),
       ...(manager && r.status === "submitted"
@@ -485,17 +503,60 @@ export default function ConnectedRegistrations({
         : []),
     ];
   }
+  function registrationInput(r) {
+    return {p_event_id:r.event_id,p_school_id:r.school_id,p_category_id:r.category_id,p_proof_id:r.proof_id||null,p_registration_id:r.id,p_expected_revision:r.revision,
+      p_athletes:data.allocations.filter(a=>a.registration_id===r.id&&a.active!==false).map(a=>({participation_id:a.participation_id,slot_number:a.slot_number})),
+      p_staff:data.registrationStaff.filter(a=>a.registration_id===r.id).map(a=>({person_id:a.person_id,staff_role_id:a.staff_role_id}))};
+  }
+  async function completeSchoolRegistration(r) {
+    if(busy)return false;
+    setBusy(true);setError('');setSuccessMessage('');setWarnings(null);
+    const payload=registrationInput(r),signature=JSON.stringify(payload);
+    if(schoolCompletionRequest.current?.signature!==signature)schoolCompletionRequest.current={signature,id:crypto.randomUUID()};
+    try {
+      const result=await api.completeRegistration(payload,schoolCompletionRequest.current.id);
+      await onChanged().catch(()=>setError("A operação foi salva, mas a lista não pôde ser atualizada. Recarregue a página para conferir a situação."));
+      schoolCompletionRequest.current=null;
+      setWarnings(result.issues?.length||result.submission_error ? {issues:result.issues||[],message:result.submission_error,event:ev(r),registrationId:r.id} : null);
+      if(result.submitted){setSuccessMessage('Inscrição enviada com sucesso. Aguarde a análise da Secretaria.');closeRoute();}
+      return !!result.submitted;
+    } catch(error){setError(readableError(error));throw error;}
+    finally{setBusy(false);}
+  }
+  async function saveSchoolCorrection(entry,options) {
+    const signature=JSON.stringify([
+      entry,options?.complete,options?.removed,
+      Object.entries(options?.files||{}).map(([id,file])=>[id,file?.name,file?.size,file?.lastModified]),
+      options?.photo===null ? null : options?.photo ? [options.photo.name,options.photo.size,options.photo.lastModified] : undefined,
+    ]);
+    // Se o envio falhar após salvar dados/anexos, repetir não faz novo upload
+    // nem tenta atualizar o cadastro com sua versão anterior.
+    if(correctedSave.current!==signature){
+      await onSaveAthlete(entry,options);
+      correctedSave.current=signature;
+    }
+    if(options?.submitRegistration){
+      try {await completeSchoolRegistration(correcting.registration);}
+      catch(error){throw Error("Os dados foram salvos, mas não foi possível confirmar o reenvio. Tente novamente. "+readableError(error));}
+    } else {
+      setWarnings({issues:[],message:"Alterações salvas como rascunho. A inscrição ainda não foi reenviada.",event:correcting.event,registrationId:correcting.registration.id});
+    }
+    setCorrecting(null);
+    return true;
+  }
   return (
     <section>
+      {successMessage && <p className="info-box" role="status">{successMessage}</p>}
       {warnings && (
         <div className="participation-issues" role="status">
-          <strong>Rascunho salvo com pendências</strong>
+          <strong>{manager ? "Rascunho salvo com pendências" : "Dados salvos. Inscrição ainda não enviada à Secretaria."}</strong>
           <ul>
             {issueMessages(warnings.issues, warnings.event).map((message) => (
               <li key={message}>{message}</li>
             ))}
           </ul>
-          <p>Corrija antes de enviar para análise.</p>
+          {warnings.message && <p>{warnings.message}</p>}
+          <p>{manager ? "Corrija antes de enviar para análise." : "Resolva as pendências e clique em Concluir inscrição ou Salvar correções e reenviar."}</p>
         </div>
       )}
       {error && (
@@ -604,6 +665,7 @@ export default function ConnectedRegistrations({
                       >
                         {registrationStatusLabel[r.status]}
                       </span>
+                      {!manager && r.status === "draft" && <small className="correction-list-deadline">Ainda não enviado à Secretaria</small>}
                       {r.status === "correction_requested" && r.correction_deadline && <small className="correction-list-deadline">Corrigir até {new Date(r.correction_deadline).toLocaleString("pt-BR")}</small>}
                     </td>
                     <td>
@@ -617,7 +679,7 @@ export default function ConnectedRegistrations({
                               r.status === "correction_requested" ? openReview(r) : onRoute ? onRoute({ id: r.id }) : setEditing(r)
                             }
                           >
-                            {r.status === "correction_requested" ? "Corrigir pendências" : "Continuar"}
+                            {r.status === "correction_requested" ? "Corrigir pendências" : "Concluir inscrição"}
                           </button>
                         )}
                         <button
@@ -664,21 +726,16 @@ export default function ConnectedRegistrations({
           registration={editing}
           data={data}
           api={api}
+          schoolWorkflow={!manager}
           onClose={closeRoute}
           onSaved={async (result) => {
-            await onChanged();
-            setWarnings(
-              result?.issues?.length
-                ? {
-                    issues: result.issues,
-                    event: editing ? ev(editing) : event,
-                  }
-                : null,
-            );
+            await onChanged().catch(()=>setError("A operação foi salva, mas a lista não pôde ser atualizada. Recarregue a página para conferir a situação."));
+            setWarnings(result?.issues?.length || result.submission_error ? {issues:result.issues || [],message:result.submission_error,event:editing ? ev(editing) : event,registrationId:result.id} : null);
+            if(result.submitted)setSuccessMessage('Inscrição enviada com sucesso. Aguarde a análise da Secretaria.');
           }}
         />
       )}
-      {correcting && <EventAthleteForm key={correcting.athlete.id} connected event={correcting.event} schoolId={correcting.school.id} schoolName={correcting.school.name} athlete={correcting.athlete} records={data.athletes} focusField={correcting.documentId ? 'document:'+correcting.documentId : 'name'} correctionNotice={correcting.message || "Corrija os dados ou anexos solicitados. Ao salvar, você volta à inscrição para conferir e reenviar."} onDocumentDownload={api.download} onClose={() => setCorrecting(null)} onSave={async(entry,options) => {await onSaveAthlete(entry,options);setCorrecting(null);return true;}} />}
+      {correcting && <EventAthleteForm key={correcting.athlete.id} connected event={correcting.event} schoolId={correcting.school.id} schoolName={correcting.school.name} athlete={correcting.athlete} records={data.athletes} registrationCorrection completeLabel="Salvar correções e reenviar" focusField={correcting.documentId ? 'document:'+correcting.documentId : 'name'} correctionNotice={correcting.message || "Corrija os dados ou anexos solicitados. Use Salvar correções e reenviar para concluir ou Salvar rascunho para continuar depois."} onDocumentDownload={api.download} onClose={() => setCorrecting(null)} onSave={saveSchoolCorrection} />}
       {decision && (
         <div className="modal-backdrop">
           <div
@@ -787,7 +844,7 @@ export default function ConnectedRegistrations({
               <X />
             </button>
             <h2>Análise da inscrição</h2>
-            <RegistrationReview key={history.r.id} history={history} savedNotes={reviewNotes[history.r.id]} onNotesChange={notes => setReviewNotes(current => ({...current,[history.r.id]:notes}))} onCorrect={!manager && onSaveAthlete ? (athlete,documentId,message) => setCorrecting({athlete,documentId,message,event:ev(history.r),school:sc(history.r)}) : undefined} onResend={() => setDecision({r:history.r,status:"submitted",label:"Reenviar para análise"})} event={ev(history.r)} school={sc(history.r)} data={data} api={api} manager={manager}
+            <RegistrationReview key={history.r.id} history={history} savedNotes={reviewNotes[history.r.id]} onNotesChange={notes => setReviewNotes(current => ({...current,[history.r.id]:notes}))} onCorrect={!manager && onSaveAthlete ? (athlete,documentId,message) => setCorrecting({athlete,documentId,message,registration:history.r,event:ev(history.r),school:sc(history.r)}) : undefined} submitting={busy} submissionError={error} submissionFeedback={warnings?.registrationId===history.r.id ? warnings : null} onResend={() => completeSchoolRegistration(history.r).catch(()=>{})} event={ev(history.r)} school={sc(history.r)} data={data} api={api} manager={manager}
               navigation={manager && (queueRows.length > 1 || remote && remote.offset+remote.limit < remote.total) && <div className="review-queue-navigation"><strong>{queueIndex >= 0 ? `Inscrição ${queueIndex+1} de ${queueRows.length} nesta página da fila` : "Inscrição fora da fila de análise"}</strong><div className="staff-actions"><button className="secondary" disabled={busy || !adjacent(-1)} onClick={() => openReview(adjacent(-1))}>Inscrição anterior</button><button className="primary" disabled={busy || !adjacent(1)} onClick={() => openReview(adjacent(1))}>Próxima inscrição</button>{remote && remote.offset+remote.limit < remote.total && <button className="secondary" onClick={() => {closeRoute();remote.onPage(remote.offset+remote.limit);}}>Próxima página da fila</button>}</div></div>}
               onContinue={() => { const r = history.r; closeRoute(); onRoute ? onRoute({id:r.id}) : setEditing(r); }}
               onDecision={(status,label,reason) => setDecision({r:history.r,status,label,reason})} />

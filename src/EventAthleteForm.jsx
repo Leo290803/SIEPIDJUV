@@ -28,6 +28,8 @@ export default function EventAthleteForm({
   onDocumentDownload,
   focusField,
   correctionNotice,
+  completeLabel="Concluir cadastro",
+  registrationCorrection=false,
 }) {
   const [photoChange, setPhotoChange] = useState(undefined);
   const prefix=useId();
@@ -168,6 +170,7 @@ export default function EventAthleteForm({
     const complete=e.nativeEvent.submitter?.value==='complete';
     setAttempted(complete?'complete':'draft');
     const blocking=issues.filter(issue=>complete||issue.blockingDraft);
+    const profileComplete=complete || (registrationCorrection && issues.length===0);
     if(blocking.length){
       setError('');
       if(complete)requestAnimationFrame(()=>{const summary=document.getElementById(fieldId('issues'));summary?.scrollIntoView({block:'start',behavior:'auto'});summary?.focus({preventScroll:true});});
@@ -203,11 +206,11 @@ export default function EventAthleteForm({
               categoryIds,
               additionalData,
               documents: profile.documents || {},
-              status: complete ? "complete" : "draft",
+              status: profileComplete ? "complete" : "draft",
             },
           },
         };
-        if (!(await onSave(entry, { event, files:activeFiles, removed:activeRemoved, complete, photo: photoChange })))
+        if (!(await onSave(entry, { event, files:activeFiles, removed:activeRemoved, complete:profileComplete, submitRegistration:registrationCorrection&&complete, photo: photoChange })))
           setError(
             "Não foi possível concluir. Os dados já gravados continuam preservados; reabra o cadastro para revisar os dados e os anexos.",
           );
@@ -435,12 +438,14 @@ export default function EventAthleteForm({
             <p className="info-box">Este evento não solicita anexos.</p>
           )}
           <p className="form-note">
+            {registrationCorrection ? "Salvar correções e reenviar valida o cadastro e a inscrição antes de enviar à Secretaria. Use Salvar rascunho para guardar alterações sem reenviar, caso ainda precise revisar outros atletas." : <>
             Nome completo, nascimento, CPF e sexo são obrigatórios, inclusive
             para salvar rascunho. “Concluir cadastro” também verifica os demais
             dados e documentos exigidos. Não envia inscrição nem ocupa vaga na
             prova. Limites de modalidades, categorias e idade já são conferidos
             neste cadastro quando configurados. Limites de provas e equipes são
             verificados ao montar as inscrições.
+            </>}
           </p>
           {error && (
             <p className="school-error" role="alert">
@@ -463,7 +468,7 @@ export default function EventAthleteForm({
               disabled={busy}
             >
               <Check size={15} />
-              {busy ? "Salvando..." : "Concluir cadastro"}
+              {busy ? "Salvando..." : completeLabel}
             </button>
           </div>
         </form>

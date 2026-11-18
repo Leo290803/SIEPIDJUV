@@ -17,7 +17,8 @@ try {
   const {buildReport,groupRows,sortRows,normalize}=await import('../src/reports/model.js');
   const queryCalls=[];
   const staffReviews=new Map();
-  let notificationFailure=false;
+  let notificationFailure=false,completionIssues=[],loseCompletionResponse=false;
+  const completionReceipts=new Map();
   const browser = await chromium.launch({
     executablePath:
       process.env.CHROMIUM_PATH ||
@@ -91,6 +92,12 @@ try {
     registration_decisions: [],
     event_badges: [],
   };
+  function recordTransition(r,status,reason,deadline){
+    registrationTransitions.push({from:r.status,to:status,actor:isAdmin||isManager?'secretaria':'escola'});
+    tables.notifications.push({id:randomUUID(),institution_id:tenant,audience:status==='submitted'?'secretaria':'escola',kind:status==='submitted'?'registration_submitted':'registration_status',payload:{registration_id:r.id,school_id:r.school_id,school_name:tables.schools.find(s=>s.id===r.school_id)?.name,event_name:tables.events.find(e=>e.id===r.event_id)?.name,status,resubmitted:r.status==='correction_requested',deadline},created_at:new Date().toISOString(),read_at:null});
+    tables.registration_decisions.push({id:randomUUID(),institution_id:tenant,registration_id:r.id,from_status:r.status,to_status:status,reason,created_at:new Date().toISOString()});
+    r.status=status;r.correction_deadline=deadline||r.correction_deadline;r.revision++;
+  }
   const uploadedPaths = new Set();
   const portrait = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
   const response = (route, data, status = 200) =>
@@ -356,6 +363,7 @@ try {
           }
           Object.assign(part, {
             status: "draft",
+            updated_at:new Date().toISOString(),
             additional_data: body.p_additional_data,
           });
           tables.participation_categories =
@@ -449,7 +457,9 @@ try {
         );
       if (table === "siep_preview_registration")
         return response(route, { issues: [] });
-      if (table === "siep_save_registration") {
+      if (table === "siep_save_registration" || table === "siep_complete_registration") {
+        const completing=table==='siep_complete_registration';
+        if(completing){queryCalls.push({table,body});if(completionReceipts.has(body.p_request_id))return response(route,completionReceipts.get(body.p_request_id));}
         let r = tables.registrations.find(
           (r) => r.id === body.p_registration_id,
         );
@@ -488,25 +498,19 @@ try {
           school_id: r.school_id,
           registration_id: r.id,
         }));
-        return response(route, {
-          id: r.id,
-          status: r.status,
-          revision: r.revision,
-          issues: [],
-        });
+        if(completing && !completionIssues.length)recordTransition(r,'submitted','Inscrição concluída pela escola');
+        const result={id:r.id,status:r.status,revision:r.revision,issues:completing?completionIssues:[],saved:true,submitted:completing&&!completionIssues.length};
+        if(completing)completionReceipts.set(body.p_request_id,structuredClone(result));
+        if(completing && loseCompletionResponse){loseCompletionResponse=false;return response(route,{message:'Resposta perdida após gravar'},503);}
+        return response(route,result);
       }
+
       if (table === "siep_transition_registration") {
         const r = tables.registrations.find(
           (r) => r.id === body.p_registration_id,
         );
         if(!isAdmin&&!isManager&&['approved','rejected','correction_requested'].includes(body.p_status))return response(route,{code:'42501',message:'Somente a Secretaria pode analisar'},403);
-        registrationTransitions.push({from:r.status,to:body.p_status,actor:isAdmin||isManager?'secretaria':'escola'});
-        tables.notifications.push({id:randomUUID(),institution_id:tenant,audience:body.p_status==='submitted'?'secretaria':'escola',kind:body.p_status==='submitted'?'registration_submitted':'registration_status',payload:{registration_id:r.id,school_id:r.school_id,school_name:tables.schools.find(s=>s.id===r.school_id)?.name,event_name:tables.events.find(e=>e.id===r.event_id)?.name,status:body.p_status,resubmitted:r.status==='correction_requested',deadline:body.p_correction_deadline},created_at:new Date().toISOString(),read_at:null});
-
-        tables.registration_decisions.push({id:randomUUID(),institution_id:tenant,registration_id:r.id,from_status:r.status,to_status:body.p_status,reason:body.p_reason,created_at:new Date().toISOString()});
-        r.status = body.p_status;
-        r.correction_deadline=body.p_correction_deadline||r.correction_deadline;
-        r.revision++;
+        recordTransition(r,body.p_status,body.p_reason,body.p_correction_deadline);
         return response(route, r);
       }
 
@@ -889,17 +893,32 @@ try {
   await page
     .getByLabel("Atleta 1", { exact: true })
     .selectOption(tables.event_participations[0].id);
-  await page
-    .getByRole("button", { name: "Salvar rascunho no banco", exact: true })
-    .click();
-  await page.getByRole("dialog").waitFor({ state: "detached" });
-  assert.equal(tables.registrations.length, 1);
-  await page
-    .getByRole("button", { name: "Enviar para análise", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Confirmar", exact: true }).click();
-  await page.getByRole("dialog").waitFor({ state: "detached" });
-  await page.getByRole("cell", { name: "Enviada", exact: true }).waitFor();
+  completionIssues=['category_roster'];
+  await page.getByRole('button',{name:'Concluir inscrição',exact:true}).click();
+  const schoolRegistrationForm=page.getByRole('dialog',{name:'Inscrição no evento',exact:true});
+  await schoolRegistrationForm.getByText('Confira o mínimo e o máximo de atletas da categoria.',{exact:true}).waitFor();
+  assert.equal(await schoolRegistrationForm.getByRole('alert').evaluate(el=>el===document.activeElement),true);
+  assert.equal(tables.registrations.length,1);assert.equal(tables.registrations[0].status,'draft');
+  assert.equal(await schoolRegistrationForm.getByRole('combobox').first().isDisabled(),true);
+  assert.equal(await schoolRegistrationForm.getByLabel('Atleta 1',{exact:true}).inputValue(),tables.event_participations[0].id);
+  completionIssues=[];
+  await page.getByRole('button',{name:'Salvar rascunho',exact:true}).click();
+  await schoolRegistrationForm.waitFor({state:'detached'});
+  await page.getByText('Ainda não enviado à Secretaria',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Enviar para análise',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Concluir inscrição',exact:true}).click();
+  loseCompletionResponse=true;
+  await schoolRegistrationForm.getByRole('button',{name:'Concluir inscrição',exact:true}).click();
+  await schoolRegistrationForm.getByRole('alert').waitFor();
+  await schoolRegistrationForm.getByRole('button',{name:'Concluir inscrição',exact:true}).click();
+  await schoolRegistrationForm.waitFor({state:'detached'});
+  assert.equal(tables.registrations.length,1);
+  assert.equal(registrationTransitions.filter(t=>t.to==='submitted').length,1);
+  const completeCalls=queryCalls.filter(call=>call.table==='siep_complete_registration');
+  assert.equal(new Set(completeCalls.map(call=>call.body.p_request_id)).size,2);
+  assert.equal(completeCalls.at(-1).body.p_request_id,completeCalls.at(-2).body.p_request_id);
+  await page.getByText('Inscrição enviada com sucesso. Aguarde a análise da Secretaria.',{exact:true}).waitFor();
+  await page.getByRole('cell',{name:'Enviada',exact:true}).waitFor();
   isAdmin=true;
   await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');
   await page.getByRole('button',{name:/^(Detalhes e histórico|Conferir inscrição|Ver inscrição)$/}).click();
@@ -940,31 +959,34 @@ try {
   const correctedForm=page.getByRole('dialog').filter({has:page.getByLabel('Nome completo *',{exact:true})});
   await correctedForm.getByText(`Atleta conectado — ${correctionDocument.name}: Confira o comprovante enviado`,{exact:true}).waitFor();
   assert.equal(await correctedForm.locator('input[type=file]:focus').count(),1);
-  await page.getByRole('button',{name:'Concluir cadastro',exact:true}).click();
+  await page.getByRole('button',{name:'Salvar rascunho',exact:true}).click();
   await correctedForm.waitFor({state:'detached'});
   await schoolReview.getByText('Cadastro atualizado após a solicitação. Confira se atende à orientação.',{exact:true}).first().waitFor();
-  await schoolReview.getByRole('button',{name:'Corrigir cadastro · Atleta conectado',exact:true}).click();
-  await correctedForm.getByLabel('Nome completo *',{exact:true}).waitFor();
-  assert.equal(await correctedForm.getByLabel('Nome completo *',{exact:true}).inputValue(),'Atleta conectado');
-  await page.getByRole('button',{name:'Concluir cadastro',exact:true}).click();
-  await correctedForm.waitFor({state:'detached'});
-  await page.setViewportSize({width:390,height:844});
-  await page.screenshot({path:'/tmp/siep-school-corrections-mobile.png',fullPage:true});
-  assert.equal(await schoolReview.evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
-  await page.setViewportSize({width:1440,height:1000});
+  assert.equal(tables.registrations[0].status,'correction_requested');
   const correctedRegistration=tables.registrations[0],savedDeadline=correctedRegistration.correction_deadline;
   correctedRegistration.correction_deadline=new Date(Date.now()-60000).toISOString();
   await page.reload();
   await schoolReview.getByText('O prazo terminou. Solicite à Secretaria a revisão do prazo antes de reenviar.',{exact:true}).waitFor();
-  assert.equal(await schoolReview.getByRole('button',{name:'Reenviar para análise',exact:true}).isDisabled(),true);
+  assert.equal(await schoolReview.getByRole('button',{name:'Salvar correções e reenviar',exact:true}).isDisabled(),true);
   correctedRegistration.correction_deadline=savedDeadline;
   await page.reload();
-  await schoolReview.getByRole('button',{name:'Reenviar para análise',exact:true}).click();
-  await page.getByLabel('Justificativa *',{exact:true}).fill('Elenco conferido e inscrição corrigida');
-  await page.getByRole('button',{name:'Confirmar',exact:true}).click();
-  await page.getByRole('dialog',{name:'Reenviar para análise',exact:true}).waitFor({state:'detached'});
-
-  await page.getByRole('button',{name:'Fechar histórico',exact:true}).click();
+  await schoolReview.getByRole('button',{name:'Corrigir cadastro · Atleta conectado',exact:true}).click();
+  await correctedForm.getByLabel('Nome completo *',{exact:true}).waitFor();
+  assert.equal(await correctedForm.getByLabel('Nome completo *',{exact:true}).inputValue(),'Atleta conectado');
+  completionIssues=['category_roster'];
+  await correctedForm.getByRole('button',{name:'Salvar correções e reenviar',exact:true}).click();
+  await correctedForm.waitFor({state:'detached'});
+  await schoolReview.getByText('Dados salvos. A inscrição ainda não foi reenviada.',{exact:true}).waitFor();
+  assert.equal(tables.registrations[0].status,'correction_requested');
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'/tmp/siep-school-unified-completion-mobile.png',fullPage:true});
+  assert.equal(await schoolReview.evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+  await page.setViewportSize({width:1440,height:1000});
+  completionIssues=[];loseCompletionResponse=true;
+  await schoolReview.getByRole('button',{name:'Salvar correções e reenviar',exact:true}).click();
+  await schoolReview.getByRole('alert').filter({hasText:'Não foi possível confirmar o reenvio.'}).waitFor();
+  await schoolReview.getByRole('button',{name:'Salvar correções e reenviar',exact:true}).click();
+  await schoolReview.waitFor({state:'detached'});
   await page.getByRole('cell',{name:'Enviada',exact:true}).waitFor();
   isAdmin=true;
   await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');
