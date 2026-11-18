@@ -356,6 +356,7 @@ try {
         );
         part.status = body.p_complete ? "complete" : "draft";
         part.additional_data=body.p_additional_data;
+        part.updated_at=new Date().toISOString();
         return response(route, {
           id: part.id,
           status: part.status,
@@ -869,8 +870,10 @@ try {
   await page.setViewportSize({width:1440,height:1000});
   await reviewDialog.getByAltText('Foto de identificação do cadastro').waitFor();
   await reviewDialog.getByLabel('O que precisa de correção em Atleta conectado?',{exact:true}).fill('Conferir elenco e reenviar para análise');
+  const correctionDocument=tables.document_requirements[0];
+  await reviewDialog.getByLabel(`O que precisa de correção em Atleta conectado — ${correctionDocument.name}?`,{exact:true}).fill('Confira o comprovante enviado');
   await reviewDialog.getByRole('button',{name:'Solicitar correção',exact:true}).click();
-  assert.equal(await page.getByLabel('Justificativa *',{exact:true}).inputValue(),'Atleta conectado: Conferir elenco e reenviar para análise');
+  assert.ok((await page.getByLabel('Justificativa *',{exact:true}).inputValue()).includes('Atleta conectado: Conferir elenco e reenviar para análise'));
   await page.getByRole('button',{name:'Voltar',exact:true}).click();
   assert.equal(await reviewDialog.getByLabel('O que precisa de correção em Atleta conectado?',{exact:true}).inputValue(),'Conferir elenco e reenviar para análise');
   await reviewDialog.getByRole('button',{name:'Solicitar correção',exact:true}).click();
@@ -879,24 +882,44 @@ try {
   await page.getByRole('button',{name:'Confirmar',exact:true}).click();
   await page.getByRole('dialog',{name:'Solicitar correção',exact:true}).waitFor({state:'detached'});
   await page.getByRole('button',{name:'Fechar histórico',exact:true}).click();
-  await page.getByRole('cell',{name:'Correção solicitada',exact:true}).waitFor();
+  await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
   isAdmin=false;
   await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/inscricoes');
-  await page.getByRole('cell',{name:'Correção solicitada',exact:true}).waitFor();
+  await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Aprovar',exact:true}).count(),0);
-  await page.getByRole('button',{name:/^(Detalhes e histórico|Conferir inscrição|Ver inscrição)$/}).click();
+  await page.getByRole('button',{name:'Corrigir pendências',exact:true}).click();
   const schoolReview=page.getByRole('dialog',{name:'Análise da inscrição',exact:true});
   await schoolReview.getByText('Atleta conectado: Conferir elenco e reenviar para análise',{exact:true}).waitFor();
   assert.equal(await schoolReview.locator('textarea').count(),0);
-  await page.getByRole('button',{name:'Fechar histórico',exact:true}).click();
-  await page.getByRole('button',{name:'Continuar',exact:true}).click();
-  await page.getByLabel('Atleta 1',{exact:true}).waitFor();
-  await page.getByRole('button',{name:'Salvar rascunho no banco',exact:true}).click();
-  await page.getByRole('dialog').waitFor({state:'detached'});
-  await page.getByRole('button',{name:'Enviar para análise',exact:true}).click();
+  await schoolReview.getByRole('button',{name:'Corrigir documento · Atleta conectado',exact:true}).click();
+  const correctedForm=page.getByRole('dialog').filter({has:page.getByLabel('Nome completo *',{exact:true})});
+  await correctedForm.getByText(`Atleta conectado — ${correctionDocument.name}: Confira o comprovante enviado`,{exact:true}).waitFor();
+  assert.equal(await correctedForm.locator('input[type=file]:focus').count(),1);
+  await page.getByRole('button',{name:'Concluir cadastro',exact:true}).click();
+  await correctedForm.waitFor({state:'detached'});
+  await schoolReview.getByText('Cadastro atualizado após a solicitação. Confira se atende à orientação.',{exact:true}).first().waitFor();
+  await schoolReview.getByRole('button',{name:'Corrigir cadastro · Atleta conectado',exact:true}).click();
+  await correctedForm.getByLabel('Nome completo *',{exact:true}).waitFor();
+  assert.equal(await correctedForm.getByLabel('Nome completo *',{exact:true}).inputValue(),'Atleta conectado');
+  await page.getByRole('button',{name:'Concluir cadastro',exact:true}).click();
+  await correctedForm.waitFor({state:'detached'});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'/tmp/siep-school-corrections-mobile.png',fullPage:true});
+  assert.equal(await schoolReview.evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+  await page.setViewportSize({width:1440,height:1000});
+  const correctedRegistration=tables.registrations[0],savedDeadline=correctedRegistration.correction_deadline;
+  correctedRegistration.correction_deadline=new Date(Date.now()-60000).toISOString();
+  await page.reload();
+  await schoolReview.getByText('O prazo terminou. Solicite à Secretaria a revisão do prazo antes de reenviar.',{exact:true}).waitFor();
+  assert.equal(await schoolReview.getByRole('button',{name:'Reenviar para análise',exact:true}).isDisabled(),true);
+  correctedRegistration.correction_deadline=savedDeadline;
+  await page.reload();
+  await schoolReview.getByRole('button',{name:'Reenviar para análise',exact:true}).click();
   await page.getByLabel('Justificativa *',{exact:true}).fill('Elenco conferido e inscrição corrigida');
   await page.getByRole('button',{name:'Confirmar',exact:true}).click();
-  await page.getByRole('dialog').waitFor({state:'detached'});
+  await page.getByRole('dialog',{name:'Reenviar para análise',exact:true}).waitFor({state:'detached'});
+
+  await page.getByRole('button',{name:'Fechar histórico',exact:true}).click();
   await page.getByRole('cell',{name:'Enviada',exact:true}).waitFor();
   isAdmin=true;
   await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');

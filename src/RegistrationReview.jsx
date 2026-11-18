@@ -1,3 +1,4 @@
+import SchoolCorrections from "./SchoolCorrections.jsx";
 import React, {useEffect, useState} from "react";
 import {registrationStatusLabel} from "./data/peopleMapping.js";
 import {guardianFields as guardianFieldPairs, guardianPolicy, isMinorAt} from "./guardianRequirements.js";
@@ -24,7 +25,7 @@ function PrivateFile({attachment, api, photo = false}) {
   </div>;
 }
 
-export default function RegistrationReview({history, event, school, data, api, manager, onDecision, onContinue, navigation, savedNotes, onNotesChange}) {
+export default function RegistrationReview({history, event, school, data, api, manager, onDecision, onContinue, navigation, savedNotes, onNotesChange, onCorrect, onResend}) {
   const [tab, setTab] = useState("review"), [notes, setNotes] = useState(savedNotes || {}), [athleteIndex, setAthleteIndex] = useState(0), [staffOpen, setStaffOpen] = useState(false);
   const r = history.r;
   const category = event?.categories.find(c => c.id === r.category_id);
@@ -43,7 +44,8 @@ export default function RegistrationReview({history, event, school, data, api, m
   return <>
     {navigation}
     <div className="review-heading"><div><strong>{event?.name}</strong><p>{school?.name}</p><p>{category?.modality} · {category?.name}{proof ? ` · ${proof.name}` : ""}</p></div><span className="tag">{registrationStatusLabel[r.status]}</span></div>
-    {latest && latest.to_status !== "submitted" && <div className={r.status === "correction_requested" ? "participation-issues" : "panel"}><strong>Última decisão · {registrationStatusLabel[latest.to_status]}</strong><p className="review-reason">{latest.reason}</p>{r.status === "correction_requested" && r.correction_deadline && <p>Corrigir até {new Date(r.correction_deadline).toLocaleString("pt-BR")}</p>}{["draft","correction_requested"].includes(r.status) && <button className="secondary" onClick={onContinue}>Continuar inscrição</button>}</div>}
+    {!manager && r.status === "correction_requested" && onCorrect && <SchoolCorrections history={history} event={event} data={data} onCorrect={onCorrect} onResend={onResend} onContinue={onContinue} />}
+    {latest && latest.to_status !== "submitted" && !(!manager && r.status === "correction_requested" && onCorrect) && <div className={r.status === "correction_requested" ? "participation-issues" : "panel"}><strong>Última decisão · {registrationStatusLabel[latest.to_status]}</strong><p className="review-reason">{latest.reason}</p>{r.status === "correction_requested" && r.correction_deadline && <p>Corrigir até {new Date(r.correction_deadline).toLocaleString("pt-BR")}</p>}{["draft","correction_requested"].includes(r.status) && <button className="secondary" onClick={onContinue}>Continuar inscrição</button>}</div>}
     <div className="review-tabs" role="tablist" aria-label="Detalhes da inscrição"><button role="tab" aria-selected={tab === "review"} className="secondary" onClick={() => setTab("review")}>Conferência</button><button role="tab" aria-selected={tab === "history"} className="secondary" onClick={() => setTab("history")}>Histórico</button></div>
     {tab === "review" ? <div role="tabpanel" aria-label="Conferência">
       <h3>Atletas · {roster.length}</h3>

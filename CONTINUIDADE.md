@@ -1,6 +1,16 @@
 # Continuidade do SIEP — contexto para o próximo chat
 
-Atualizado em 16/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+Atualizado em 18/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+
+## Correção guiada pela escola
+
+Em **Minhas inscrições → Corrigir pendências** (ou Detalhes e histórico), inscrições em correção mostram orientação completa, prazo, ações por atleta/documento e reenvio no próprio fluxo. **Corrigir cadastro** abre o formulário existente do atleta no evento; **Corrigir documento** abre o mesmo formulário com foco no campo do anexo. A orientação permanece visível durante a edição. Salvar conserva o cadastro, retorna à inscrição e não reenvia automaticamente. A escola pode revisar o elenco e confirmar **Reenviar para análise**, usando a mesma RPC, revisão esperada e validações do evento. Prazo vencido desabilita reenvio no cliente e orienta procurar a Secretaria; validação de prazo no servidor permanece.
+
+Não adiciona coluna, tabela ou migração. Decisões existentes continuam como texto em `registration_decisions.reason`. `registrationCorrections.js` cria atalhos apenas se uma linha corresponder exatamente a um rótulo único de atleta/documento do elenco e categoria atuais. Homônimos, nomes alterados, orientações gerais, comissão técnica ou documentos não identificáveis continuam como texto sem atalho inferido. A seção **Revisar atletas e anexos desta inscrição** oferece a escolha manual. Isso preserva solicitações antigas sem inventar um vínculo por semelhança de nome. Eventuais futuras orientações com IDs estruturados exigirão migração própria.
+
+O indicador **Cadastro atualizado após a solicitação** compara `event_participations.updated_at` com o momento da decisão. Não significa pendência resolvida nem aprovação: a orientação continua visível e será reavaliada pela Secretaria. Dados/categoria/foto/anexos existentes são preservados pelo mesmo formulário e repositório de cadastro. Observações não são apagadas ou marcadas automaticamente como aceitas. A Secretaria continua com sua interface; a escola não recebe controles de decisão. Trocar de rota fecha o formulário de correção.
+
+Validação: **106 testes JS**, build e fluxo Chromium com API simulada (correção de cadastro/documento, foco do anexo, salvamento/retorno, indicador de atualização, prazo vencido, reenvio, aprovação posterior e layout 390px). Testes unitários cobrem alvo exato, categoria, homônimos, pessoa fora da escola/removida, orientação livre e limite de prazo. Não afirma teste HTTP real do Supabase. Captura: `/tmp/siep-school-corrections-mobile.png`.
 
 ## Fila compacta e conferência contínua
 

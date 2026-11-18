@@ -2,7 +2,7 @@ import PersonPhoto from "./PersonPhoto.jsx";
 import FormIssues from "./FormIssues.jsx";
 import {eventFormIssues} from "./eventFormIssues.js";
 import {guardianFields,guardianPolicy,isMinorAt,guardianRelationships} from "./guardianRequirements.js";
-import React, { useState, useId } from "react";
+import React, { useState, useId, useEffect } from "react";
 import { X, Check } from "lucide-react";
 import { requirementsFor, baseDataFields } from "./eventRequirements.js";
 import {
@@ -26,6 +26,8 @@ export default function EventAthleteForm({
   onClose,
   connected = false,
   onDocumentDownload,
+  focusField,
+  correctionNotice,
 }) {
   const [photoChange, setPhotoChange] = useState(undefined);
   const prefix=useId();
@@ -42,6 +44,7 @@ export default function EventAthleteForm({
       (target.matches('input,select,textarea')?target:target.querySelector('input,select,button')||target).focus({preventScroll:true});
     });
   };
+  useEffect(() => { if(focusField) goTo(focusField); }, [focusField]);
   const profile = athlete.eventProfiles?.[String(event.id)] || {};
   const source = requirementsFor(event);
   const required = { ...source, data: { ...source.data } };
@@ -296,6 +299,7 @@ export default function EventAthleteForm({
           </div>
         </div>
         <form onSubmit={save} noValidate>
+          {correctionNotice && <p className="participation-issues" role="status">{correctionNotice}</p>}
           {attempted==='complete'&&issues.length>0&&<FormIssues id={fieldId('issues')} issues={issues} onGo={goTo} disabled={busy}/>}
           <h3>1. Dados do atleta</h3>
           {connected && <PersonPhoto photo={athlete.photo} value={photoChange} onChange={setPhotoChange} disabled={busy} />}

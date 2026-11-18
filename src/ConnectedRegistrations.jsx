@@ -1,3 +1,4 @@
+import EventAthleteForm from "./EventAthleteForm.jsx";
 import RegistrationReview from "./RegistrationReview.jsx";
 import ServerPagination from "./ServerPagination.jsx";
 import { useServerFilters } from "./data/useServerFilters.js";
@@ -372,6 +373,7 @@ export default function ConnectedRegistrations({
   event,
   manager,
   onChanged,
+  onSaveAthlete,
   routeAction,
   routeRegistrationId,
   onRoute,
@@ -382,6 +384,7 @@ export default function ConnectedRegistrations({
     [editing, setEditing] = useState(null),
     [starting, setStarting] = useState(false),
     [decision, setDecision] = useState(null),
+    [correcting, setCorrecting] = useState(null),
     [history, setHistory] = useState(null),
     [reviewNotes, setReviewNotes] = useState({}),
     [warnings, setWarnings] = useState(null),
@@ -422,7 +425,9 @@ export default function ConnectedRegistrations({
       controller.abort();
     };
   }, [routeAction, routeRegistrationId, data.registrations]);
+  useEffect(() => {setCorrecting(null);}, [routeAction,routeRegistrationId]);
   const closeRoute = () => {
+    setCorrecting(null);
     setEditing(null);
     setStarting(false);
     setHistory(null);
@@ -596,6 +601,7 @@ export default function ConnectedRegistrations({
                       >
                         {registrationStatusLabel[r.status]}
                       </span>
+                      {r.status === "correction_requested" && r.correction_deadline && <small className="correction-list-deadline">Corrigir até {new Date(r.correction_deadline).toLocaleString("pt-BR")}</small>}
                     </td>
                     <td>
                       <div className="staff-actions">
@@ -605,10 +611,10 @@ export default function ConnectedRegistrations({
                           <button
                             className="secondary"
                             onClick={() =>
-                              onRoute ? onRoute({ id: r.id }) : setEditing(r)
+                              r.status === "correction_requested" ? openReview(r) : onRoute ? onRoute({ id: r.id }) : setEditing(r)
                             }
                           >
-                            Continuar
+                            {r.status === "correction_requested" ? "Corrigir pendências" : "Continuar"}
                           </button>
                         )}
                         <button
@@ -669,6 +675,7 @@ export default function ConnectedRegistrations({
           }}
         />
       )}
+      {correcting && <EventAthleteForm key={correcting.athlete.id} connected event={correcting.event} schoolId={correcting.school.id} schoolName={correcting.school.name} athlete={correcting.athlete} records={data.athletes} focusField={correcting.documentId ? 'document:'+correcting.documentId : 'name'} correctionNotice={correcting.message || "Corrija os dados ou anexos solicitados. Ao salvar, você volta à inscrição para conferir e reenviar."} onDocumentDownload={api.download} onClose={() => setCorrecting(null)} onSave={async(entry,options) => {await onSaveAthlete(entry,options);setCorrecting(null);return true;}} />}
       {decision && (
         <div className="modal-backdrop">
           <div
@@ -762,7 +769,7 @@ export default function ConnectedRegistrations({
         </div>
       )}
       {history && (
-        <div className="modal-backdrop" style={decision ? {display:"none"} : undefined}>
+        <div className="modal-backdrop" style={decision || correcting ? {display:"none"} : undefined}>
           <div
             className="modal athlete-event-modal"
             role="dialog"
@@ -777,7 +784,7 @@ export default function ConnectedRegistrations({
               <X />
             </button>
             <h2>Análise da inscrição</h2>
-            <RegistrationReview key={history.r.id} history={history} savedNotes={reviewNotes[history.r.id]} onNotesChange={notes => setReviewNotes(current => ({...current,[history.r.id]:notes}))} event={ev(history.r)} school={sc(history.r)} data={data} api={api} manager={manager}
+            <RegistrationReview key={history.r.id} history={history} savedNotes={reviewNotes[history.r.id]} onNotesChange={notes => setReviewNotes(current => ({...current,[history.r.id]:notes}))} onCorrect={!manager && onSaveAthlete ? (athlete,documentId,message) => setCorrecting({athlete,documentId,message,event:ev(history.r),school:sc(history.r)}) : undefined} onResend={() => setDecision({r:history.r,status:"submitted",label:"Reenviar para análise"})} event={ev(history.r)} school={sc(history.r)} data={data} api={api} manager={manager}
               navigation={manager && (queueRows.length > 1 || remote && remote.offset+remote.limit < remote.total) && <div className="review-queue-navigation"><strong>{queueIndex >= 0 ? `Inscrição ${queueIndex+1} de ${queueRows.length} nesta página da fila` : "Inscrição fora da fila de análise"}</strong><div className="staff-actions"><button className="secondary" disabled={busy || !adjacent(-1)} onClick={() => openReview(adjacent(-1))}>Inscrição anterior</button><button className="primary" disabled={busy || !adjacent(1)} onClick={() => openReview(adjacent(1))}>Próxima inscrição</button>{remote && remote.offset+remote.limit < remote.total && <button className="secondary" onClick={() => {closeRoute();remote.onPage(remote.offset+remote.limit);}}>Próxima página da fila</button>}</div></div>}
               onContinue={() => { const r = history.r; closeRoute(); onRoute ? onRoute({id:r.id}) : setEditing(r); }}
               onDecision={(status,label,reason) => setDecision({r:history.r,status,label,reason})} />

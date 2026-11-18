@@ -891,6 +891,7 @@ export default function InstitutionPortal({
                         tenant={tenant}
                         school={schoolArea ? school : undefined}
                         event={schoolArea ? activeEvent : undefined}
+                        onSaveAthlete={(entry,options) => savePerson("athlete",entry,options)}
                         manager={canManage && !schoolArea}
                         onChanged={refresh}
                       />

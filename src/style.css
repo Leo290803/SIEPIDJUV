@@ -222,3 +222,14 @@
 .review-decisions {position:sticky;bottom:0;background:white;padding:12px 0;z-index:1;}
 @media(max-width:600px) {.review-queue-navigation .staff-actions {width:100%;}.review-athlete-navigation label {order:-1;flex-basis:100%;}.review-document-pdf {height:350px;}}
 @media(max-width:600px) {.review-decisions {position:static;}}
+.school-corrections {background:#fff9ed;border:1px solid #edc788;border-radius:8px;padding:18px;margin:18px 0;}
+.school-corrections h3 {margin-top:0;}
+.correction-items {padding-left:20px;}
+.correction-items li {margin:16px 0;}
+.correction-items small {display:block;margin-bottom:8px;}
+.school-corrections details {margin:18px 0;padding:12px;background:white;border-radius:6px;}
+.school-corrections summary {cursor:pointer;}
+.correction-person {display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0;}
+.correction-person small {display:block;margin-top:5px;}
+.correction-list-deadline {display:block;max-width:190px;margin-top:6px;color:#88570b;}
+.school-corrections .review-reason {white-space:pre-wrap;overflow-wrap:anywhere;}
