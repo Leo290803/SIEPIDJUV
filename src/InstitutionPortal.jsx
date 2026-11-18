@@ -1,3 +1,5 @@
+import NotificationBell from "./NotificationBell.jsx";
+import {notificationTitle,notificationPath} from "./notificationModel.js";
 import { useNavigate, useLocation } from "react-router-dom";
 import { portalPath, eventTabs, safeReturn } from "./routing/routes.js";
 import AccessState from "./routing/AccessState.jsx";
@@ -122,7 +124,6 @@ export default function InstitutionPortal({
         ? managedEvent
         : null;
   const duplicate = route.action === "duplicateEvent" ? managedEvent : null;
-  const notifications = data.summary?.unread || 0;
   const go = (next, { primary = false, action, recordId } = {}) => {
     setMobileMenu(false);
     setMessage("");
@@ -442,17 +443,7 @@ export default function InstitutionPortal({
             {route.area === "escola" ? "Escola" : "Secretaria"}
           </strong>
           <div className="portal-header-account">
-            <button
-              className={"header-notifications" + (page === "Notificações" ? " active" : "")}
-              aria-label="Notificações"
-              aria-description={notifications ? `${notifications} notificações não lidas` : "Nenhuma notificação não lida"}
-              title={notifications ? `${notifications} notificações não lidas` : "Notificações"}
-              aria-current={page === "Notificações" ? "page" : undefined}
-              onClick={() => go("Notificações", { primary: true })}
-            >
-              <Bell size={20} aria-hidden="true" />
-              {notifications > 0 && <span className="header-notification-count" aria-hidden="true">{notifications > 99 ? "99+" : notifications}</span>}
-            </button>
+            <NotificationBell version={data.summary?.unread} api={api} tenant={tenant} area={route.area} schoolId={schoolId} path={location.pathname} navigate={navigate} onViewAll={() => go("Notificações",{primary:true})} />
             <span className="portal-account-status">Conta conectada</span>
           </div>
         </header>
@@ -916,14 +907,13 @@ export default function InstitutionPortal({
                             <Bell size={20} />
                             <div className="school-info">
                               <h3>
-                                Atualização de inscrição:{" "}
-                                {registrationStatusLabel[n.payload.status] ||
-                                  "Novo aviso"}
+                                {notificationTitle(n)}
                               </h3>
                               <p>
                                 {new Date(n.created_at).toLocaleString("pt-BR")}
                               </p>
                             </div>
+                            {notificationPath(n,tenant,route.area,schoolId) && <button className="secondary" onClick={async()=>{try{if(!n.read_at)await api.markRead(n.id);navigate(notificationPath(n,tenant,route.area,schoolId));}catch(error){setError(readableError(error));}}}>Abrir inscrição</button>}
                             {!n.read_at ? (
                               <button
                                 className="secondary"

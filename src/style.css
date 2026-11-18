@@ -233,3 +233,17 @@
 .correction-person small {display:block;margin-top:5px;}
 .correction-list-deadline {display:block;max-width:190px;margin-top:6px;color:#88570b;}
 .school-corrections .review-reason {white-space:pre-wrap;overflow-wrap:anywhere;}
+.notification-center {position:relative;}
+.notification-popover {position:absolute;right:0;top:42px;width:400px;max-width:calc(100vw - 24px);background:white;color:#20344e;border:1px solid #d4dfed;border-radius:10px;box-shadow:0 12px 35px #122d4b30;z-index:50;text-align:left;}
+.notification-popover header,.notification-popover footer {display:flex;justify-content:space-between;align-items:center;padding:14px 16px;}
+.notification-popover h2 {font-size:17px;margin:0;}
+.notification-popover>p {padding:0 16px;}
+.notification-recent-list {max-height:min(65vh,540px);overflow:auto;}
+.notification-item {padding:14px 16px;border-top:1px solid #e0e7f0;overflow-wrap:anywhere;}
+.notification-item.unread {background:#f0f6fd;border-left:3px solid #245585;}
+.notification-item p {margin:7px 0;}
+.notification-item small {color:#5c7088;}
+.notification-item .staff-actions {margin-top:10px;}
+@media(max-width:600px){.notification-popover {position:fixed;top:64px;right:12px;width:calc(100vw - 24px);}}
+.notification-popover {overflow:hidden;}
+.notification-popover header .text-btn {color:white;}

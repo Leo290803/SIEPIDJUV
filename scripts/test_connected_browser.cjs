@@ -16,6 +16,7 @@ try {
   const {fromEvent}=await import('../src/data/eventMapping.js');
   const {buildReport,groupRows,sortRows,normalize}=await import('../src/reports/model.js');
   const queryCalls=[];
+  let notificationFailure=false;
   const browser = await chromium.launch({
     executablePath:
       process.env.CHROMIUM_PATH ||
@@ -178,6 +179,17 @@ try {
         return route.fulfill({ status:200, body:bucket==='siep-person-photos'?portrait:Buffer.from("test-image"),contentType:"image/png" });
       }
       const table = url.pathname.split("/").at(-1);
+      if(table==='siep_notification_center'){
+        if(notificationFailure)return response(route,{message:'Falha simulada'},503);
+        const rows=tables.notifications.filter(n=>!n.audience||n.audience===(isAdmin||isManager?'secretaria':'escola')).sort((a,b)=>b.created_at.localeCompare(a.created_at));
+        return response(route,{rows:rows.slice(0,10),unread:rows.filter(n=>!n.read_at).length});
+      }
+      if(table==='siep_mark_notification_read'){
+        const notification=tables.notifications.find(n=>n.id===body.p_notification_id);
+        if(notification)notification.read_at=notification.read_at||new Date().toISOString();
+        return response(route,null);
+      }
+
       if(table==='siep_report_page'){
         queryCalls.push({table,body});
         const schools=tables.schools.map(s=>({...s,...s.details}));
@@ -461,6 +473,8 @@ try {
         );
         if(!isAdmin&&!isManager&&['approved','rejected','correction_requested'].includes(body.p_status))return response(route,{code:'42501',message:'Somente a Secretaria pode analisar'},403);
         registrationTransitions.push({from:r.status,to:body.p_status,actor:isAdmin||isManager?'secretaria':'escola'});
+        tables.notifications.push({id:randomUUID(),institution_id:tenant,audience:body.p_status==='submitted'?'secretaria':'escola',kind:body.p_status==='submitted'?'registration_submitted':'registration_status',payload:{registration_id:r.id,school_id:r.school_id,school_name:tables.schools.find(s=>s.id===r.school_id)?.name,event_name:tables.events.find(e=>e.id===r.event_id)?.name,status:body.p_status,resubmitted:r.status==='correction_requested',deadline:body.p_correction_deadline},created_at:new Date().toISOString(),read_at:null});
+
         tables.registration_decisions.push({id:randomUUID(),institution_id:tenant,registration_id:r.id,from_status:r.status,to_status:body.p_status,reason:body.p_reason,created_at:new Date().toISOString()});
         r.status = body.p_status;
         r.correction_deadline=body.p_correction_deadline||r.correction_deadline;
@@ -887,7 +901,10 @@ try {
   await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/inscricoes');
   await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Aprovar',exact:true}).count(),0);
-  await page.getByRole('button',{name:'Corrigir pendências',exact:true}).click();
+  await page.getByRole('button',{name:'Notificações',exact:true}).click();
+  const schoolBell=page.getByRole('region',{name:'Avisos recentes',exact:true});
+  await schoolBell.getByText('Correção solicitada pela Secretaria',{exact:true}).waitFor();
+  await schoolBell.locator('article').filter({hasText:'Correção solicitada pela Secretaria'}).getByRole('button',{name:'Abrir inscrição',exact:true}).click();
   const schoolReview=page.getByRole('dialog',{name:'Análise da inscrição',exact:true});
   await schoolReview.getByText('Atleta conectado: Conferir elenco e reenviar para análise',{exact:true}).waitFor();
   assert.equal(await schoolReview.locator('textarea').count(),0);
@@ -1059,10 +1076,25 @@ try {
     await resultTable.waitFor();
   }
   if(process.env.SIEP_SCALE_BROWSER)await require('./test_scale_browser.cjs')({page,tables,tenant,queryCalls});
+  notificationFailure=true;
   await page.getByRole("button", { name: "Notificações", exact: true }).click();
-  await page
-    .getByText("Nenhuma notificação recebida.", { exact: true })
-    .waitFor();
+  const notificationPanel=page.getByRole('region',{name:'Avisos recentes',exact:true});
+  await notificationPanel.getByRole('alert').waitFor();
+  notificationFailure=false;
+  await notificationPanel.getByRole('button',{name:'Tentar novamente',exact:true}).click();
+  await notificationPanel.getByRole('alert').waitFor({state:'detached'});
+  await notificationPanel.getByText('Inscrição corrigida e reenviada',{exact:true}).waitFor();
+  const unreadBefore=tables.notifications.filter(n=>n.audience==='secretaria'&&!n.read_at).length;
+  await notificationPanel.getByRole('button',{name:'Marcar como lida',exact:true}).first().click();
+  await notificationPanel.getByText('Lida',{exact:true}).waitFor();
+  assert.equal(tables.notifications.filter(n=>n.audience==='secretaria'&&!n.read_at).length,unreadBefore-1);
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'/tmp/siep-notification-bell-mobile.png',fullPage:true});
+  assert.equal(await notificationPanel.evaluate(el=>el.getBoundingClientRect().right<=innerWidth),true);
+  await page.setViewportSize({width:1440,height:1000});
+  await notificationPanel.getByRole('button',{name:'Abrir inscrição',exact:true}).first().click();
+  await page.getByRole('dialog',{name:'Análise da inscrição',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Fechar histórico',exact:true}).click();
   await page.getByRole("button",{name:"Responsáveis",exact:true}).click();
   await page.getByRole("button",{name:"Cadastrar responsável",exact:true}).click();
   await page.getByLabel("Nome completo *",{exact:true}).fill("Responsável com foto");
@@ -1085,6 +1117,7 @@ try {
   assert.equal(tables.person_photos.some(p=>p.person_id===responsiblePerson.id&&p.is_current),false);
   assert.ok(tables.person_photos.some(p=>p.person_id===responsiblePerson.id&&p.status==='superseded'));
   await page.getByRole("button",{name:"Notificações",exact:true}).click();
+  await page.getByRole("button",{name:"Ver todas as notificações",exact:true}).click();
   const retainedPath = new URL(page.url()).pathname;
   await page.reload();
   await page

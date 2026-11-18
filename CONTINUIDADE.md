@@ -2,6 +2,22 @@
 
 Atualizado em 18/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Central no sino e avisos de inscrições
+
+O sino do cabeçalho agora abre um painel de **10 avisos recentes**, com contador de **todas as não lidas** (99+ no visual), título, evento/escola e prazo quando aplicável. Abrir inscrição marca o aviso como lido e navega para a rota de histórico/análise na área corrente; marcar como lida também funciona sem navegar. **Ver todas as notificações** mantém a página paginada anterior, agora com título específico e acesso à inscrição. Escape/fechar retorna foco ao sino, clique fora fecha; layout ajustado a 390px. Falha de consulta mostra erro e Tentar novamente, sem confundir com caixa vazia. Nenhum destino externo do payload é seguido: IDs UUID formam rotas internas e a autorização da rota continua no servidor.
+
+`NotificationBell` consulta `siep_notification_center` ao entrar/trocar de rota, abrir o painel, receber alteração no resumo de não lidas, voltar à aba e a cada **60 segundos com a página visível**. Cancela consultas/temporizadores ao sair e evita requisições sobrepostas. Não utiliza Realtime, push, e-mail ou novo serviço externo. A página mantém a RPC de marcação individual, que só permite o destinatário da instituição.
+
+Migração **20261118160000_notification_center**, aplicada e verificada no Supabase:
+- Trigger nas decisões cria **Nova inscrição para análise** e **Inscrição corrigida e reenviada** para administradores/gestores aprovados da instituição. Contas pendentes/encerradas não recebem. Mantém os avisos já existentes de decisão à escola e seus registros históricos.
+- Contexto de evento/escola/ID da escola/prazo é acrescentado aos novos avisos; a consulta do sino enriquece avisos antigos em leitura, sem regravar o histórico.
+- Ao consultar o sino, cria lembrete pessoal quando uma inscrição em correção tem prazo futuro a até **24 horas**, apenas para o responsável aprovado e ativo daquela escola. Deduplicação por inscrição/revisão/prazo/destinatário evita repetição entre abas/consultas. Prazo vencido, distante ou inscrição fora de correção não gera novo lembrete. Não há cron: lembretes aparecem enquanto a pessoa utiliza/retorna ao sistema; não é alerta externo durante ausência.
+- Índices para busca de correções por escola/prazo e contagem de não lidas. Funções privadas sem execução pública; centro exige autenticação e vínculo aprovado; só retorna avisos do próprio usuário e instituição. Não adiciona tabelas nem altera migrações anteriores. Avisos históricos permanecem; não cria retrospectivamente avisos de envios anteriores à implantação.
+
+Validação: **108 testes JS**, build, **15 suítes SQL + 3 cenários de concorrência** no PostgreSQL local; mesmas asserções SQL no Supabase durante validação e aplicação (fixtures descartados). Testes cobrem envio/reenvio, destinatários aprovados, marcação alheia negada, instituição indevida, revogação, deduplicação de prazo, janela de 24h e total não lido independente do limite 10. Chromium com API simulada confirmou sino da escola/Secretaria, acesso à inscrição, contador/leitura, recuperação de erro, página completa, permissões e celular. Teste de geração de acesso escolar também passou. Não representa teste HTTP real do Auth/Storage. Captura: `/tmp/siep-notification-bell-mobile.png`.
+
+Total atual: **26 migrações**, 31 tabelas públicas com RLS, 15 suítes SQL e 108 testes JS.
+
 ## Correção guiada pela escola
 
 Em **Minhas inscrições → Corrigir pendências** (ou Detalhes e histórico), inscrições em correção mostram orientação completa, prazo, ações por atleta/documento e reenvio no próprio fluxo. **Corrigir cadastro** abre o formulário existente do atleta no evento; **Corrigir documento** abre o mesmo formulário com foco no campo do anexo. A orientação permanece visível durante a edição. Salvar conserva o cadastro, retorna à inscrição e não reenvia automaticamente. A escola pode revisar o elenco e confirmar **Reenviar para análise**, usando a mesma RPC, revisão esperada e validações do evento. Prazo vencido desabilita reenvio no cliente e orienta procurar a Secretaria; validação de prazo no servidor permanece.

@@ -218,6 +218,7 @@ export function portalRepository(client) {
       ]);
       return {versions,decisions};
     },
+    notifications: (tenant,signal) => queryPage("siep_notification_center",{p_institution_id:tenant},signal),
     markRead: async (id) =>
       checked(
         await client.rpc("siep_mark_notification_read", {
