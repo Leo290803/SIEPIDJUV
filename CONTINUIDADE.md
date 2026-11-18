@@ -2,6 +2,18 @@
 
 Atualizado em 18/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Validação completa e liberação correta de crachás
+
+Rodada de 18/11/2026 registrada em **VALIDACAO_FLUXO.md**. Testados cadastro/login escolar, foto/anexo, conclusão unificada, correção/prazo, reenvio, aprovação, conferência técnica independente, relatórios e PDF/reimpressão de crachás. O site e o HTTP do projeto Supabase continuam bloqueados pelo proxy (403); navegador usa API simulada. PostgreSQL local e Supabase Management API executaram as regras reais, com fixtures descartados. Não criar/alterar cadastros reais para repetir esta validação.
+
+Foi reproduzida e corrigida uma inconsistência: profissional podia receber crachá pela aprovação da inscrição dos atletas, mesmo sem a própria conferência técnica. Migração **20261118210000_badge_staff_approval**, aplicada no Supabase: novas emissões de comissão técnica exigem `siep_private.staff_conference_row(...).status = approved`, portanto análise atual, fingerprint compatível e vínculo com inscrição aprovada. A regra está em `badge_rows`, consumida pela página e emissão, e no endpoint legado `siep_badge_candidates`, agora usando o mesmo helper. Bloqueia pendentes, correções, indeferidos e dados/foto/funções alterados desde a aprovação técnica. Não muda a aprovação dos atletas nem o fluxo de revisão da Secretaria; só atualiza o texto explicativo da emissão. Atletas/responsáveis continuam com regras anteriores. Crachás emitidos anteriormente, snapshots, fotos e reimpressão foram preservados. Esta regra substitui a observação anterior de que a conferência técnica não afetava crachás.
+
+Nova suíte `school_badge_roundtrip.sql` percorre a conclusão/correção/reenvio/aprovação e verifica profissionais em cada situação, chamada direta de emissão, isolamento por evento/escola, pessoas/fotos distintas, snapshots corretos por perfil, mudança de foto/revisão e histórico preservado. A suíte existente de crachás agora inclui a aprovação técnica nos pontos necessários. Navegador ampliado verifica a foto de atleta e a de um técnico distinto com marcadores PNG de cores diferentes, além de renderização de anexo válido e PDF misto. Os marcadores são fixtures, não retratos reais. Teste adicional de cinco crachás confirma duas páginas A4 e nenhum corte.
+
+Verificações aprovadas: **110 testes JS**, build, **18 suítes SQL + 3 cenários de concorrência**, fluxo conectado e acesso escolar no Chromium (API simulada), impressão/PDF e asserções SQL no Supabase. Artefatos em `/tmp/siep-roundtrip-athlete-staff-badges.pdf`, `.png` e `/tmp/siep-badges-pagination-test.pdf`. Leia o relatório para o limite do que foi testado; não afirmar validação HTTP real do site/Auth/Storage.
+
+Total atual: **29 migrações**, **33 tabelas públicas com RLS**, 18 suítes SQL e 110 testes JS; tabela privada de recibos de conclusão permanece.
+
 ## Conclusão da inscrição em uma ação — escola
 
 A pedido do usuário, o envio separado foi removido das ações da escola. **Concluir inscrição** abre o elenco e a ação primária valida, salva e envia à Secretaria numa única operação. **Salvar rascunho** continua disponível, com identificação **Ainda não enviado à Secretaria**. Se houver pendências, o rascunho/elenco é preservado, o formulário permanece aberto com quadro focado no topo e os valores selecionados mantidos. A identidade/revisão do rascunho recém-criado fica no formulário para continuar corrigindo sem criar outra inscrição; categoria/prova passam a ficar bloqueadas como em um rascunho existente. Mensagem de sucesso somente com confirmação `submitted:true`.

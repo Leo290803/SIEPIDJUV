@@ -16,7 +16,7 @@ try {
   const {fromEvent}=await import('../src/data/eventMapping.js');
   const {buildReport,groupRows,sortRows,normalize}=await import('../src/reports/model.js');
   const queryCalls=[];
-  const staffReviews=new Map();
+  const staffReviews=new Map(),developmentImages=new Map();
   let notificationFailure=false,completionIssues=[],loseCompletionResponse=false;
   const completionReceipts=new Map();
   const browser = await chromium.launch({
@@ -92,6 +92,13 @@ try {
     registration_decisions: [],
     event_badges: [],
   };
+  function staffBadgeAllowed(event,school,person){
+    const assignments=tables.registration_staff.filter(a=>a.event_id===event&&a.school_id===school&&a.person_id===person.id);
+    const roles=[...new Set(assignments.map(a=>a.staff_role_id))].map(id=>({id,name:tables.event_staff_roles.find(r=>r.id===id)?.name||'Técnico'}));
+    const f=tables.person_photos.find(f=>f.person_id===person.id&&f.is_current),photo=f?{id:f.id,bucket:f.bucket_id,objectPath:f.object_path,name:f.original_name}:null;
+    const review=staffReviews.get([event,school,person.id].join(':'));
+    return review?.status==='approved'&&review.fingerprint===JSON.stringify([person,photo,roles]);
+  }
   function recordTransition(r,status,reason,deadline){
     registrationTransitions.push({from:r.status,to:status,actor:isAdmin||isManager?'secretaria':'escola'});
     tables.notifications.push({id:randomUUID(),institution_id:tenant,audience:status==='submitted'?'secretaria':'escola',kind:status==='submitted'?'registration_submitted':'registration_status',payload:{registration_id:r.id,school_id:r.school_id,school_name:tables.schools.find(s=>s.id===r.school_id)?.name,event_name:tables.events.find(e=>e.id===r.event_id)?.name,status,resubmitted:r.status==='correction_requested',deadline},created_at:new Date().toISOString(),read_at:null});
@@ -184,7 +191,7 @@ try {
         const match=url.pathname.match(/\/storage\/v1\/object\/(?:authenticated\/)?(siep-documents|siep-person-photos)\/(.*)/);
         const bucket=match?.[1],path=match?.[2];
         if (method === "POST") { uploadedPaths.add(path); return response(route, { Key: bucket+"/"+path, Id: randomUUID() }); }
-        return route.fulfill({ status:200, body:bucket==='siep-person-photos'?portrait:Buffer.from("test-image"),contentType:"image/png" });
+        return route.fulfill({ status:200, body:portrait,contentType:"image/png" });
       }
       const table = url.pathname.split("/").at(-1);
       if(['siep_staff_conference_page','siep_staff_conference_detail','siep_review_staff'].includes(table)){
@@ -268,7 +275,7 @@ try {
       }
       if(table==='siep_read_development_photo'){
         assert.ok(tables.person_photos.some(p=>p.bucket_id==='siep-development-photos'&&p.object_path===body.p_path));
-        return response(route,{mime_type:'image/png',base64:portrait.toString('base64')});
+        return response(route,{mime_type:'image/png',base64:(developmentImages.get(body.p_path)||portrait).toString('base64')});
       }
       if (table === "siep_prepare_person_photo") {
         const current=tables.person_photos.find(p=>p.person_id===body.p_person_id&&p.is_current);
@@ -291,6 +298,7 @@ try {
           for(const [role,assignments] of [['athlete',tables.registration_athletes],['staff',tables.registration_staff]])for(const assignment of assignments.filter(a=>a.registration_id===registration.id)){
             if(body.p_role&&body.p_role!==role)continue;
             const person=tables.people.find(p=>p.id===assignment.person_id),school=tables.schools.find(s=>s.id===registration.school_id),photo=tables.person_photos.find(p=>p.person_id===person.id&&p.is_current);
+            if(role==='staff'&&!staffBadgeAllowed(body.p_event_id,school.id,person))continue;
             const row={person_id:person.id,school_id:school.id,role,role_label:role==='athlete'?'Atleta':'Comissão técnica',person_name:person.full_name,school_name:school.name,photo_id:photo?.id||null,photo_bucket:photo?.bucket_id,photo_path:photo?.object_path};
             eligible.set([school.id,person.id,role].join(':'),row);
           }
@@ -300,6 +308,7 @@ try {
       }
       if (table === "siep_issue_event_badges") {
         const event=tables.events.find(e=>e.id===body.p_event_id),issued=[];
+        if(body.p_entries.some(e=>e.role==='staff'&&!staffBadgeAllowed(body.p_event_id,e.school_id,tables.people.find(p=>p.id===e.person_id))))return response(route,{message:'Conferência técnica não aprovada ou desatualizada'},400);
         for(const entry of body.p_entries){
           const person=tables.people.find(p=>p.id===entry.person_id),school=tables.schools.find(s=>s.id===entry.school_id),photo=tables.person_photos.find(p=>p.person_id===person.id&&p.is_current);
           const previous=tables.event_badges.filter(b=>b.event_id===event.id&&b.school_id===school.id&&b.person_id===person.id&&b.role===entry.role);
@@ -858,7 +867,7 @@ try {
   await page.getByLabel("Anexar Foto", { exact: true }).setInputFiles({
     name: "foto.png",
     mimeType: "image/png",
-    buffer: Buffer.from("fake-image"),
+    buffer: portrait,
   });
   await page.getByRole('region',{name:'Pendências do cadastro',exact:true}).waitFor({state:'detached'});
   await page
@@ -930,6 +939,7 @@ try {
   assert.equal(await reviewDialog.evaluate(el => el.scrollWidth > el.clientWidth+1),false);
   await page.setViewportSize({width:1440,height:1000});
   await reviewDialog.getByAltText('Foto de identificação do cadastro').waitFor();
+  await page.waitForFunction(()=>{const img=document.querySelector('.review-document-image');return img?.complete&&img.naturalWidth>0;});
   await reviewDialog.getByLabel('O que precisa de correção em Atleta conectado?',{exact:true}).fill('Conferir elenco e reenviar para análise');
   const correctionDocument=tables.document_requirements[0];
   await reviewDialog.getByLabel(`O que precisa de correção em Atleta conectado — ${correctionDocument.name}?`,{exact:true}).fill('Confira o comprovante enviado');
@@ -1124,6 +1134,47 @@ try {
   const reprintPopup=await reprintPopupPromise;
   await reprintPopup.locator('.event-badge').waitFor();await reprintPopup.close();
   assert.equal(tables.event_badges.length,1,'Reimprimir criou nova emissão');
+  // Profissional distinto: foto própria e aprovação técnica antes do lote misto.
+  const printStaff={id:randomUUID(),institution_id:tenant,full_name:'Técnico do crachá de teste',cpf:'12345678909',birth_date:'1990-02-03',gender:'Masculino',archived:false,contact:{},updated_at:new Date().toISOString()};
+  tables.people.push(printStaff);
+  tables.school_people.push({id:randomUUID(),institution_id:tenant,person_id:printStaff.id,school_id:registration.school_id,role:'staff',position:'Técnico',status:'approved',version:1,archived:false});
+  tables.registration_staff.push({id:randomUUID(),institution_id:tenant,event_id:registration.event_id,school_id:registration.school_id,registration_id:registration.id,person_id:printStaff.id,staff_role_id:staffRole.id});
+  const printPhoto={id:randomUUID(),institution_id:tenant,person_id:printStaff.id,bucket_id:'siep-development-photos',object_path:'development/print-staff-test.png',original_name:'tecnico.png',status:'uploaded',is_current:true};
+  tables.person_photos.push(printPhoto);
+  const redImage=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=4;c.height=4;const context=c.getContext('2d');context.fillStyle='rgb(190,30,30)';context.fillRect(0,0,4,4);return c.toDataURL('image/png').split(',')[1];});
+  developmentImages.set(printPhoto.object_path,Buffer.from(redImage,'base64'));
+  await page.getByLabel('Perfil dos crachás',{exact:true}).selectOption('staff');
+  await page.getByText('Nenhum participante aprovado encontrado para estes filtros.',{exact:true}).waitFor();
+  await page.goto(origin+'/secretaria/'+tenant+'/inscricoes?tipo=comissao');
+  await page.getByRole('button',{name:'Conferir profissional',exact:true}).click();
+  const printReview=page.getByRole('dialog',{name:'Conferência do profissional',exact:true});
+  await printReview.getByRole('button',{name:'Aprovar profissional',exact:true}).click();
+  await printReview.getByLabel('Justificativa da conferência *',{exact:true}).fill('Dados e foto do profissional conferidos para o crachá');
+  await printReview.getByRole('button',{name:'Confirmar decisão do profissional',exact:true}).click();
+  await printReview.getByText('Aprovado',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Fechar conferência técnica',exact:true}).click();
+  await page.getByRole('button',{name:'Crachás',exact:true}).click();
+  await page.getByLabel('Evento dos crachás',{exact:true}).selectOption(registration.event_id);
+  await page.getByLabel('Escola dos crachás',{exact:true}).selectOption(registration.school_id);
+  await page.getByRole('checkbox',{name:'Selecionar Atleta conectado · Atleta',exact:true}).check();
+  await page.getByRole('checkbox',{name:'Selecionar Técnico do crachá de teste · Comissão técnica',exact:true}).check();
+  const mixedPrintPromise=page.waitForEvent('popup');
+  await page.getByRole('button',{name:'Emitir e abrir impressão',exact:true}).click();
+  const mixedPrint=await mixedPrintPromise;
+  await mixedPrint.locator('.event-badge').nth(1).waitFor();
+  await mixedPrint.waitForFunction(()=>[...document.images].every(img=>img.complete&&img.naturalWidth>0));
+  const staffCard=mixedPrint.locator('.event-badge').filter({hasText:'Técnico do crachá de teste'}),athleteCard=mixedPrint.locator('.event-badge').filter({hasText:'Atleta conectado'});
+  await staffCard.getByText('Comissão técnica',{exact:true}).waitFor();await athleteCard.getByText('Atleta',{exact:true}).waitFor();
+  assert.equal(await mixedPrint.getByText('Escola conectada',{exact:true}).count(),2);
+  const samplePixel=async el=>{const c=document.createElement('canvas');c.width=1;c.height=1;const context=c.getContext('2d');context.drawImage(el,0,0,1,1);return [...context.getImageData(0,0,1,1).data];};
+  const staffPixel=await staffCard.locator('.badge-portrait').evaluate(samplePixel),athletePixel=await athleteCard.locator('.badge-portrait').evaluate(samplePixel);
+  assert.deepEqual(staffPixel.slice(0,3),[190,30,30]);assert.notDeepEqual(staffPixel,athletePixel);
+  await mixedPrint.pdf({path:'/tmp/siep-roundtrip-athlete-staff-badges.pdf',preferCSSPageSize:true,printBackground:true});
+  await mixedPrint.screenshot({path:'/tmp/siep-roundtrip-athlete-staff-badges.png',fullPage:true});
+  await mixedPrint.close();
+  assert.equal(tables.event_badges.length,3);
+  assert.equal(tables.event_badges.find(b=>b.person_id===printStaff.id).photo_id,printPhoto.id);
+
   await page.getByRole("button", { name: "Relatórios", exact: true }).click();
   const resultTable=page.getByRole('table',{name:'Resultado do relatório'});
   await resultTable.getByText('Atleta conectado',{exact:true}).first().waitFor();

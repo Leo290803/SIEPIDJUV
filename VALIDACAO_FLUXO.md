@@ -1,35 +1,45 @@
-# Validação do fluxo escolar — 16/11/2026
+# Validação do fluxo escolar — 18/11/2026
 
-O fluxo passou nas verificações disponíveis: Chromium sobre o build de produção com API simulada, PostgreSQL local descartável e 13 suítes SQL no Supabase real com rollback. Esta rodada não encontrou falha de produto. Os exemplos existentes não foram modificados e nenhuma conta real foi criada.
+O fluxo disponível passou após corrigir uma inconsistência na liberação de crachás da comissão técnica. A validação combinou Chromium sobre o build de produção com API simulada, PostgreSQL local descartável e asserções SQL no Supabase real. **Não é um teste HTTP ponta a ponta do site publicado**: o proxy deste ambiente recusou o acesso a `siepidjuv.vercel.app` e ao domínio do projeto Supabase com HTTP 403. Auth/Storage foram simulados no navegador; regras, transações e permissões foram executadas em PostgreSQL real. Nenhuma conta ou inscrição de teste foi criada de forma persistente no banco real.
 
-| Etapa | Evidência |
+## Inconsistência encontrada e corrigida
+
+A inscrição aprovada dos atletas liberava a comissão técnica para emissão de crachá mesmo sem a conferência independente do profissional. O novo teste SQL reproduziu a falha com a mensagem **Comissão sem conferência própria liberou crachá**.
+
+A migração `20261118210000_badge_staff_approval` passa a exigir conferência técnica **aprovada e atual** para novas emissões de profissionais. Pendente, correção solicitada, indeferido ou cadastro/foto/funções alterados após a análise não liberam nova emissão. A lista paginada, o endpoint anterior de candidatos e a emissão direta usam a mesma regra; esconder a pessoa na interface não é a única proteção. O vínculo com inscrição aprovada continua obrigatório. Atletas e responsáveis mantêm suas regras anteriores. Emissões, fotos históricas, versões e reimpressão permanecem preservadas; nenhum crachá existente é apagado ou alterado.
+
+## Resultado por etapa
+
+| Etapa | Resultado e evidência |
 | --- | --- |
-| Secretaria gera acesso | Navegador: gera acesso do responsável sem e-mail e mostra as credenciais previstas. |
-| Responsável entra com CPF | Navegador: login pelo endpoint simulado de CPF e entrada direta na área escolar; sem cadastro público e sem exigir troca de senha. |
-| Escola acessa somente seu escopo | Interface recusa rotas da Secretaria e escola não autorizada; SQL real verifica RLS e recusa leitura/gravação em escola existente de outro escopo. |
-| Cadastro no evento e foto | Navegador: identidade reutilizada, foto escolhida/substituída, anexo privado e participação concluída no evento. SQL verifica os requisitos de cadastro/documentos e os limites esportivos. |
-| Escola cria e envia inscrição | Navegador executa a operação sob perfil escolar. SQL confirma envio e impede autoaprovação/edição de inscrição enviada. |
-| Secretaria solicita correção | Navegador informa justificativa e prazo futuro; inscrição aparece para a escola como Correção solicitada. |
-| Escola edita e reenvia | Navegador abre Continuar, salva e reenvia; a escola não tem botão Aprovar. SQL salva a revisão corrigida com comissão técnica, reenvia e mantém o histórico. |
-| Secretaria aprova | Navegador e SQL confirmam a transição. No SQL, a aprovação chega à revisão 6 e o snapshot preserva a comissão corrigida. |
-| Detalhes/histórico | Navegador abre, exibe participante/decisão, recarrega a URL e fecha; sem o antigo erro de referência a `all`. |
-| Crachá | Navegador emite, carrega imagem, abre a prévia e reimprime sem criar outra emissão. PDF do crachá gerado em Chromium; sem acionar impressora física. |
-| Relatório | Navegador filtra evento/escola/sexo/categoria, baixa PDF/CSV e testa agrupamentos. PDF foi inspecionado para nome, escola, situação e filtros. |
+| Acesso da escola | Navegador testa geração pela Secretaria, login com CPF, entrada na escola autorizada, recusa de rotas indevidas e expiração da sessão. API simulada. SQL executa RLS e permissões reais. |
+| Cadastro, foto e documentos | Navegador reutiliza identidade, substitui foto, envia anexo PNG válido, exibe a prévia do documento privado e verifica responsável legal quando necessário. SQL valida exigências e limites. |
+| Concluir inscrição | Navegador valida pendências, preserva valores, distingue rascunho e conclui sem botão separado de envio. Testa resposta perdida após gravar e repetição sem duplicar inscrição/avisos. SQL confirma transação, idempotência e limites de acesso. |
+| Correção e reenvio | Secretaria informa orientação/prazo; escola abre o anexo indicado, salva sem reenviar quando necessário e usa Salvar correções e reenviar. Testes verificam pendências, prazo vencido e resposta perdida na rede. |
+| Aprovação da inscrição | Só a Secretaria aprova. SQL recusa autoaprovação pela escola. A aprovação não aprova automaticamente o profissional. |
+| Comissão técnica | Um registro por pessoa/evento/escola, sem repetir por modalidade. Histórico e revisão esperada; escola consulta, mas não decide. Alterar dados/foto exige nova análise. |
+| Liberação de crachás | SQL verifica atleta de inscrição aprovada e profissional com análise própria aprovada e atual. Pendência, correção e indeferimento técnicos bloqueiam lista e emissão direta. Outro evento/escola não libera crachá. |
+| Dados e fotos por perfil | SQL usa pessoas e fotos distintas e confere nome, evento, escola, papel e ID da foto nos snapshots. Navegador emite um lote com atleta e técnico e verifica os pixels de imagens marcadoras diferentes, detectando troca de fotos entre perfis. |
+| Histórico e reimpressão | Reimprimir não cria emissão. Trocar a foto técnica não altera o snapshot antigo, bloqueia nova emissão até revisão e produz versão 2 com a foto nova após aprovação. |
+| PDF de crachás | Lote de dois perfis em uma página A4; teste adicional com cinco crachás e nomes longos gera duas páginas A4 sem cortes. A impressora física não é acionada. |
+| Relatórios | Navegador testa filtros de evento/escola/sexo/categoria, agrupamentos, busca sem resultado e exportações PDF/CSV; SQL testa consulta paginada e escopo. |
+| Notificações e celular | Navegador testa escola/Secretaria, contador/leitura, destino da inscrição, recuperação de erro e layout em 390px. |
 
-## Comandos
+## Verificações executadas
 
-Com o build servido por `npm run preview -- --port 4173`:
+- `npm test`: **110 testes aprovados**.
+- `npm run build`: aprovado.
+- `npm run test:database`: **18 suítes SQL e 3 cenários de concorrência**, aprovados.
+- `SIEP_TEST_ORIGIN=http://localhost:4173 npm run test:browser`: aprovado, API simulada.
+- `SIEP_TEST_ORIGIN=http://localhost:4173 npm run test:access-browser`: aprovado, API simulada.
+- `npm run test:badge-print`: cinco crachás, zero cortes, duas páginas A4.
+- Validação e aplicação da migração no Supabase: asserções SQL aprovadas, fixtures descartados.
 
-```sh
-SIEP_TEST_ORIGIN=http://localhost:4173 npm run test:access-browser
-SIEP_TEST_ORIGIN=http://localhost:4173 npm run test:browser
-npm run test:database
-```
+## Artefatos desta execução
 
-A validação remota foi executada com `scripts/supabase_migrate.py` no modo padrão, sem `--apply`: **zero migrações pendentes**, todas as asserções SQL passaram e a transação foi desfeita. Os fixtures SQL também se desfazem internamente. A sequência de transições escola → Secretaria → escola → Secretaria virou uma asserção permanente no teste conectado.
+- `/tmp/siep-roundtrip-athlete-staff-badges.pdf`: dois perfis, nomes/escola/evento corretos. As imagens preta/vermelha são **marcadores de teste**, não retratos ou dados reais.
+- `/tmp/siep-roundtrip-athlete-staff-badges.png`: prévia do mesmo lote.
+- `/tmp/siep-badges-pagination-test.pdf`: cinco crachás em duas páginas A4, incluindo nomes longos.
+- `/tmp/siep-relatorio.pdf`: relatório exportado pelo fluxo de navegador.
 
-Artefatos temporários desta execução: `/tmp/siep-roundtrip-badge.pdf`, `/tmp/siep-relatorio.pdf` e `/tmp/siep-badge-preview.png`. Não contêm dados dos cadastros reais do usuário.
-
-## Limite da validação
-
-O executor continua recebendo 403 do proxy ao conectar ao domínio `oshzcmmbhxvmchjgxztp.supabase.co`, inclusive no endpoint de saúde do Auth. Por isso **não foi validado o login/upload HTTP real de ponta a ponta**. O acesso SQL pela Management API funciona; ele comprova regras e permissões do banco, mas não substitui a autenticação HTTP, a implantação das Edge Functions ou a transferência real de arquivos no site publicado. O teste de navegador usa respostas simuladas nesses serviços. Esse bloqueio é do ambiente de teste e não demonstra uma falha de acesso no navegador do usuário.
+As regras do banco foram verificadas com dados temporários. A conferência de uma sessão real no site publicado e de downloads reais pelo HTTP do Storage continua pendente por causa do bloqueio de rede descrito acima.

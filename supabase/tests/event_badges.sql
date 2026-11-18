@@ -1,5 +1,5 @@
 do $$
-declare tenant uuid:=gen_random_uuid();other_tenant uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();school_user uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();school uuid:=gen_random_uuid();person uuid:=gen_random_uuid();event_uuid uuid:=gen_random_uuid();sport uuid:=gen_random_uuid();category uuid:=gen_random_uuid();staff_role uuid:=gen_random_uuid();part uuid:=gen_random_uuid();r jsonb;candidates jsonb;batch jsonb;issued jsonb;photo jsonb;second_photo jsonb;first_id uuid;
+declare tenant uuid:=gen_random_uuid();other_tenant uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();school_user uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();school uuid:=gen_random_uuid();person uuid:=gen_random_uuid();event_uuid uuid:=gen_random_uuid();sport uuid:=gen_random_uuid();category uuid:=gen_random_uuid();staff_role uuid:=gen_random_uuid();part uuid:=gen_random_uuid();r jsonb;candidates jsonb;batch jsonb;issued jsonb;photo jsonb;second_photo jsonb;first_id uuid;staff_detail jsonb;
 begin
  begin
   insert into auth.users(id) values(admin_user),(school_user),(outsider);
@@ -21,6 +21,8 @@ begin
   r:=public.siep_transition_registration((r->>'id')::uuid,(r->>'revision')::integer,'submitted','Enviar');
   if public.siep_badge_candidates(event_uuid)<>'[]'::jsonb then raise exception 'Inscrição em análise liberou crachá';end if;
   r:=public.siep_transition_registration((r->>'id')::uuid,(r->>'revision')::integer,'approved','Conferido');
+  staff_detail:=public.siep_staff_conference_detail(tenant,event_uuid,school,person);
+  perform public.siep_review_staff(tenant,event_uuid,school,person,(staff_detail->>'revision')::int,staff_detail->>'fingerprint','approved','Profissional conferido');
   candidates:=public.siep_badge_candidates(event_uuid);
   if jsonb_array_length(candidates)<>3 then raise exception 'Papéis do evento não foram listados';end if;
   select jsonb_agg(jsonb_build_object('person_id',value->>'person_id','school_id',value->>'school_id','role',value->>'role')) into batch from jsonb_array_elements(candidates);
@@ -28,6 +30,9 @@ begin
   photo:=public.siep_prepare_person_photo(person,'foto.png','image/png',20);
   insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-person-photos',photo->>'path',admin_user::text,'{"size":20,"mimetype":"image/png"}');
   perform public.siep_finalize_person_photo((photo->>'id')::uuid);
+  staff_detail:=public.siep_staff_conference_detail(tenant,event_uuid,school,person);
+  perform public.siep_review_staff(tenant,event_uuid,school,person,(staff_detail->>'revision')::int,staff_detail->>'fingerprint','approved','Profissional conferido');
+
   issued:=public.siep_issue_event_badges(event_uuid,batch);first_id:=(issued->0->>'id')::uuid;
   if jsonb_array_length(issued)<>3 or issued->0->'snapshot'->>'event_name'<>'Evento correto' or issued->0->'snapshot'->>'school_name'<>'Escola autorizada' or issued->0->'snapshot'->>'photo_id'<>photo->>'id' then raise exception 'Snapshot incorreto';end if;
   if issued->0->'snapshot' ? 'cpf' or issued->0->'snapshot' ? 'birth_date' then raise exception 'Dados civis desnecessários no crachá';end if;
@@ -40,6 +45,9 @@ begin
   second_photo:=public.siep_prepare_person_photo(person,'nova.jpg','image/jpeg',21,(photo->>'id')::uuid);
   insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-person-photos',second_photo->>'path',admin_user::text,'{"size":21,"mimetype":"image/jpeg"}');
   perform public.siep_finalize_person_photo((second_photo->>'id')::uuid);
+  staff_detail:=public.siep_staff_conference_detail(tenant,event_uuid,school,person);
+  perform public.siep_review_staff(tenant,event_uuid,school,person,(staff_detail->>'revision')::int,staff_detail->>'fingerprint','approved','Profissional conferido');
+
   issued:=public.siep_issue_event_badges(event_uuid,batch);
   if (issued->0->>'version')::integer<>2 or issued->0->'snapshot'->>'photo_id'<>second_photo->>'id' then raise exception 'Nova emissão não versionada';end if;
   if not exists(select 1 from public.event_badges where id=first_id and not is_current and snapshot->>'person_name'='Nome da emissão original' and photo_id=(photo->>'id')::uuid) then raise exception 'Histórico da emissão alterado';end if;

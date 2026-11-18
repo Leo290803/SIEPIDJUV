@@ -48,7 +48,7 @@ export default function EventBadges({events,schools,api,tenant}) {
   finally{setBusy(false);}
  }
  return <section className="panel event-badges">
-  <h2>Crachás do evento</h2><p className="panel-desc">Atletas e comissão técnica de inscrições aprovadas e responsáveis autorizados das escolas participantes. A foto de identificação é obrigatória para emitir.</p>
+  <h2>Crachás do evento</h2><p className="panel-desc">Atletas com inscrição aprovada, profissionais com conferência própria aprovada e atual, vinculados a inscrições aprovadas, e responsáveis autorizados das escolas participantes. A foto de identificação é obrigatória para emitir.</p>
   <div className="badge-filters">
    <label>Evento<select aria-label="Evento dos crachás" value={eventId} disabled={busy} onChange={e=>{setEventId(e.target.value);setOffset(0);}}><option value="">Selecione o evento</option>{events.map(e=><option key={e.id} value={e.id}>{e.name} · {e.year}{e.status==='Arquivado'?' · Arquivado':''}</option>)}</select></label>
    <label>Escola<select aria-label="Escola dos crachás" value={schoolId} disabled={busy} onChange={e=>{setSchoolId(e.target.value);setOffset(0);}}><option value="">Todas as escolas</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>

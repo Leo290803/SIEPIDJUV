@@ -1,0 +1,68 @@
+-- Fluxo novo da escola até o crachá, com identidades e fotos distintas.
+do $$
+declare tenant uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();school_user uuid:=gen_random_uuid();school uuid:=gen_random_uuid();other_school uuid:=gen_random_uuid();ev uuid:=gen_random_uuid();other_event uuid:=gen_random_uuid();sport uuid:=gen_random_uuid();cat uuid:=gen_random_uuid();athlete uuid:=gen_random_uuid();professional uuid:=gen_random_uuid();guardian uuid:=gen_random_uuid();staff_role uuid:=gen_random_uuid();part uuid;registration uuid;result jsonb;detail jsonb;athlete_photo jsonb;staff_photo jsonb;next_photo jsonb;batch jsonb;issued jsonb;first_staff_badge uuid;old_staff_snapshot jsonb;denied boolean;v integer;
+begin
+ begin
+ insert into auth.users(id) values(admin_user),(school_user);
+ insert into public.institutions(id,name,slug) values(tenant,'Validação do fluxo','badge-roundtrip-'||tenant);
+ insert into public.institution_memberships(institution_id,user_id,role,status) values(tenant,admin_user,'admin','approved');
+ insert into public.schools(id,institution_id,name) values(school,tenant,'Escola correta'),(other_school,tenant,'Outra escola');
+ insert into public.events(id,institution_id,name,edition,status) values(ev,tenant,'Evento correto','2026','open'),(other_event,tenant,'Outro evento','2027','open');
+ insert into public.event_modalities(id,institution_id,event_id,name,classification) values(sport,tenant,ev,'Atletismo','individual');
+ insert into public.event_categories(id,institution_id,event_id,modality_id,name,participation) values(cat,tenant,ev,sport,'Livre','individual');
+ insert into public.event_staff_roles(id,institution_id,event_id,name) values(staff_role,tenant,ev,'Técnico');
+ insert into public.people(id,institution_id,full_name,birth_date,cpf,gender) values(athlete,tenant,'Atleta correto','2010-01-01','52998224725','Feminino'),(professional,tenant,'Técnico correto','1990-01-01','12345678909','Masculino'),(guardian,tenant,'Gestor escolar','1980-01-01','11144477735','Feminino');
+ insert into public.school_people(institution_id,school_id,person_id,role,status,user_id,position) values(tenant,school,athlete,'athlete','approved',null,null),(tenant,school,professional,'staff','approved',null,'Técnico'),(tenant,school,guardian,'responsible','approved',school_user,null);
+ perform set_config('request.jwt.claim.sub',school_user::text,true);execute 'set local role authenticated';
+ result:=public.siep_save_participation(ev,school,athlete,array[cat],'{}',true);part:=(result->>'id')::uuid;
+ result:=public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,jsonb_build_array(jsonb_build_object('participation_id',part,'slot_number',1)),jsonb_build_array(jsonb_build_object('person_id',professional,'staff_role_id',staff_role)));registration:=(result->>'id')::uuid;v:=(result->>'revision')::integer;
+ if result->>'status'<>'submitted' then raise exception 'Escola não concluiu o envio';end if;
+ denied:=false;begin perform public.siep_transition_registration(registration,v,'approved','Tentar aprovar');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Escola se autoaprovou';end if;
+ execute 'reset role';perform set_config('request.jwt.claim.sub',admin_user::text,true);execute 'set local role authenticated';
+ result:=public.siep_badge_page(ev);if result->>'total'<>'0' then raise exception 'Inscrição não aprovada liberou crachás';end if;
+ result:=public.siep_transition_registration(registration,v,'correction_requested','Revisar cadastro',now()+interval '1 day');v:=(result->>'revision')::integer;
+ execute 'reset role';perform set_config('request.jwt.claim.sub',school_user::text,true);execute 'set local role authenticated';
+ perform public.siep_save_participation(ev,school,athlete,array[cat],'{"phone":"95999998888"}',true);
+ result:=public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,jsonb_build_array(jsonb_build_object('participation_id',part,'slot_number',1)),jsonb_build_array(jsonb_build_object('person_id',professional,'staff_role_id',staff_role)),registration,v);v:=(result->>'revision')::integer;
+ execute 'reset role';perform set_config('request.jwt.claim.sub',admin_user::text,true);execute 'set local role authenticated';
+ result:=public.siep_transition_registration(registration,v,'approved','Inscrição conferida');
+ result:=public.siep_badge_page(ev,school,'staff');if result->>'total'<>'0' then raise exception 'Comissão sem conferência própria liberou crachá';end if;
+ athlete_photo:=public.siep_prepare_person_photo(athlete,'atleta.png','image/png',20);
+ insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-person-photos',athlete_photo->>'path',admin_user::text,'{"size":20,"mimetype":"image/png"}');perform public.siep_finalize_person_photo((athlete_photo->>'id')::uuid);
+ staff_photo:=public.siep_prepare_person_photo(professional,'tecnico.png','image/png',21);
+ insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-person-photos',staff_photo->>'path',admin_user::text,'{"size":21,"mimetype":"image/png"}');perform public.siep_finalize_person_photo((staff_photo->>'id')::uuid);
+ detail:=public.siep_staff_conference_detail(tenant,ev,school,professional);
+ perform public.siep_review_staff(tenant,ev,school,professional,(detail->>'revision')::int,detail->>'fingerprint','correction_requested','Conferir identificação');
+ result:=public.siep_badge_page(ev,school,'staff');if result->>'total'<>'0' then raise exception 'Profissional em correção liberou crachá';end if;
+ batch:=jsonb_build_array(jsonb_build_object('person_id',professional,'school_id',school,'role','staff'));
+ denied:=false;begin perform public.siep_issue_event_badges(ev,batch);exception when check_violation then denied:=true;end;if not denied then raise exception 'Emissão direta contornou conferência técnica';end if;
+ detail:=public.siep_staff_conference_detail(tenant,ev,school,professional);perform public.siep_review_staff(tenant,ev,school,professional,(detail->>'revision')::int,detail->>'fingerprint','rejected','Identificação indeferida');
+ if public.siep_badge_candidates(ev,school,'staff')<>'[]' then raise exception 'Endpoint antigo contornou indeferimento';end if;
+ detail:=public.siep_staff_conference_detail(tenant,ev,school,professional);perform public.siep_review_staff(tenant,ev,school,professional,(detail->>'revision')::int,detail->>'fingerprint','approved','Identificação conferida');
+ result:=public.siep_badge_page(ev,school,'staff');if result->>'total'<>'1' then raise exception 'Profissional aprovado não liberou crachá';end if;
+ result:=public.siep_badge_page(ev,other_school);if result->>'total'<>'0' then raise exception 'Crachá em outra escola';end if;
+ result:=public.siep_badge_page(other_event);if result->>'total'<>'0' then raise exception 'Crachá em outro evento';end if;
+ denied:=false;begin perform public.siep_issue_event_badges(other_event,batch);exception when check_violation then denied:=true;end;if not denied then raise exception 'Emissão em evento errado aceita';end if;
+ batch:=batch||jsonb_build_array(jsonb_build_object('person_id',athlete,'school_id',school,'role','athlete'));
+ issued:=public.siep_issue_event_badges(ev,batch);
+ if jsonb_array_length(issued)<>2 then raise exception 'Lote não contém dois perfis';end if;
+ for result in select value from jsonb_array_elements(issued) loop
+  if result#>>'{snapshot,event_name}'<>'Evento correto' or result#>>'{snapshot,school_name}'<>'Escola correta' then raise exception 'Contexto do crachá incorreto';end if;
+  if result->>'role'='staff' then
+   if result->>'photo_id'<>staff_photo->>'id' or result#>>'{snapshot,person_name}'<>'Técnico correto' or result#>>'{snapshot,role_label}'<>'Comissão técnica' then raise exception 'Dados/foto/papel da comissão incorretos';end if;
+   first_staff_badge:=(result->>'id')::uuid;old_staff_snapshot:=result->'snapshot';
+  elsif result->>'role'='athlete' then
+   if result->>'photo_id'<>athlete_photo->>'id' or result#>>'{snapshot,person_name}'<>'Atleta correto' or result#>>'{snapshot,role_label}'<>'Atleta' then raise exception 'Dados/foto/papel do atleta incorretos';end if;
+  else raise exception 'Papel inesperado';end if;
+ end loop;
+ next_photo:=public.siep_prepare_person_photo(professional,'nova.png','image/png',22,(staff_photo->>'id')::uuid);
+ insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-person-photos',next_photo->>'path',admin_user::text,'{"size":22,"mimetype":"image/png"}');perform public.siep_finalize_person_photo((next_photo->>'id')::uuid);
+ result:=public.siep_badge_page(ev,school,'staff');if result->>'total'<>'0' then raise exception 'Foto alterada manteve liberação técnica';end if;
+ if not exists(select 1 from public.event_badges where id=first_staff_badge and snapshot=old_staff_snapshot and photo_id=(staff_photo->>'id')::uuid) then raise exception 'Foto/snapshot de emissão anterior alterados';end if;
+ detail:=public.siep_staff_conference_detail(tenant,ev,school,professional);perform public.siep_review_staff(tenant,ev,school,professional,(detail->>'revision')::int,detail->>'fingerprint','approved','Nova foto conferida');
+ issued:=public.siep_issue_event_badges(ev,jsonb_build_array(batch->0));if issued#>>'{0,photo_id}'<>next_photo->>'id' or issued#>>'{0,version}'<>'2' then raise exception 'Reemissão não usou foto atual/versionamento';end if;
+ execute 'reset role';
+ raise exception 'rollback_school_badge_roundtrip' using errcode='ZX001';
+ exception when sqlstate 'ZX001' then null;
+ end;
+end $$;
