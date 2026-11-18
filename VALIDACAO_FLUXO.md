@@ -43,3 +43,9 @@ A migração `20261118210000_badge_staff_approval` passa a exigir conferência t
 - `/tmp/siep-relatorio.pdf`: relatório exportado pelo fluxo de navegador.
 
 As regras do banco foram verificadas com dados temporários. A conferência de uma sessão real no site publicado e de downloads reais pelo HTTP do Storage continua pendente por causa do bloqueio de rede descrito acima.
+
+## Atualização: relatórios sob demanda, sem prévia de participantes
+
+A tabela automática de nomes e os contadores da prévia foram removidos. Os filtros e colunas continuam disponíveis; somente gerar PDF/CSV consulta os registros. Nenhum cadastro do banco foi apagado ou duplicado. Não houve migração nesta alteração.
+
+A rodada de interface posterior aprovou os 110 testes JS, build, fluxo Chromium e `test:scale-browser`. Verificou ausência de consultas de relatório ao abrir a tela/trocar filtros, arquivo vazio tratado sem download, PDF/CSV corretos, agrupamentos, ausência de CPF não selecionado e layout móvel. Com 10.001 registros simulados, o PDF foi gerado em 21 lotes de até 500, sem repetir offset zero e com interface responsiva; cancelamento também passou. Esse volume foi simulado no navegador, sem carga no projeto real do Supabase. O PDF grande está em `/tmp/siep-scale-10001.pdf`.

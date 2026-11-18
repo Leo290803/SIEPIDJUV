@@ -2,6 +2,16 @@
 
 Atualizado em 18/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
 
+## Relatórios somente para geração — sem lista automática de nomes
+
+A pedido do usuário, **Relatórios** agora contém filtros, agrupamento/ordenação, orientação do PDF, escolha de colunas e ações de geração. Foram removidos a tabela de participantes, a paginação da prévia e os contadores consultados automaticamente. Abrir a tela ou mudar tipo/filtros/agrupamento não chama `siep_report_page`. Os catálogos de eventos/escolas e o sino continuam com suas consultas próprias; não afirmar que a página inteira faz zero acessos ao banco.
+
+PDF/CSV só consultam registros quando o usuário solicita o arquivo. O primeiro lote de 500 retorna dados/contagens/snapshot para a geração e é reutilizado, evitando consultar offset zero duas vezes. Lotes seguintes permanecem sequenciais com verificação de snapshot, limite de 20 mil linhas, prazo de 120s, processamento em worker e cancelamento. Resultado vazio informa que os filtros não encontraram registros, sem baixar arquivo vazio. Durante geração, controles ficam desabilitados e não há segunda tarefa simultânea. Ao concluir, a tela mostra apenas o formato e quantidade de linhas geradas, sem guardar/montar nomes em tabela de prévia. Os nomes continuam no arquivo quando a coluna estiver selecionada; agrupamentos podem produzir somente os totais por escola/sexo etc.
+
+Não remove cadastros, nomes, inscrições ou histórico do banco. A lista anterior era uma consulta, não uma duplicação de armazenamento. Esta alteração reduz consultas repetidas e montagem da interface; não exige migração ou limpeza de dados. Totais de estrutura permanecem 29 migrações e 33 tabelas públicas com RLS.
+
+Validação desta alteração: **110 testes JS**, build e fluxo Chromium com API simulada aprovados. O teste verifica zero chamadas de relatório ao abrir/alterar filtros/tipos, ausência da tabela e de nomes no DOM, retorno vazio sob demanda, primeiro lote consultado uma vez, PDF/CSV com nomes/filtros corretos, CPF não selecionado ausente do CSV, resumos por sexo/escola e layout em 390px. `test:scale-browser` também passou: **10.001 atletas simulados**, relatório sem carga automática, PDF completo em **21 lotes de até 500**, interface responsiva e cancelamento. Dados simulados ficam no processo de teste; não foi teste de carga contra o Supabase Free real. Capturas `/tmp/siep-reports-desktop.png`, `/tmp/siep-reports-mobile.png` e `/tmp/siep-scale-reports-mobile.png`; arquivo grande `/tmp/siep-scale-10001.pdf`. Helpers de exportação e API SQL foram preservados.
+
 ## Validação completa e liberação correta de crachás
 
 Rodada de 18/11/2026 registrada em **VALIDACAO_FLUXO.md**. Testados cadastro/login escolar, foto/anexo, conclusão unificada, correção/prazo, reenvio, aprovação, conferência técnica independente, relatórios e PDF/reimpressão de crachás. O site e o HTTP do projeto Supabase continuam bloqueados pelo proxy (403); navegador usa API simulada. PostgreSQL local e Supabase Management API executaram as regras reais, com fixtures descartados. Não criar/alterar cadastros reais para repetir esta validação.

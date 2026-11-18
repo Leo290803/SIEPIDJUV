@@ -25,18 +25,21 @@ module.exports=async function({page,tables,tenant,queryCalls}){
   await page.getByText('1 atleta',{exact:true}).waitFor();
   await page.getByText('Volume atleta 09999',{exact:true}).waitFor();
   assert.ok(queryCalls.slice(count).filter(c=>c.table==='siep_portal_page').length<=2,'Disparou uma consulta por tecla');
+  const beforeOpen=queryCalls.filter(c=>c.table==='siep_report_page').length;
   await page.goto(`${origin}/secretaria/${tenant}/relatorios`);
-  const table=page.getByRole('table',{name:'Resultado do relatório'});
-  await table.getByText('Atleta conectado',{exact:true}).waitFor();
-  assert.equal(await table.locator('tbody tr').count(),25);
-  await page.getByRole('button',{name:'Próxima',exact:true}).click();
-  await page.getByText('Exibindo 26 a 50 de 10001',{exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Relatórios e filtros',exact:true}).waitFor();
+  await page.waitForTimeout(500);
+  assert.equal(await page.getByRole('table',{name:'Resultado do relatório'}).count(),0);
+  assert.equal(queryCalls.filter(c=>c.table==='siep_report_page').length,beforeOpen,'Relatório carregou participantes automaticamente');
   // A interface precisa continuar respondendo enquanto o worker gera um PDF grande.
   await page.evaluate(()=>{window.scaleTicks=0;window.scaleTimer=setInterval(()=>window.scaleTicks++,10);});
   const download=page.waitForEvent('download',{timeout:120000});
   await page.getByRole('button',{name:'Exportar PDF',exact:true}).click();
   await page.getByRole('button',{name:'Cancelar exportação',exact:true}).waitFor();
   const file=await download;await file.saveAs('/tmp/siep-scale-10001.pdf');
+  const batches=queryCalls.filter(c=>c.table==='siep_report_page').slice(beforeOpen);
+  assert.equal(batches.length,21);assert.equal(batches.filter(c=>c.body.p_offset===0).length,1);
+  assert.ok(batches.every(c=>c.body.p_limit===500));
   const ticks=await page.evaluate(()=>{clearInterval(window.scaleTimer);return window.scaleTicks;});
   assert.ok(ticks>10,'A interface deixou de responder durante o PDF');
   // Cancelar um segundo arquivo encerra consultas adicionais e não produz download.
@@ -47,10 +50,10 @@ module.exports=async function({page,tables,tenant,queryCalls}){
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.screenshot({path:'/tmp/siep-scale-reports-mobile.png',fullPage:true});
   await page.setViewportSize({width:1440,height:1000});
-  console.log('PASS: 10001 pessoas simuladas, listas com 25 linhas, busca com atraso, paginação remota, PDF completo em worker com interface responsiva e cancelamento.');
+  console.log('PASS: 10001 atletas simulados, listas com 25 linhas, relatórios sem carga automática, PDF em 21 lotes de 500 sem repetir o primeiro, interface responsiva e cancelamento.');
  }finally{
   for(const [key,size] of Object.entries(sizes))tables[key].splice(size);
   await page.goto(`${origin}/secretaria/${tenant}/relatorios`);
-  await page.getByRole('table',{name:'Resultado do relatório'}).getByText('Atleta conectado',{exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Relatórios e filtros',exact:true}).waitFor();
  }
 };
