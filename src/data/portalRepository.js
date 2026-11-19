@@ -159,11 +159,20 @@ export function portalRepository(client) {
     },signal),
     savePerson,
     badgeCandidates: async (event, school, role, query = "", offset = 0, signal) => queryPage("siep_badge_page", { p_event_id:event, p_school_id:school, p_role:role, p_query:query, p_offset:offset, p_limit:25 },signal),
+    badgeTemplate: (event,role,signal) => queryPage("siep_badge_template",{p_event_id:event,p_role:role},signal),
+    prepareBadgeArt: (event,file) => queryPage("siep_prepare_badge_art",{p_event_id:event,p_name:file.name,p_mime_type:file.type,p_size_bytes:file.size}),
+    uploadBadgeArt: async (metadata,file) => {checked(await client.storage.from(metadata.bucket).upload(metadata.path,file,{contentType:file.type,upsert:false}));checked(await client.rpc("siep_finalize_badge_art",{p_art_id:metadata.id}));},
+    saveBadgeTemplate: (event,role,version,layout,background) => queryPage("siep_save_badge_template",{p_event_id:event,p_role:role,p_expected_version:version,p_layout:layout,p_background_id:background||null}),
     issueBadges: async (event, entries) => checked(await client.rpc("siep_issue_event_badges", { p_event_id:event, p_entries:entries })),
-    badgeHistory: async (tenant, event, school) => {
-      let query=client.from("event_badges").select("*").eq("institution_id",tenant).eq("event_id",event);
-      if(school)query=query.eq("school_id",school);
-      return checked(await query.order("issued_at",{ascending:false}).limit(100));
+    badgeHistory: async (tenant,event,school) => {
+      try {return await queryPage("siep_badge_history",{p_institution_id:tenant,p_event_id:event,p_school_id:school||null});}
+      catch(error){
+        if(!["PGRST202","42883"].includes(error.code))throw error;
+        // Compatibilidade durante a aplicação da migração; a RLS anterior permanece.
+        let query=client.from("event_badges").select("*").eq("institution_id",tenant).eq("event_id",event);
+        if(school)query=query.eq("school_id",school);
+        return checked(await query.order("issued_at",{ascending:false}).limit(100));
+      }
     },
     decideLink: async (id, status, reason) =>
       checked(

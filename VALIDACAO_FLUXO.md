@@ -1,3 +1,5 @@
+> Atualização de 19/11/2026: crachás configuráveis e gabaritos foram testados localmente com 113 testes JS, build, 19 suítes SQL + 3 cenários de concorrência e Chromium com API simulada. A migração `20261119140000_custom_badge_templates.sql` **ainda não foi aplicada remotamente por esta conversa**, devido ao retorno HTTP 401. A outra conversa relatou HTTP 200. Estado, arquivos e roteiro de retomada estão na primeira seção de `CONTINUIDADE.md`. Os resultados remotos abaixo pertencem à rodada de 18/11, não à migração nova.
+
 # Validação do fluxo escolar — 18/11/2026
 
 O fluxo disponível passou após corrigir uma inconsistência na liberação de crachás da comissão técnica. A validação combinou Chromium sobre o build de produção com API simulada, PostgreSQL local descartável e asserções SQL no Supabase real. **Não é um teste HTTP ponta a ponta do site publicado**: o proxy deste ambiente recusou o acesso a `siepidjuv.vercel.app` e ao domínio do projeto Supabase com HTTP 403. Auth/Storage foram simulados no navegador; regras, transações e permissões foram executadas em PostgreSQL real. Nenhuma conta ou inscrição de teste foi criada de forma persistente no banco real.

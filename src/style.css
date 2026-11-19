@@ -252,3 +252,17 @@
 .conference-type select {min-width:190px;}
 .staff-review-count {display:block;margin-top:6px;color:#657b93;}
 @media(max-width:600px){.conference-type label {width:100%;flex-wrap:wrap;}.conference-type select {flex:1;min-width:150px;}}
+.badge-template-editor {max-width:1050px;}
+.badge-template-toolbar {display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:18px 0;}
+.badge-template-toolbar label {display:grid;gap:6px;}
+.badge-designer-grid {display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,1fr);gap:24px;align-items:start;}
+.badge-design-preview {overflow:auto;max-width:100%;padding:4px;}
+.badge-design-preview .event-badge {box-shadow:0 0 0 1px #b8c9db;}
+.badge-design-preview small {display:block;margin:10px 0;}
+.badge-art-field.designer-field {border:1px dashed #8eacc7;background:transparent;padding:0;cursor:grab;touch-action:none;}
+.badge-art-field.designer-field.selected {outline:2px solid #215888;outline-offset:-2px;}
+.badge-design-settings {display:grid;gap:12px;min-width:0;}
+.badge-design-settings label {display:grid;gap:6px;}
+.badge-coordinate-grid {display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.badge-coordinate-grid input {width:100%;min-width:0;}
+@media(max-width:780px){.badge-designer-grid {grid-template-columns:minmax(0,1fr);}}

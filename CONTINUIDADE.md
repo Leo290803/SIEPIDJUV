@@ -1,6 +1,40 @@
 # Continuidade do SIEP — contexto para o próximo chat
 
-Atualizado em 18/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+Atualizado em 19/11/2026. Este documento consolida as decisões do usuário e o estado real do código. Não contém credenciais. Leia também README.md e inspecione o checkout antes de começar.
+
+## Retomada prioritária — crachás com arte e gabarito (19/11/2026)
+
+**Leia esta seção antes das entradas históricas abaixo.** O usuário pediu reunir o trabalho nesta continuidade para retomar na conversa que conseguiu acesso ao Supabase. O código desta etapa acompanha este documento no repositório; não refazer as funcionalidades anteriores. Não publicar o ambiente Codex nem apagar/substituir cadastros existentes.
+
+### Implementado e testado localmente
+
+Em **Secretaria → Inscrições e documentos → Crachás**, selecionar o evento e abrir **Configurar arte e campos**. Modelos separados por evento e perfil: atleta, comissão técnica e responsável. Arte PNG/JPEG de até 5 MB em bucket privado; campos posicionáveis por arraste e por medidas em milímetros, com fonte/cor/alinhamento. Tamanho físico **86 × 130 mm**. Campos mínimos por perfil: foto, nome e escola; modalidade para atleta, função para comissão e identificação do papel para responsável. Outros campos podem ser acrescentados conforme o perfil. Prévia com dados ilustrativos e adaptação para celular.
+
+O editor oferece **Baixar gabarito PDF** e **Baixar imagem-guia PNG**. PDF de uma página no tamanho real 86 × 130 mm, medidas/posições dos campos e margem de segurança de 3 mm; PNG de 1016 × 1535 pixels. Usar como camada de referência no editor de arte e ocultar as guias antes de exportar o fundo final. Não afirmar que o PNG contém metadados de 300 DPI. Gabarito reflete o perfil e as posições atuais dos campos.
+
+A impressão usa a arte ao fundo e os dados reais por cima; detecta texto que não cabe e impede impressão com corte silencioso. Histórico conserva a versão do modelo usada na emissão. Alterar o modelo afeta novas emissões, não os crachás já emitidos. Layout e arte são versionados uma vez por modelo; cada emissão guarda referência à versão, evitando repetir todo o layout por pessoa. Crachás antigos continuam com o visual anterior. Fotos/artes iguais são baixadas uma vez por lote. A aprovação independente da comissão técnica continua obrigatória.
+
+Arquivos principais: `src/BadgeTemplateEditor.jsx`, `src/badgeTemplates.js`, `src/badgeGuide.js`, `src/BadgePrint.jsx`, `src/EventBadges.jsx`, `src/data/portalRepository.js` e estilos em `src/style.css`. Testes em `tests/badgeTemplates.test.js`, `supabase/tests/custom_badge_templates.sql` e `scripts/test_connected_browser.cjs`.
+
+### Banco pendente — não afirmar que esta migração foi aplicada
+
+Migração nova **`supabase/migrations/20261119140000_custom_badge_templates.sql`**, ainda não aplicada no Supabase por esta conversa. Cria `badge_art_assets`, `badge_templates`, `badge_template_versions`, bucket privado `siep-badge-art`, regras RLS/Storage e RPCs de preparação/finalização da arte, leitura/gravação do modelo e histórico. Acrescenta referência imutável à versão em `event_badges` e atualiza emissão mantendo autorização/aprovações existentes. Isolamento por instituição/evento e concorrência por versão esperada. Versões e artes históricas não devem ser removidas.
+
+Último estado confirmado do banco remoto antes desta etapa: **29 migrações aplicadas e 33 tabelas públicas com RLS**. Checkout passa a ter **30 migrações e estrutura prevista de 36 tabelas públicas** depois da aplicação; confirmar o estado real remoto antes de executar. Não editar migrações já aplicadas.
+
+Compatibilidade temporária: se as novas RPCs ainda não existirem (PGRST202/42883), o histórico usa a consulta anterior com RLS e o editor permite baixar gabaritos, mas desabilita salvar, com aviso de que a gravação de modelos ainda está indisponível. Outros erros, inclusive autorização, não recebem esse fallback. Isso permite continuar usando crachás existentes antes da migração.
+
+### Credencial: resultado exato e próximo passo
+
+O usuário atualizou `SUPABASE_ACCESS_TOKEN` pelo campo seguro do editor do ambiente, que abre outra conversa. Uma captura dessa outra conversa relata consulta de leitura à Management API com **HTTP 200**. Neste chat, consultas novas a `https://api.supabase.com/v1/projects` continuaram retornando **HTTP 401**, inclusive após a atualização. Portanto houve resultados distintos entre sessões; o motivo não foi determinado. O status `ready` do segredo não comprova validade, nem distingue valor novo/antigo. Não solicitar outro token nem pedir segredo pelo chat. Não copiar credenciais para arquivos, código ou documentação.
+
+Retomar pela conversa com acesso válido: confirmar por consulta somente de leitura que o projeto **`oshzcmmbhxvmchjgxztp`** está acessível; ler este documento e inspecionar `git status`/`main` antes de alterar. Depois executar `python scripts/supabase_migrate.py --project-ref oshzcmmbhxvmchjgxztp` (validação sem aplicação) e, passando, o mesmo comando com `--apply`, dentro do escopo já autorizado de migrações versionadas. Conferir o histórico real e executar as asserções, preservando todos os dados. Atualizar este documento com o resultado real e confirmar o editor/arte/emissão/reimpressão no ambiente com acesso. Não afirmar conclusão remota antes dessa verificação.
+
+### Evidências e limites desta entrega
+
+Aprovados localmente: **113 testes JS**, build, **19 suítes SQL + 3 cenários de concorrência** e fluxo Chromium com API simulada. SQL novo cobre permissões, isolamento, arte inválida/ausente, obrigatoriedade de campos, limites, versão concorrente, preservação histórica e aprovação. Chromium cobre download dos gabaritos, configuração da arte, posição numérica, campos mínimos, celular, emissão com arte/dados, versão nova e reimpressão antiga, além do fallback sem RPC. O fluxo completo anterior também passou. Build mantém aviso de chunks grandes; não é falha de compilação.
+
+Artefatos temporários desta sessão: `/tmp/gabarito-cracha-atleta.pdf`, `/tmp/gabarito-cracha-atleta.png`, logs `/tmp/siep-template-unit.log`, `/tmp/siep-template-build.log`, `/tmp/siep-template-browser.log`, `/tmp/siep-template-db.log` e `/tmp/siep-template-print.log`. Esses arquivos temporários podem não existir em outro ambiente; gerar novamente pelos botões ou testes. Teste de impressão anterior desta rodada: cinco crachás, zero cortes, duas páginas A4. Não representa validação real HTTP de Auth/Storage/site publicado nem teste de carga no Supabase Free. A migração nova e suas asserções ainda precisam ser executadas remotamente.
 
 ## Relatórios somente para geração — sem lista automática de nomes
 

@@ -1,3 +1,4 @@
+import BadgeTemplateEditor from "./BadgeTemplateEditor.jsx";
 import ServerPagination from "./ServerPagination.jsx";
 import React, { useEffect, useState } from "react";
 import { Printer, RefreshCw } from "lucide-react";
@@ -6,6 +7,7 @@ import { showBadgePrint } from "./BadgePrint.jsx";
 const keyOf = row => [row.school_id,row.person_id,row.role].join(":");
 export default function EventBadges({events,schools,api,tenant}) {
  const [eventId,setEventId]=useState(""),[schoolId,setSchoolId]=useState(""),[role,setRole]=useState(""),[query,setQuery]=useState(""),[rows,setRows]=useState([]),[history,setHistory]=useState([]),[selected,setSelected]=useState([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[refresh,setRefresh]=useState(0);
+ const [configuring,setConfiguring]=useState(false);
  const [offset,setOffset]=useState(0),[total,setTotal]=useState(0);
  const event=events.find(e=>e.id===eventId);
  useEffect(()=>{
@@ -54,6 +56,8 @@ export default function EventBadges({events,schools,api,tenant}) {
    <label>Escola<select aria-label="Escola dos crachás" value={schoolId} disabled={busy} onChange={e=>{setSchoolId(e.target.value);setOffset(0);}}><option value="">Todas as escolas</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
    <label>Perfil<select aria-label="Perfil dos crachás" value={role} disabled={busy} onChange={e=>{setRole(e.target.value);setOffset(0);}}><option value="">Todos</option><option value="athlete">Atletas</option><option value="staff">Comissão técnica</option><option value="responsible">Responsáveis</option></select></label>
   </div>
+  {eventId&&<div className="school-form-footer"><button className="secondary" disabled={busy} onClick={()=>setConfiguring(true)}>Configurar arte e campos</button></div>}
+  {configuring&&event&&<BadgeTemplateEditor key={event.id} api={api} event={event} initialRole={role||"athlete"} onClose={()=>setConfiguring(false)}/>}
   {error&&<p role="alert" className="school-error">{error}</p>}{message&&<p role="status" className="school-success">{message}</p>}
   {!eventId?<div className="empty">Selecione o evento para consultar os crachás disponíveis.</div>:<>
    <div className="badge-toolbar"><label>Pesquisar pessoa ou escola<input aria-label="Pesquisar crachá" type="search" value={query} onChange={e=>{setQuery(e.target.value);setOffset(0);}} /></label><button type="button" className="secondary" disabled={busy||loading} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={15}/>Atualizar lista</button></div>

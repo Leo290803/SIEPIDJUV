@@ -18,7 +18,8 @@ try {
   const queryCalls=[];
   const staffReviews=new Map(),developmentImages=new Map();
   let notificationFailure=false,completionIssues=[],loseCompletionResponse=false;
-  const completionReceipts=new Map();
+  const completionReceipts=new Map(),badgeTemplates=new Map(),artAssets=new Map();
+  let nextArtBytes=null,templateServiceMissing=false;
   const browser = await chromium.launch({
     executablePath:
       process.env.CHROMIUM_PATH ||
@@ -188,12 +189,23 @@ try {
         if (url.pathname.endsWith("/user")) return response(route, user);
       }
       if (url.pathname.startsWith("/storage/v1/object/")) {
-        const match=url.pathname.match(/\/storage\/v1\/object\/(?:authenticated\/)?(siep-documents|siep-person-photos)\/(.*)/);
+        const match=url.pathname.match(/\/storage\/v1\/object\/(?:authenticated\/)?(siep-documents|siep-person-photos|siep-badge-art)\/(.*)/);
         const bucket=match?.[1],path=match?.[2];
         if (method === "POST") { uploadedPaths.add(path); return response(route, { Key: bucket+"/"+path, Id: randomUUID() }); }
-        return route.fulfill({ status:200, body:portrait,contentType:"image/png" });
+        return route.fulfill({ status:200, body:bucket==='siep-badge-art'?[...artAssets.values()].find(a=>a.path===path)?.bytes||portrait:portrait,contentType:"image/png" });
       }
       const table = url.pathname.split("/").at(-1);
+      if(templateServiceMissing&&['siep_badge_history','siep_badge_template'].includes(table))return response(route,{code:'PGRST202',message:'Function not found'},404);
+      if(table==='siep_badge_history')return response(route,tables.event_badges.filter(b=>b.institution_id===body.p_institution_id&&b.event_id===body.p_event_id&&(!body.p_school_id||b.school_id===body.p_school_id)).sort((a,b)=>b.issued_at.localeCompare(a.issued_at)).slice(0,100));
+      if(table==='siep_badge_template')return response(route,badgeTemplates.get(body.p_event_id+':'+body.p_role)||null);
+      if(table==='siep_prepare_badge_art'){const id=randomUUID(),a={id,bucket:'siep-badge-art',path:tenant+'/'+body.p_event_id+'/'+id+'.png',name:body.p_name,bytes:nextArtBytes||portrait,status:'pending'};artAssets.set(id,a);return response(route,{id,bucket:a.bucket,path:a.path});}
+      if(table==='siep_finalize_badge_art'){const a=artAssets.get(body.p_art_id);assert.ok(uploadedPaths.has(a.path));a.status='uploaded';return response(route,null);}
+      if(table==='siep_save_badge_template'){
+        const key=body.p_event_id+':'+body.p_role,old=badgeTemplates.get(key);
+        if((old?.version||0)!==body.p_expected_version)return response(route,{code:'40001',message:'Modelo alterado'},409);
+        const asset=artAssets.get(body.p_background_id),model={id:old?.id||randomUUID(),version_id:randomUUID(),version:(old?.version||0)+1,role:body.p_role,layout:structuredClone(body.p_layout),background:asset?{id:asset.id,bucket:asset.bucket,objectPath:asset.path,name:asset.name}:null};
+        badgeTemplates.set(key,model);return response(route,model);
+      }
       if(['siep_staff_conference_page','siep_staff_conference_detail','siep_review_staff'].includes(table)){
         queryCalls.push({table,body});
         if(body.p_institution_id!==tenant)return response(route,{message:'Acesso negado'},403);
@@ -314,6 +326,11 @@ try {
           const previous=tables.event_badges.filter(b=>b.event_id===event.id&&b.school_id===school.id&&b.person_id===person.id&&b.role===entry.role);
           for(const badge of previous)badge.is_current=false;
           const badge={id:randomUUID(),institution_id:tenant,event_id:event.id,person_id:person.id,school_id:school.id,role:entry.role,photo_id:photo.id,version:previous.length+1,is_current:true,issued_at:new Date().toISOString(),snapshot:{event_name:event.name,edition:event.edition,institution_name:'IDJUV',person_name:person.full_name,school_name:school.name,role_label:entry.role==='athlete'?'Atleta':'Comissão técnica',photo_bucket:photo.bucket_id,photo_path:photo.object_path}};
+          badge.snapshot.badge_template=structuredClone(badgeTemplates.get(event.id+':'+entry.role)||null);
+          const categories=tables.registrations.filter(r=>r.event_id===event.id&&r.school_id===school.id&&r.status==='approved').map(r=>tables.event_categories.find(c=>c.id===r.category_id)).filter(Boolean);
+          badge.snapshot.modalities=[...new Set(categories.map(c=>tables.event_modalities.find(m=>m.id===c.modality_id)?.name).filter(Boolean))].join(' / ');
+          badge.snapshot.categories=[...new Set(categories.map(c=>c.name))].join(' / ');
+          badge.snapshot.functions=entry.role==='staff'?'Técnico':'Responsável escolar';
           issued.push(badge);tables.event_badges.push(badge);
         }
         return response(route,issued);
@@ -1107,6 +1124,24 @@ try {
   examplePhoto.bucket_id='siep-development-photos';examplePhoto.object_path='development/'+examplePhoto.id+'.png';
   await page.getByRole("button",{name:"Crachás",exact:true}).click();
   await page.getByLabel("Evento dos crachás",{exact:true}).selectOption(tables.events[0].id);
+  await page.getByRole('button',{name:'Configurar arte e campos',exact:true}).click();
+  const templateDialog=page.getByRole('dialog',{name:'Configurar arte do crachá',exact:true});
+  await templateDialog.getByLabel('Campo do crachá',{exact:true}).waitFor();
+  const guidePdf=page.waitForEvent('download');await templateDialog.getByRole('button',{name:'Baixar gabarito PDF',exact:true}).click();await (await guidePdf).saveAs('/tmp/gabarito-cracha-atleta.pdf');
+  assert.equal(fs.readFileSync('/tmp/gabarito-cracha-atleta.pdf').subarray(0,4).toString(),'%PDF');
+  const guidePng=page.waitForEvent('download');await templateDialog.getByRole('button',{name:'Baixar imagem-guia PNG',exact:true}).click();await (await guidePng).saveAs('/tmp/gabarito-cracha-atleta.png');
+  assert.equal(fs.readFileSync('/tmp/gabarito-cracha-atleta.png').subarray(1,4).toString(),'PNG');
+  const blueArt=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=860;c.height=1300;const x=c.getContext('2d');x.fillStyle='#e7efff';x.fillRect(0,0,860,1300);return c.toDataURL('image/png').split(',')[1];});
+  nextArtBytes=Buffer.from(blueArt,'base64');
+  await templateDialog.getByLabel('Arte do crachá',{exact:true}).setInputFiles({name:'arte-atleta.png',mimeType:'image/png',buffer:nextArtBytes});
+  await templateDialog.getByRole('img',{name:'Arte de fundo do modelo',exact:true}).waitFor();
+  await templateDialog.getByLabel('Campo do crachá',{exact:true}).selectOption('person_name');
+  await templateDialog.getByLabel('Esquerda (mm)',{exact:true}).fill('5');
+  assert.equal(await templateDialog.getByRole('button',{name:'Remover campo',exact:true}).count(),0);
+  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/siep-badge-template-mobile.png',fullPage:true});assert.equal(await templateDialog.evaluate(el=>el.scrollWidth>el.clientWidth+1),false);await page.setViewportSize({width:1440,height:1000});
+  await templateDialog.getByRole('button',{name:'Salvar modelo',exact:true}).click();
+  await templateDialog.getByText('Modelo salvo. Será usado nas próximas emissões deste perfil.',{exact:true}).waitFor();
+  await templateDialog.getByRole('button',{name:'Fechar configuração do crachá',exact:true}).click();
   await page.getByRole("checkbox",{name:"Selecionar Atleta conectado · Atleta",exact:true}).check();
   const badgePopupPromise=page.waitForEvent('popup');
   await page.getByRole("button",{name:"Emitir e abrir impressão",exact:true}).click();
@@ -1115,6 +1150,9 @@ try {
   assert.equal(await badgePopup.locator('.event-badge').count(),1);
   await badgePopup.getByText('Atleta conectado',{exact:true}).waitFor();
   await badgePopup.getByText('Escola conectada',{exact:true}).waitFor();
+  await badgePopup.getByRole('img',{name:'Arte personalizada do crachá',exact:true}).waitFor();
+  await badgePopup.getByText('Futsal',{exact:true}).waitFor();
+  assert.equal(await badgePopup.locator('.art-badge').getAttribute('data-template-version'),'1');
   assert.equal((await badgePopup.locator('body').innerText()).includes('52998224725'),false);
   await badgePopup.waitForFunction(()=>[...document.images].every(img=>img.complete&&img.naturalWidth>0));
   await badgePopup.evaluate(()=>{window.print=()=>{window.printInvoked=true;};});
@@ -1129,11 +1167,25 @@ try {
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.screenshot({path:'/tmp/siep-badges-mobile.png',fullPage:true});
   await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('button',{name:'Configurar arte e campos',exact:true}).click();
+  await templateDialog.getByLabel('Campo do crachá',{exact:true}).waitFor();
+  await templateDialog.getByLabel('Campo do crachá',{exact:true}).selectOption('person_name');await templateDialog.getByLabel('Esquerda (mm)',{exact:true}).fill('6');
+  await templateDialog.getByRole('button',{name:'Salvar modelo',exact:true}).click();await templateDialog.getByText('Modelo salvo. Será usado nas próximas emissões deste perfil.',{exact:true}).waitFor();await templateDialog.getByRole('button',{name:'Fechar configuração do crachá',exact:true}).click();
   const reprintPopupPromise=page.waitForEvent('popup');
   await page.getByRole('button',{name:'Reimprimir',exact:true}).click();
   const reprintPopup=await reprintPopupPromise;
-  await reprintPopup.locator('.event-badge').waitFor();await reprintPopup.close();
+  await reprintPopup.locator('.event-badge').waitFor();assert.equal(await reprintPopup.locator('.art-badge').getAttribute('data-template-version'),'1');await reprintPopup.close();
   assert.equal(tables.event_badges.length,1,'Reimprimir criou nova emissão');
+  templateServiceMissing=true;
+  await page.getByRole('button',{name:'Atualizar lista',exact:true}).click();
+  await page.getByRole('button',{name:'Reimprimir',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Configurar arte e campos',exact:true}).click();
+  await templateDialog.getByText('A gravação de modelos ainda não está disponível neste ambiente. Os gabaritos já podem ser baixados.',{exact:true}).waitFor();
+  assert.equal(await templateDialog.getByRole('button',{name:'Salvar modelo',exact:true}).isDisabled(),true);
+  assert.equal(await templateDialog.getByRole('button',{name:'Baixar gabarito PDF',exact:true}).isEnabled(),true);
+  await templateDialog.getByRole('button',{name:'Fechar configuração do crachá',exact:true}).click();
+  templateServiceMissing=false;
+
   // Profissional distinto: foto própria e aprovação técnica antes do lote misto.
   const printStaff={id:randomUUID(),institution_id:tenant,full_name:'Técnico do crachá de teste',cpf:'12345678909',birth_date:'1990-02-03',gender:'Masculino',archived:false,contact:{},updated_at:new Date().toISOString()};
   tables.people.push(printStaff);
