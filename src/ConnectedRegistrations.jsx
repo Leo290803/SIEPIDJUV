@@ -473,7 +473,9 @@ export default function ConnectedRegistrations({
     onRoute?.(null);
   };
   useServerFilters(remote, {query, status, eventId:eventFilter,schoolId:schoolFilter});
-  const rows = remote ? data.registrations : data.registrations.filter(
+  const schoolList = !!school && !!event && !manager;
+  const visibleRegistrations = schoolList ? data.registrations.filter(r=>r.status !== "cancelled") : data.registrations;
+  const rows = remote ? visibleRegistrations : visibleRegistrations.filter(
     (r) =>
       (!school || r.school_id === school.id) &&
       (!event || r.event_id === event.id) &&
@@ -488,6 +490,7 @@ export default function ConnectedRegistrations({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
+  const visibleTotal = remote?.total ?? rows.length;
   const ev = (r) => events.find((e) => e.id === r.event_id),
     sc = (r) => schools.find((s) => s.id === r.school_id);
   async function openReview(r) {
@@ -592,16 +595,16 @@ export default function ConnectedRegistrations({
       </div>}
       <div className="panel registration-compact-list">
         <div className="table-toolbar">
-          <span className="record-count">{remote?.total ?? rows.length} inscrições</span>
+          <span className="record-count">{visibleTotal} {visibleTotal === 1 ? "inscrição" : "inscrições"}</span>
           <div className="school-tools">
-            <label className="search">
+            {!schoolList && <label className="search">
               <input
                 aria-label="Buscar inscrições"
                 placeholder="Evento ou escola"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-            </label>
+            </label>}
             {manager && !school && <select aria-label="Escola das inscrições" value={schoolFilter} onChange={e=>setSchoolFilter(e.target.value)}><option value="">Todas as escolas</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>}
             {!event && (
               <select
@@ -623,7 +626,7 @@ export default function ConnectedRegistrations({
               onChange={(e) => {setStatus(e.target.value);setPdfError("");}}
             >
               <option value="all">Todas as situações</option>
-              {Object.entries(registrationStatusLabel).map(([key, label]) => (
+              {Object.entries(registrationStatusLabel).filter(([key])=>!schoolList||key!=="cancelled").map(([key, label]) => (
                 <option key={key} value={key}>
                   {label}
                 </option>
@@ -636,18 +639,18 @@ export default function ConnectedRegistrations({
                 {event.modalities.map(modality=><option key={modality.id} value={modality.id}>{modality.name}</option>)}
               </select>
               <button type="button" className="secondary" disabled={generatingPdf}
-                aria-busy={generatingPdf} onClick={downloadRegistrationsPdf}>
+                aria-busy={generatingPdf} aria-label="Baixar relatório em PDF" onClick={downloadRegistrationsPdf}>
                 <FileDown size={16}/>
-                {generatingPdf ? "Gerando PDF…" : "Baixar relatório em PDF"}
+                {generatingPdf ? "Gerando PDF…" : "Baixar PDF"}
               </button>
             </>)}
             {school && event && (
               <button
-                className="primary"
+                className="primary" aria-label="Nova inscrição neste evento"
                 onClick={() => (onRoute ? onRoute({}) : setStarting(true))}
               >
                 <Plus size={16} />
-                Nova inscrição neste evento
+                Nova inscrição
               </button>
             )}
           </div>
@@ -657,7 +660,7 @@ export default function ConnectedRegistrations({
           <table>
             <thead>
               <tr>
-                <th>Evento / escola</th>
+                {!schoolList&&<th>Evento / escola</th>}
                 <th>Modalidade / categoria / prova</th>
                 <th>Atletas</th>
                 <th>Situação</th>
@@ -672,10 +675,10 @@ export default function ConnectedRegistrations({
                   proof = category?.proofs.find((p) => p.id === r.proof_id);
                 return (
                   <tr key={r.id}>
-                    <td>
+                    {!schoolList&&<td>
                       <strong>{ev(r)?.name || "Evento"}</strong>
                       <div>{sc(r)?.name}</div>
-                    </td>
+                    </td>}
                     <td>
                       {category?.modality} · {category?.name}
                       {proof && <div>{proof.name}</div>}
@@ -722,7 +725,7 @@ export default function ConnectedRegistrations({
                           onClick={() => openReview(r)}
                           disabled={busy}
                         >
-                          {manager ? r.status === "submitted" ? "Conferir inscrição" : "Ver inscrição" : "Detalhes e histórico"}
+                          {manager ? r.status === "submitted" ? "Conferir inscrição" : "Ver inscrição" : "Ver detalhes"}
                         </button>
                         {manager && actions(r).length > 0 && <details className="registration-more"><summary>Mais ações</summary><div>{["draft","correction_requested"].includes(r.status) && <button className="secondary" onClick={() => onRoute ? onRoute({id:r.id}) : setEditing(r)}>Continuar</button>}{actions(r).map(([label,value]) => <button key={value} className="secondary" onClick={() => setDecision({r,status:value,label})}>{label}</button>)}</div></details>}
                         {!manager && actions(r).map(([label, value]) => (
@@ -743,7 +746,7 @@ export default function ConnectedRegistrations({
               })}
               {!rows.length && (
                 <tr>
-                  <td className="table-empty" colSpan={5}>
+                  <td className="table-empty" colSpan={schoolList ? 4 : 5}>
                     Nenhuma inscrição encontrada.
                   </td>
                 </tr>
@@ -800,6 +803,7 @@ export default function ConnectedRegistrations({
                       ? new Date(f.get("deadline")).toISOString()
                       : null,
                   );
+                  if (schoolList && decision.status === "cancelled" && remote?.offset) remote.onPage(0);
                   await onChanged();
                   setWarnings(null);
                   setDecision(null);

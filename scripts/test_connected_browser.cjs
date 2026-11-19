@@ -283,7 +283,7 @@ try {
           if(body.p_detail_id&&!links.some(l=>l.id===body.p_detail_id)){const l=tables.school_people.find(l=>l.id===body.p_detail_id);if(l)links.push(l);}
         }
         if(mode==='registrations'){
-          registrations=tables.registrations.filter(r=>(!scope||r.school_id===scope)&&(!event||r.event_id===event)&&(!filters.status||filters.status==='all'||r.status===filters.status)&&normalize([tables.events.find(e=>e.id===r.event_id)?.name,smap.get(r.school_id)?.name].join(' ')).includes(normalize(filters.query||'')));
+          registrations=tables.registrations.filter(r=>(!scope||r.school_id===scope)&&(!event||r.event_id===event)&&(!filters.excludeCancelled||r.status!=='cancelled')&&(!filters.status||filters.status==='all'||r.status===filters.status)&&normalize([tables.events.find(e=>e.id===r.event_id)?.name,smap.get(r.school_id)?.name].join(' ')).includes(normalize(filters.query||'')));
           total=registrations.length;registrations=registrations.slice(body.p_offset,body.p_offset+body.p_limit);
           if(body.p_detail_id&&!registrations.some(r=>r.id===body.p_detail_id)){const r=tables.registrations.find(r=>r.id===body.p_detail_id);if(r)registrations.push(r);}
         }
@@ -967,7 +967,7 @@ try {
   await page.getByRole('cell',{name:'Enviada',exact:true}).waitFor();
   isAdmin=true;
   await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');
-  await page.getByRole('button',{name:/^(Detalhes e histórico|Conferir inscrição|Ver inscrição)$/}).click();
+  await page.getByRole('button',{name:/^(Ver detalhes|Conferir inscrição|Ver inscrição)$/}).click();
   const reviewDialog=page.getByRole('dialog',{name:'Análise da inscrição',exact:true});
   await reviewDialog.getByRole('tab',{name:'Conferência',exact:true}).waitFor();
   await page.screenshot({path:'/tmp/siep-registration-review-desktop.png',fullPage:true});
@@ -1001,10 +1001,17 @@ try {
   await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/inscricoes');
   await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
   assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
+  const cancelledRow={...schoolPdfFixture,id:randomUUID(),status:'cancelled'};
+  tables.registrations.push(cancelledRow);
   await page.goto(page.url()+'?tipo=comissao');
   await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
   assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
   assert.equal(await page.getByRole('region',{name:'Conferência da comissão técnica'}).count(),0);
+  assert.equal(await page.getByRole('columnheader',{name:'Evento / escola',exact:true}).count(),0);
+  assert.equal(await page.getByRole('cell',{name:'Cancelada',exact:true}).count(),0);
+  assert.equal(await page.getByText('1 inscrição',{exact:true}).count(),1);
+  assert.ok(queryCalls.some(({table,body})=>table==='siep_portal_page'&&body.p_mode==='registrations'&&body.p_filters.excludeCancelled));
+  tables.registrations.pop();
   assert.equal(await page.getByRole('button',{name:'Aprovar',exact:true}).count(),0);
   const athleticsRegistration={...schoolPdfFixture,id:randomUUID(),category_id:pdfCategory.id,proof_id:null};
   const pdfStaffLink=tables.school_people.find(link=>link.role==='staff'&&link.school_id===schoolPdfFixture.school_id);
@@ -1133,7 +1140,7 @@ try {
   const registration=tables.registrations[0];
   tables.registration_versions.push({id:randomUUID(),institution_id:tenant,registration_id:registration.id,revision:registration.revision,status:'approved',created_at:new Date().toISOString(),snapshot:{athletes:[{person:{id:tables.people[0].id,full_name:'Atleta conectado'},allocation:{slot_number:1}}],staff:[]}});
   tables.registration_decisions.push({id:randomUUID(),institution_id:tenant,registration_id:registration.id,to_status:'approved',reason:'Conferido no histórico',created_at:new Date().toISOString()});
-  await page.getByRole('button',{name:/^(Detalhes e histórico|Conferir inscrição|Ver inscrição)$/}).click();
+  await page.getByRole('button',{name:/^(Ver detalhes|Conferir inscrição|Ver inscrição)$/}).click();
   const historyDialog=page.getByRole('dialog',{name:'Análise da inscrição',exact:true});
   await historyDialog.waitFor();
   await historyDialog.getByText('Conferido no histórico',{exact:false}).waitFor();

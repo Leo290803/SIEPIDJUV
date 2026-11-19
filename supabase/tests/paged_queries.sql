@@ -44,7 +44,13 @@ begin
  denied:=false;begin perform public.siep_report_page(t,'{}','','name','asc',0,501);exception when sqlstate '22023' then denied:=true;end;if not denied then raise exception 'Limite ignorado';end if;
  update public.people set full_name='Ana atualizada' where id=p;
  denied:=false;begin perform public.siep_report_page(t,'{}','','name','asc',0,25,snapshot);exception when sqlstate '40001' then denied:=true;end;if not denied then raise exception 'Exportação não detectou alteração';end if;
+ perform public.siep_transition_registration(r,(select revision from public.registrations where id=r),'cancelled','Cancelado no teste');
+ result:=public.siep_portal_page(t,'registrations');if result->>'total'<>'1' or result#>>'{tables,registrations,0,status}'<>'cancelled' then raise exception 'Secretaria perdeu inscrição cancelada';end if;
  perform set_config('request.jwt.claim.sub',outsider::text,true);
+ result:=public.siep_portal_page(t,'registrations',s,null,'{"excludeCancelled":true}');
+ if result->>'total'<>'0' or jsonb_array_length(result#>'{tables,registrations}')<>0 then raise exception 'Cancelada entrou na lista ou na contagem da escola';end if;
+ result:=public.siep_portal_page(t,'registrations',s,null,'{"excludeCancelled":true}',0,10,r);
+ if result#>>'{tables,registrations,0,status}'<>'cancelled' then raise exception 'Consulta pelo histórico perdeu inscrição cancelada';end if;
  denied:=false;begin perform public.siep_badge_page(e);exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Escola acessou crachás da Secretaria';end if;
  denied:=false;begin perform public.siep_report_page(t);exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Escola acessou relatório da Secretaria';end if;
  result:=public.siep_portal_page(t,'people',s,'athlete','{"status":"all"}');if result->>'total'<>'1' or jsonb_array_length(result#>'{tables,event_participations}')<>1 or result#>>'{tables,people,0,full_name}'<>'Ana atualizada' then raise exception 'Escopo da escola incorreto';end if;
