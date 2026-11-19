@@ -52,6 +52,12 @@ O editor de modelos frente e verso permite selecionar **Verso**, enviar uma arte
 
 A migração `20261119190000_badge_reverse_art` foi aplicada com as asserções remotas aprovadas. A arte usa o mesmo bucket privado e fica vinculada à versão da emissão, inclusive após restaurar o padrão. Foram conferidos os registros anteriores de emissões, versões, modelos e artes antes e depois da migração.
 
+### Modelo padrão da instituição
+
+Em **Crachás → Modelo padrão da instituição**, a Secretaria pode configurar uma vez o modelo de cada perfil. Eventos sem modelo próprio usam esse padrão automaticamente, inclusive sem configuração prévia. A tela de configuração de um evento sem modelo próprio mostra o padrão como ponto de partida; salvar ali cria um modelo somente para esse evento. O nome e a edição do evento vêm dos dados gravados na emissão. Textos que fazem parte da imagem enviada continuam fixos na arte.
+
+A migração `20261119200000_institution_badge_defaults` mantém modelos, versões e artes existentes e usa a estrutura versionada também para os padrões. Foram validados o uso automático em um segundo evento, a prioridade do modelo específico, o isolamento entre instituições e a preservação das emissões antigas.
+
 ### Evidências e limites desta entrega
 
 Aprovados localmente: **113 testes JS**, build, **19 suítes SQL + 3 cenários de concorrência** e fluxo Chromium com API simulada. SQL novo cobre permissões, isolamento, arte inválida/ausente, obrigatoriedade de campos, limites, versão concorrente, preservação histórica e aprovação. Chromium cobre download dos gabaritos, configuração da arte, posição numérica, campos mínimos, celular, emissão com arte/dados, versão nova e reimpressão antiga, além do fallback sem RPC. O fluxo completo anterior também passou. Build mantém aviso de chunks grandes; não é falha de compilação.

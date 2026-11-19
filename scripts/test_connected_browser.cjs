@@ -12,13 +12,14 @@ try {
   } = require("/opt/codex/runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright"));
 }
 (async () => {
+  const {defaultBadgeLayout}=await import('../src/badgeTemplates.js');
   const {mapPortalData}=await import('../src/data/peopleMapping.js');
   const {fromEvent}=await import('../src/data/eventMapping.js');
   const {buildReport,groupRows,sortRows,normalize}=await import('../src/reports/model.js');
   const queryCalls=[];
   const staffReviews=new Map(),developmentImages=new Map();
   let notificationFailure=false,completionIssues=[],loseCompletionResponse=false;
-  const completionReceipts=new Map(),badgeTemplates=new Map(),artAssets=new Map();
+  const completionReceipts=new Map(),badgeTemplates=new Map(),defaultBadgeTemplates=new Map(),artAssets=new Map();
   const persistedBadgeArt=new Map();
   let nextArtBytes=null,templateServiceMissing=false;
   const browser = await chromium.launch({
@@ -198,6 +199,14 @@ try {
       const table = url.pathname.split("/").at(-1);
       if(templateServiceMissing&&['siep_badge_history','siep_badge_template'].includes(table))return response(route,{code:'PGRST202',message:'Function not found'},404);
       if(table==='siep_badge_history')return response(route,tables.event_badges.filter(b=>b.institution_id===body.p_institution_id&&b.event_id===body.p_event_id&&(!body.p_school_id||b.school_id===body.p_school_id)).sort((a,b)=>b.issued_at.localeCompare(a.issued_at)).slice(0,100));
+      if(table==='siep_default_badge_template')return response(route,defaultBadgeTemplates.get(body.p_role)||null);
+      if(table==='siep_save_default_badge_template'){
+        assert.equal(body.p_institution_id,tenant);
+        const old=defaultBadgeTemplates.get(body.p_role);
+        if((old?.version||0)!==body.p_expected_version)return response(route,{code:'40001',message:'Modelo alterado'},409);
+        const model={id:old?.id||randomUUID(),version_id:randomUUID(),version:(old?.version||0)+1,role:body.p_role,layout:structuredClone(body.p_layout),background:null,reverse_background:null};
+        defaultBadgeTemplates.set(body.p_role,model);return response(route,model);
+      }
       if(table==='siep_badge_template')return response(route,badgeTemplates.get(body.p_event_id+':'+body.p_role)||null);
       if(table==='siep_prepare_badge_art'){const id=randomUUID(),a={id,bucket:'siep-badge-art',path:tenant+'/'+body.p_event_id+'/'+id+'.png',name:body.p_name,bytes:persistedBadgeArt.get(body.p_name)||nextArtBytes||portrait,status:'pending'};artAssets.set(id,a);return response(route,{id,bucket:a.bucket,path:a.path});}
       if(table==='siep_finalize_badge_art'){const a=artAssets.get(body.p_art_id);assert.ok(uploadedPaths.has(a.path));a.status='uploaded';return response(route,null);}
@@ -331,7 +340,11 @@ try {
           const previous=tables.event_badges.filter(b=>b.event_id===event.id&&b.school_id===school.id&&b.person_id===person.id&&b.role===entry.role);
           for(const badge of previous)badge.is_current=false;
           const badge={id:randomUUID(),institution_id:tenant,event_id:event.id,person_id:person.id,school_id:school.id,role:entry.role,photo_id:photo.id,version:previous.length+1,is_current:true,issued_at:new Date().toISOString(),snapshot:{event_name:event.name,edition:event.edition,institution_name:'IDJUV',person_name:person.full_name,school_name:school.name,role_label:entry.role==='athlete'?'Atleta':'Comissão técnica',photo_bucket:photo.bucket_id,photo_path:photo.object_path}};
-          badge.snapshot.badge_template=structuredClone(badgeTemplates.get(event.id+':'+entry.role)||null);
+          const override=badgeTemplates.get(event.id+':'+entry.role);
+          if(!override&&!defaultBadgeTemplates.has(entry.role)){
+            defaultBadgeTemplates.set(entry.role,{id:randomUUID(),version_id:randomUUID(),version:1,layout:defaultBadgeLayout(entry.role)});
+          }
+          badge.snapshot.badge_template=structuredClone(override||defaultBadgeTemplates.get(entry.role));
           const assignments=entry.role==='staff'?tables.registration_staff:tables.registration_athletes;
           const categories=tables.registrations.filter(r=>r.event_id===event.id&&r.school_id===school.id&&r.status==='approved'&&assignments.some(a=>a.registration_id===r.id&&a.person_id===person.id)).map(r=>tables.event_categories.find(c=>c.id===r.category_id)).filter(Boolean);
           badge.snapshot.modalities=[...new Set(categories.map(c=>tables.event_modalities.find(m=>m.id===c.modality_id)?.name).filter(Boolean))].join(' / ');
@@ -1130,10 +1143,17 @@ try {
   const examplePhoto=tables.person_photos.find(p=>p.is_current&&p.person_id===tables.people[0].id);
   examplePhoto.bucket_id='siep-development-photos';examplePhoto.object_path='development/'+examplePhoto.id+'.png';
   await page.getByRole("button",{name:"Crachás",exact:true}).click();
+  await page.getByRole('button',{name:'Modelo padrão da instituição',exact:true}).click();
+  const defaultDialog=page.getByRole('dialog',{name:'Configurar arte do crachá',exact:true});
+  await defaultDialog.getByLabel('Esquerda (mm)',{exact:true}).fill('6.5');
+  await defaultDialog.getByRole('button',{name:'Salvar modelo padrão',exact:true}).click();
+  await defaultDialog.getByText('Modelo padrão salvo. Será usado nos eventos sem modelo próprio.',{exact:true}).waitFor();
+  await defaultDialog.getByRole('button',{name:'Fechar configuração do crachá',exact:true}).click();
   await page.getByLabel("Evento dos crachás",{exact:true}).selectOption(tables.events[0].id);
   await page.getByRole('button',{name:'Configurar arte e campos',exact:true}).click();
   const templateDialog=page.getByRole('dialog',{name:'Configurar arte do crachá',exact:true});
   await templateDialog.getByLabel('Campo do crachá',{exact:true}).waitFor();
+  assert.equal(await templateDialog.getByLabel('Esquerda (mm)',{exact:true}).inputValue(),'6.5');
   await templateDialog.locator('.badge-qr').waitFor();
   assert.equal(await templateDialog.getByLabel('Verso do crachá').count(),2);
   await templateDialog.screenshot({path:'/tmp/siep-credencial-frente-verso.png'});
@@ -1263,6 +1283,8 @@ try {
   await mixedPrint.screenshot({path:'/tmp/siep-roundtrip-athlete-staff-badges.png',fullPage:true});
   await mixedPrint.close();
   assert.equal(tables.event_badges.length,3);
+  assert.equal(defaultBadgeTemplates.get('athlete').version,1);
+  assert.equal(tables.event_badges.find(b=>b.person_id===printStaff.id).snapshot.badge_template.version_id,defaultBadgeTemplates.get('staff').version_id);
   assert.equal(tables.event_badges.find(b=>b.person_id===printStaff.id).photo_id,printPhoto.id);
 
   const reportCalls=()=>queryCalls.filter(c=>c.table==='siep_report_page');

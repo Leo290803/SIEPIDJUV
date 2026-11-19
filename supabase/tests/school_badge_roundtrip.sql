@@ -52,18 +52,21 @@ begin
   if result->>'role'='staff' then
    if result->>'photo_id'<>staff_photo->>'id' or result#>>'{snapshot,person_name}'<>'Técnico correto' or result#>>'{snapshot,role_label}'<>'Comissão técnica' then raise exception 'Dados/foto/papel da comissão incorretos';end if;
    if result#>>'{snapshot,cref}' is distinct from '123456-G/RR' then raise exception 'CREF da escola não foi registrado na emissão';end if;
+   if result#>>'{snapshot,badge_template,layout,theme}' is distinct from 'credential-v1' then raise exception 'Padrão inicial não foi usado';end if;
    first_staff_badge:=(result->>'id')::uuid;old_staff_snapshot:=result->'snapshot';
   elsif result->>'role'='athlete' then
-   if result#>>'{snapshot,athlete_category}' is distinct from 'Livre' or result#>>'{snapshot,cref}' is not null then raise exception 'Categoria/CREF incorretos para atleta';end if;
+   if result#>>'{snapshot,categories}' is distinct from 'Livre' or result#>>'{snapshot,cref}' is not null then raise exception 'Categoria/CREF incorretos para atleta';end if;
    if result->>'photo_id'<>athlete_photo->>'id' or result#>>'{snapshot,person_name}'<>'Atleta correto' or result#>>'{snapshot,role_label}'<>'Atleta' then raise exception 'Dados/foto/papel do atleta incorretos';end if;
   else raise exception 'Papel inesperado';end if;
  end loop;
+ result:=public.siep_save_default_badge_template(tenant,'staff',1,jsonb_set(old_staff_snapshot#>'{badge_template,layout}','{fields,0,fontSize}','11'),null,null);
+ if result->>'version' is distinct from '2' then raise exception 'Padrão institucional não foi versionado';end if;
  next_photo:=public.siep_prepare_person_photo(professional,'nova.png','image/png',22,(staff_photo->>'id')::uuid);
  insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-person-photos',next_photo->>'path',admin_user::text,'{"size":22,"mimetype":"image/png"}');perform public.siep_finalize_person_photo((next_photo->>'id')::uuid);
  result:=public.siep_badge_page(ev,school,'staff');if result->>'total'<>'0' then raise exception 'Foto alterada manteve liberação técnica';end if;
- if not exists(select 1 from public.event_badges where id=first_staff_badge and snapshot=old_staff_snapshot and photo_id=(staff_photo->>'id')::uuid) then raise exception 'Foto/snapshot de emissão anterior alterados';end if;
+ if not exists(select 1 from public.event_badges where id=first_staff_badge and snapshot-'badge_template'=old_staff_snapshot-'badge_template' and template_version_id=(old_staff_snapshot#>>'{badge_template,version_id}')::uuid and photo_id=(staff_photo->>'id')::uuid) then raise exception 'Foto/snapshot de emissão anterior alterados';end if;
  detail:=public.siep_staff_conference_detail(tenant,ev,school,professional);perform public.siep_review_staff(tenant,ev,school,professional,(detail->>'revision')::int,detail->>'fingerprint','approved','Nova foto conferida');
- issued:=public.siep_issue_event_badges(ev,jsonb_build_array(batch->0));if issued#>>'{0,photo_id}'<>next_photo->>'id' or issued#>>'{0,version}'<>'2' then raise exception 'Reemissão não usou foto atual/versionamento';end if;
+ issued:=public.siep_issue_event_badges(ev,jsonb_build_array(batch->0));if issued#>>'{0,photo_id}'<>next_photo->>'id' or issued#>>'{0,version}'<>'2' or issued#>>'{0,snapshot,badge_template,version}' is distinct from '2' then raise exception 'Reemissão não usou foto atual/versionamento';end if;
  execute 'reset role';
  raise exception 'rollback_school_badge_roundtrip' using errcode='ZX001';
  exception when sqlstate 'ZX001' then null;

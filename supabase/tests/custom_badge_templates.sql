@@ -1,5 +1,5 @@
 do $$
-declare tenant uuid:=gen_random_uuid();other_tenant uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();school_user uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();school uuid:=gen_random_uuid();ev uuid:=gen_random_uuid();other_ev uuid:=gen_random_uuid();sport uuid:=gen_random_uuid();cat uuid:=gen_random_uuid();person uuid:=gen_random_uuid();guardian uuid:=gen_random_uuid();part uuid;reg jsonb;art jsonb;reverse_art jsonb;photo jsonb;layout jsonb;changed jsonb;model jsonb;first_version uuid;first_badge uuid;issued jsonb;history jsonb;denied boolean;
+declare tenant uuid:=gen_random_uuid();other_tenant uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();school_user uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();school uuid:=gen_random_uuid();ev uuid:=gen_random_uuid();other_ev uuid:=gen_random_uuid();other_sport uuid:=gen_random_uuid();other_cat uuid:=gen_random_uuid();sport uuid:=gen_random_uuid();cat uuid:=gen_random_uuid();person uuid:=gen_random_uuid();guardian uuid:=gen_random_uuid();part uuid;reg jsonb;art jsonb;reverse_art jsonb;default_art jsonb;default_model jsonb;photo jsonb;layout jsonb;changed jsonb;model jsonb;first_version uuid;first_badge uuid;issued jsonb;history jsonb;denied boolean;
 begin
  begin
  insert into auth.users(id) values(admin_user),(school_user),(outsider);
@@ -63,12 +63,33 @@ begin
  history:=public.siep_badge_history(tenant,ev,school);
  if not exists(select 1 from jsonb_array_elements(history) h where h->>'id'=issued#>>'{0,id}' and h#>>'{snapshot,badge_template,reverse_background,objectPath}'=reverse_art->>'path') then raise exception 'Reimpressão perdeu a arte do verso';end if;
  if not exists(select 1 from storage.objects where bucket_id='siep-badge-art' and name=art->>'path') then raise exception 'Arte histórica inacessível';end if;
+ default_art:=public.siep_prepare_default_badge_art(tenant,'padrao.png','image/png',25);
+ insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-badge-art',default_art->>'path',admin_user::text,'{"size":25,"mimetype":"image/png"}');
+ perform public.siep_finalize_badge_art((default_art->>'id')::uuid);
+ denied:=false;begin perform public.siep_save_default_badge_template(tenant,'athlete',0,changed,(art->>'id')::uuid,null);exception when check_violation then denied:=true;end;if not denied then raise exception 'Padrão aceitou arte restrita a evento';end if;
+ default_model:=public.siep_save_default_badge_template(tenant,'athlete',0,changed,(default_art->>'id')::uuid,(default_art->>'id')::uuid);
+ if public.siep_default_badge_template(tenant,'athlete') is distinct from default_model then raise exception 'Leitura do padrão institucional divergente';end if;
+ if public.siep_badge_template(ev,'athlete')#>>'{version}' is distinct from '4' then raise exception 'Padrão substituiu o modelo do evento';end if;
+ execute 'reset role';
+ insert into public.event_modalities(id,institution_id,event_id,name,classification) values(other_sport,tenant,other_ev,'Natação','individual');
+ insert into public.event_categories(id,institution_id,event_id,modality_id,name,participation) values(other_cat,tenant,other_ev,other_sport,'Livre','individual');
+ execute 'set local role authenticated';
+ reg:=public.siep_save_participation(other_ev,school,person,array[other_cat],'{}',true);
+ reg:=public.siep_complete_registration(gen_random_uuid(),other_ev,school,other_cat,null,jsonb_build_array(jsonb_build_object('participation_id',reg->>'id','slot_number',1)),'[]');
+ reg:=public.siep_transition_registration((reg->>'id')::uuid,(reg->>'revision')::int,'approved','Conferido');
+ issued:=public.siep_issue_event_badges(other_ev,jsonb_build_array(jsonb_build_object('person_id',person,'school_id',school,'role','athlete')));
+ if issued#>>'{0,snapshot,badge_template,version_id}' is distinct from default_model->>'version_id'
+ or issued#>>'{0,snapshot,edition}' is distinct from '2027'
+ or issued#>>'{0,snapshot,modalities}' is distinct from 'Natação' then raise exception 'Evento novo não herdou o modelo com seus próprios dados';end if;
+ model:=public.siep_save_badge_template(other_ev,'athlete',0,changed,(default_art->>'id')::uuid,(default_art->>'id')::uuid);
+ if model#>>'{background,id}' is distinct from default_art->>'id' then raise exception 'Modelo do evento perdeu a arte padrão ao personalizar';end if;
  execute 'reset role';denied:=false;begin update public.badge_template_versions set layout='{}' where id=first_version;exception when check_violation then denied:=true;end;if not denied then raise exception 'Histórico do modelo alterado';end if;
  denied:=false;begin delete from public.badge_art_assets where id=(art->>'id')::uuid;exception when foreign_key_violation then denied:=true;end;if not denied then raise exception 'Arte histórica excluída';end if;
  perform set_config('request.jwt.claim.sub',school_user::text,true);execute 'set local role authenticated';
  if exists(select 1 from storage.objects where bucket_id='siep-badge-art' and name=art->>'path') then raise exception 'Escola leu a arte privada';end if;
  denied:=false;begin perform public.siep_badge_history(tenant,ev);exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Escola leu emissões';end if;
  execute 'reset role';perform set_config('request.jwt.claim.sub',outsider::text,true);execute 'set local role authenticated';
+ denied:=false;begin perform public.siep_default_badge_template(tenant,'athlete');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Outra instituição leu o padrão';end if;
  denied:=false;begin perform public.siep_badge_template(ev,'athlete');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Outra instituição leu modelo';end if;
  execute 'reset role';if has_function_privilege('anon','public.siep_save_badge_template(uuid,text,integer,jsonb,uuid)','execute') then raise exception 'RPC pública';end if;
  raise exception 'rollback_custom_badge_templates' using errcode='ZX001';
