@@ -408,6 +408,7 @@ export default function ConnectedRegistrations({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const pdfRequest = useRef(null);
+  const [pdfModality,setPdfModality] = useState("");
   const [generatingPdf,setGeneratingPdf] = useState(false), [pdfError,setPdfError] = useState("");
   useEffect(() => () => pdfRequest.current?.abort(), []);
   async function downloadRegistrationsPdf() {
@@ -417,7 +418,7 @@ export default function ConnectedRegistrations({
     setGeneratingPdf(true);setPdfError("");
     try {
       const {createSchoolRegistrationsPdf} = await import("./reports/schoolRegistrations.js");
-      const pdf = await createSchoolRegistrationsPdf({api,tenant,school,event,status,query,signal:controller.signal});
+      const pdf = await createSchoolRegistrationsPdf({api,tenant,school,event,status,query,modalityId:pdfModality,signal:controller.signal});
       controller.signal.throwIfAborted();
       if (pdf) pdf.save("siep-inscricoes-da-escola.pdf");
       else setPdfError("Nenhuma inscrição corresponde aos filtros selecionados.");
@@ -628,13 +629,18 @@ export default function ConnectedRegistrations({
                 </option>
               ))}
             </select>
-            {school && event && !manager && !routeAction && (
+            {school && event && !manager && !routeAction && (<>
+              <select aria-label="Modalidade do PDF" value={pdfModality} disabled={generatingPdf}
+                onChange={e=>{setPdfModality(e.target.value);setPdfError("");}}>
+                <option value="">PDF de todas as modalidades</option>
+                {event.modalities.map(modality=><option key={modality.id} value={modality.id}>{modality.name}</option>)}
+              </select>
               <button type="button" className="secondary" disabled={generatingPdf}
                 aria-busy={generatingPdf} onClick={downloadRegistrationsPdf}>
                 <FileDown size={16}/>
                 {generatingPdf ? "Gerando PDF…" : "Baixar relatório em PDF"}
               </button>
-            )}
+            </>)}
             {school && event && (
               <button
                 className="primary"

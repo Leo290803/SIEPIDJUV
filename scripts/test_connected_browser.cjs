@@ -992,6 +992,11 @@ try {
   await page.getByRole('button',{name:'Fechar histórico',exact:true}).click();
   await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
   isAdmin=false;
+  const schoolPdfFixture=tables.registrations[0], originalRegistrationCount=tables.registrations.length;
+  const pdfSport={id:randomUUID(),event_id:schoolPdfFixture.event_id,institution_id:tenant,name:'Atletismo',classification:'individual',enabled:true};
+  const pdfCategory={...tables.event_categories[0],id:randomUUID(),modality_id:pdfSport.id};
+  tables.event_modalities.push(pdfSport);
+  tables.event_categories.push(pdfCategory);
   await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/inscricoes');
   await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
   assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
@@ -1000,8 +1005,13 @@ try {
   assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
   assert.equal(await page.getByRole('region',{name:'Conferência da comissão técnica'}).count(),0);
   assert.equal(await page.getByRole('button',{name:'Aprovar',exact:true}).count(),0);
-  const schoolPdfFixture=tables.registrations[0], originalRegistrationCount=tables.registrations.length;
+  const athleticsRegistration={...schoolPdfFixture,id:randomUUID(),category_id:pdfCategory.id,proof_id:null};
+  const pdfStaffLink=tables.school_people.find(link=>link.role==='staff'&&link.school_id===schoolPdfFixture.school_id);
+  assert.ok(pdfStaffLink);
+  const pdfStaffName=tables.people.find(person=>person.id===pdfStaffLink.person_id).full_name;
+  tables.registration_staff.push({registration_id:athleticsRegistration.id,person_id:pdfStaffLink.person_id});
   tables.registrations.push(
+    athleticsRegistration,
     ...Array.from({length:100},()=>({...schoolPdfFixture,id:randomUUID()})),
     {...schoolPdfFixture,id:randomUUID(),school_id:randomUUID()},
     {...schoolPdfFixture,id:randomUUID(),event_id:randomUUID()},
@@ -1012,8 +1022,6 @@ try {
   await page.getByRole('button',{name:'Baixar relatório em PDF',exact:true}).click();
   const schoolPdfPath='/tmp/siep-inscricoes-da-escola.pdf';
   await (await schoolPdfDownload).saveAs(schoolPdfPath);
-  tables.registrations.splice(originalRegistrationCount);
-  await page.getByLabel('Situação das inscrições',{exact:true}).selectOption('all');
   assert.equal(fs.readFileSync(schoolPdfPath).subarray(0,4).toString(),'%PDF');
   const schoolPdfRequests=queryCalls.filter(call=>call.table==='siep_portal_page'&&call.body.p_mode==='registrations'&&call.body.p_limit===100);
   assert.deepEqual(schoolPdfRequests.map(call=>call.body.p_offset),[0,100]);
@@ -1021,9 +1029,28 @@ try {
   const schoolPdfText=require('node:child_process').spawnSync('pdftotext',[schoolPdfPath,'-'],{encoding:'utf8'});
   if(!schoolPdfText.error){
     assert.equal(schoolPdfText.status,0);
-    for(const expected of ['Atleta conectado','Escola conectada','Futsal','Correção solicitada','Inscrições: 101'])assert.ok(schoolPdfText.stdout.includes(expected),expected);
+    for(const expected of ['Atleta conectado','Escola conectada','Futsal','Correção solicitada','Inscrições: 102','Futsal · Atletas inscritos','Atletismo · Comissão técnica',pdfStaffName])assert.ok(schoolPdfText.stdout.includes(expected),expected);
     assert.ok(!schoolPdfText.stdout.includes('52998224725'));
   }
+  await page.getByLabel('Modalidade do PDF',{exact:true}).selectOption(pdfSport.id);
+  const athleticsPdf=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Baixar relatório em PDF',exact:true}).click();
+  const athleticsPdfPath='/tmp/siep-inscricoes-atletismo.pdf';
+  await (await athleticsPdf).saveAs(athleticsPdfPath);
+  const athleticsText=require('node:child_process').spawnSync('pdftotext',[athleticsPdfPath,'-'],{encoding:'utf8'});
+  if(!athleticsText.error){
+    assert.equal(athleticsText.status,0);
+    assert.ok(athleticsText.stdout.includes('Atletismo · Comissão técnica'));
+    assert.ok(athleticsText.stdout.includes(pdfStaffName));
+    assert.ok(!athleticsText.stdout.includes('Futsal'));
+  }
+  tables.registrations.splice(originalRegistrationCount);
+  tables.registration_staff.pop();
+  tables.event_categories.pop();
+  tables.event_modalities.pop();
+  await page.getByLabel('Modalidade do PDF',{exact:true}).selectOption('');
+  await page.getByLabel('Situação das inscrições',{exact:true}).selectOption('all');
+
 
   await page.getByRole('button',{name:'Notificações',exact:true}).click();
   const schoolBell=page.getByRole('region',{name:'Avisos recentes',exact:true});

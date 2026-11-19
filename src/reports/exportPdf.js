@@ -1,7 +1,10 @@
-export async function createReportPdf({ title, institution, columns, rows, filters, summary, orientation = "auto", generatedAt = new Date() }) {
-  if (!columns.length || !rows.length) throw Error("Não há resultados ou colunas para exportar.");
+export async function createReportPdf({ title, institution, columns, rows, sections, filters, summary, orientation = "auto", generatedAt = new Date() }) {
+  const groups = sections || [{ tables: [{ columns, rows }] }];
+  if (!groups.length || groups.some(group => !group.tables.length || group.tables.some(table => !table.columns.length || !table.rows.length))) {
+    throw Error("Não há resultados ou colunas para exportar.");
+  }
   const [{ jsPDF }, { autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-  const direction = orientation === "auto" ? (columns.length > 6 ? "landscape" : "portrait") : orientation;
+  const direction = orientation === "auto" ? (groups.some(group => group.tables.some(table => table.columns.length > 6)) ? "landscape" : "portrait") : orientation;
   const doc = new jsPDF({ orientation: direction, unit: "mm", format: "a4", compress: true, putOnlyUsedFonts: true });
   doc.setProperties({ title: `SIEP · ${title}`, subject: filters.join("; "), author: institution });
   const width = doc.internal.pageSize.getWidth(), margin = 14, textWidth = width - margin * 2;
@@ -18,13 +21,23 @@ export async function createReportPdf({ title, institution, columns, rows, filte
     doc.text(line, margin, y); y += 4;
   }
   y += 4;
-  autoTable(doc, {
-    startY: y, margin: { top: 17, right: margin, bottom: 16, left: margin },
-    head: [columns.map(c => c.label)], body: rows.map(r => columns.map(c => String(r.cells[c.key] ?? ""))),
-    theme: "striped", styles: { font: "helvetica", fontSize: 8, cellPadding: 2.5, overflow: "linebreak", minCellWidth: 20, textColor: [43, 61, 81] },
-    headStyles: { fillColor: [31, 77, 127], textColor: 255, fontStyle: "bold" }, alternateRowStyles: { fillColor: [243, 247, 251] },
-    rowPageBreak: "avoid", horizontalPageBreak: true, horizontalPageBreakRepeat: 0,
-  });
+  for (const [index, group] of groups.entries()) {
+    if (index > 0) { doc.addPage(); y = 17; }
+    for (const table of group.tables) {
+      const headings = table.columns.map(column => column.label);
+      const head = group.title
+        ? [[{content: `${group.title} · ${table.title}`, colSpan:headings.length}], headings]
+        : [headings];
+      autoTable(doc, {
+        startY: y, margin: { top: 17, right: margin, bottom: 16, left: margin },
+        head, body: table.rows.map(row => table.columns.map(column => String(row.cells[column.key] ?? ""))),
+        theme: "striped", styles: { font: "helvetica", fontSize: 8, cellPadding: 2.5, overflow: "linebreak", minCellWidth: 20, textColor: [43, 61, 81] },
+        headStyles: { fillColor: [31, 77, 127], textColor: 255, fontStyle: "bold" }, alternateRowStyles: { fillColor: [243, 247, 251] },
+        rowPageBreak: "avoid", horizontalPageBreak: !group.title, horizontalPageBreakRepeat: 0,
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
+  }
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page++) {
     doc.setPage(page); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(100, 117, 137);
