@@ -86,7 +86,13 @@ export default function InstitutionPortal({
   const scope = [tenant, page, schoolId || ""].join(":");
   const list = listState.scope === scope ? listState : {scope,filters:{},offset:0};
   const loadedScope = useRef(""), loadedPlan = useRef(""), loadSequence = useRef(0);
-  const staffConference = ['Inscrições','Minhas inscrições'].includes(page) && !route.action && new URLSearchParams(location.search).get('tipo')==='comissao';
+  const conferenceParams = new URLSearchParams(location.search);
+  const conferenceSelector = canManage && !schoolArea && page === "Inscrições" && !route.action;
+  const schoolConferenceLink = schoolArea && ["Inscrições","Minhas inscrições"].includes(page) &&
+    !route.action && !!schoolId && conferenceParams.get("escola") === schoolId &&
+    conferenceParams.has("profissional") && conferenceParams.has("evento");
+  const staffConference = (conferenceSelector || schoolConferenceLink) &&
+    conferenceParams.get("tipo") === "comissao";
   const planKey = JSON.stringify(pagePlan(staffConference ? {...route,page:'Conferência técnica'} : route,list.filters,list.offset));
   useEffect(() => {
     let active = true;
@@ -850,8 +856,8 @@ export default function InstitutionPortal({
                       </details>
                     </>
                   )}
-                  {(page === "Inscrições" || page === "Minhas inscrições") && !route.action && !showPicker && <div className="conference-type"><label>Tipo de conferência<select aria-label="Tipo de conferência" value={staffConference?'comissao':'atletas'} onChange={e=>navigate(location.pathname+(e.target.value==='comissao'?'?tipo=comissao':''))}><option value="atletas">Atletas</option><option value="comissao">Comissão técnica</option></select></label></div>}
-                  {staffConference && !showPicker && <StaffConference api={api} tenant={tenant} events={events} schools={schools} schoolId={schoolArea?schoolId:undefined} manager={canManage&&!schoolArea}/>}
+                  {conferenceSelector && !showPicker && <div className="conference-type"><label>Tipo de conferência<select aria-label="Tipo de conferência" value={staffConference?'comissao':'atletas'} onChange={e=>navigate(location.pathname+(e.target.value==='comissao'?'?tipo=comissao':''))}><option value="atletas">Atletas</option><option value="comissao">Comissão técnica</option></select></label></div>}
+                  {staffConference && !showPicker && <StaffConference api={api} tenant={tenant} events={events} schools={schools} schoolId={schoolArea?schoolId:undefined} manager={canManage&&!schoolArea} onReturn={schoolArea?()=>navigate(location.pathname):undefined}/>}
                   {(page === "Inscrições" || page === "Minhas inscrições") &&
                     !staffConference && !showPicker && (
                       <ConnectedRegistrations

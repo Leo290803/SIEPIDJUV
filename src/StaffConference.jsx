@@ -5,7 +5,7 @@ import {PrivateFile} from './RegistrationReview.jsx';
 import ServerPagination from './ServerPagination.jsx';
 import {readableError} from './data/client.js';
 export const staffReviewLabels={pending:'Aguardando análise',approved:'Aprovado',correction_requested:'Correção solicitada',rejected:'Indeferido'};
-export default function StaffConference({api,tenant,events,schools,schoolId,manager}) {
+export default function StaffConference({api,tenant,events,schools,schoolId,manager,onReturn}) {
  const [params,setParams]=useSearchParams();
  const [filters,setFilters]=useState({query:'',eventId:params.get('evento')||'',schoolId:schoolId||params.get('escola')||'',status:'all'}),[offset,setOffset]=useState(0),[page,setPage]=useState({rows:[],total:0}),[loading,setLoading]=useState(true),[error,setError]=useState(''),[detail,setDetail]=useState(null),[decision,setDecision]=useState(null),[saving,setSaving]=useState(false),[version,setVersion]=useState(0);
  const person=params.get('profissional'),ev=params.get('evento'),school=params.get('escola');
@@ -13,9 +13,10 @@ export default function StaffConference({api,tenant,events,schools,schoolId,mana
  useEffect(()=>{setDetail(null);if(!person||!ev||!school)return;let active=true;const controller=new AbortController();api.staffDetail(tenant,ev,school,person,controller.signal).then(result=>{if(active)setDetail(result);}).catch(e=>{if(active)setError(readableError(e));});return()=>{active=false;controller.abort();};},[api,tenant,person,ev,school,version]);
  function filter(key,value){setFilters(current=>({...current,[key]:value}));setOffset(0);}
  function open(row){setError('');setDecision(null);const next=new URLSearchParams(params);next.set('tipo','comissao');next.set('profissional',row.person_id);next.set('evento',row.event_id);next.set('escola',row.school_id);setParams(next);}
- function close(){setDetail(null);setDecision(null);const next=new URLSearchParams(params);next.delete('profissional');next.delete('evento');next.delete('escola');setParams(next);}
+ function close(){if(onReturn){onReturn();return;}setDetail(null);setDecision(null);const next=new URLSearchParams(params);next.delete('profissional');next.delete('evento');next.delete('escola');setParams(next);}
  const index=detail?page.rows.findIndex(r=>r.person_id===detail.person_id&&r.school_id===detail.school_id&&r.event_id===detail.event_id):-1;
  return <section aria-label="Conferência da comissão técnica">
+  {onReturn&&<button type="button" className="secondary" onClick={onReturn}>Voltar às minhas inscrições</button>}
   <p className="info-box">Uma conferência por profissional, evento e escola, mesmo quando acompanha várias modalidades. A decisão aqui é independente da aprovação das inscrições dos atletas.</p>
   {error&&<p className="school-error" role="alert">{error}</p>}
   <div className="panel"><div className="table-toolbar"><strong>{page.total} profissionais no evento e escola</strong><div className="school-tools"><input aria-label="Buscar profissional na conferência" placeholder="Nome, CPF ou escola" value={filters.query} onChange={e=>filter('query',e.target.value)}/><select aria-label="Evento da comissão técnica" value={filters.eventId} onChange={e=>filter('eventId',e.target.value)}><option value="">Todos os eventos</option>{events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select>{!schoolId&&<select aria-label="Escola da comissão técnica" value={filters.schoolId} onChange={e=>filter('schoolId',e.target.value)}><option value="">Todas as escolas</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>}<select aria-label="Situação da conferência técnica" value={filters.status} onChange={e=>filter('status',e.target.value)}><option value="all">Todas as situações</option>{Object.entries(staffReviewLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div></div>

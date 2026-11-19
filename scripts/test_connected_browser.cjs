@@ -994,6 +994,11 @@ try {
   isAdmin=false;
   await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/inscricoes');
   await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
+  assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
+  await page.goto(page.url()+'?tipo=comissao');
+  await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
+  assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
+  assert.equal(await page.getByRole('region',{name:'Conferência da comissão técnica'}).count(),0);
   assert.equal(await page.getByRole('button',{name:'Aprovar',exact:true}).count(),0);
   await page.getByRole('button',{name:'Notificações',exact:true}).click();
   const schoolBell=page.getByRole('region',{name:'Avisos recentes',exact:true});
@@ -1261,6 +1266,19 @@ try {
   await printReview.getByRole('button',{name:'Confirmar decisão do profissional',exact:true}).click();
   await printReview.getByText('Aprovado',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Fechar conferência técnica',exact:true}).click();
+  isAdmin=false;
+  const schoolConferencePath='/escola/'+tenant+'/escolas/'+registration.school_id+'/inscricoes';
+  await page.goto(origin+schoolConferencePath+'?'+new URLSearchParams({
+    tipo:'comissao',profissional:printStaff.id,evento:registration.event_id,escola:registration.school_id,
+  }));
+  await printReview.getByText('Aprovado',{exact:true}).waitFor();
+  assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
+  assert.equal(await printReview.getByRole('button',{name:'Aprovar profissional',exact:true}).count(),0);
+  await printReview.getByRole('button',{name:'Fechar conferência técnica',exact:true}).click();
+  await page.getByRole('button',{name:'Nova inscrição neste evento',exact:true}).waitFor();
+  isAdmin=true;
+  await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');
+
   await page.getByRole('button',{name:'Crachás',exact:true}).click();
   await page.getByLabel('Evento dos crachás',{exact:true}).selectOption(registration.event_id);
   await page.getByLabel('Escola dos crachás',{exact:true}).selectOption(registration.school_id);
