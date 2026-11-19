@@ -37,9 +37,12 @@ begin
  execute 'reset role';
  if not exists(select 1 from public.event_badges where id=first_badge and template_version_id=first_version and not(snapshot->'badge_template' ? 'layout')) then raise exception 'Layout foi duplicado no armazenamento de cada crachá';end if;
  execute 'set local role authenticated';
- changed:=jsonb_set(layout,'{fields,1,x}','7');model:=public.siep_save_badge_template(ev,'athlete',1,changed,(art->>'id')::uuid);
+ changed:=jsonb_set(layout,'{fields,1,x}','7');
+ changed:=jsonb_set(changed,'{fields}',(changed->'fields')||'{"key":"qr_code","x":72,"y":40,"w":22,"h":14.55,"fontSize":11,"color":"#163453","align":"center"}'::jsonb);
+ denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,jsonb_set(changed,'{fields,4,w}','2'));exception when check_violation then denied:=true;end;if not denied then raise exception 'QR Code pequeno aceito';end if;
+ model:=public.siep_save_badge_template(ev,'athlete',1,changed,(art->>'id')::uuid);
  issued:=public.siep_issue_event_badges(ev,jsonb_build_array(jsonb_build_object('person_id',person,'school_id',school,'role','athlete')));
- if issued#>>'{0,snapshot,badge_template,version}'<>'2' then raise exception 'Emissão nova usou versão antiga';end if;
+ if issued#>>'{0,snapshot,badge_template,version}'<>'2' or issued#>>'{0,snapshot,badge_template,layout,fields,4,key}' is distinct from 'qr_code' then raise exception 'Emissão nova usou versão antiga';end if;
  history:=public.siep_badge_history(tenant,ev,school);
  if not exists(select 1 from jsonb_array_elements(history) h where h->>'id'=first_badge::text and h#>>'{snapshot,badge_template,version}'='1' and h#>>'{snapshot,badge_template,layout,fields,1,x}'='5') then raise exception 'Reimpressão trocou posição/arte antiga';end if;
  perform public.siep_save_badge_template(ev,'athlete',2,changed,null);

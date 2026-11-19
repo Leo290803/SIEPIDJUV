@@ -16,25 +16,29 @@ A impressão usa a arte ao fundo e os dados reais por cima; detecta texto que n�
 
 Arquivos principais: `src/BadgeTemplateEditor.jsx`, `src/badgeTemplates.js`, `src/badgeGuide.js`, `src/BadgePrint.jsx`, `src/EventBadges.jsx`, `src/data/portalRepository.js` e estilos em `src/style.css`. Testes em `tests/badgeTemplates.test.js`, `supabase/tests/custom_badge_templates.sql` e `scripts/test_connected_browser.cjs`.
 
-### Banco pendente — não afirmar que esta migração foi aplicada
+### Migração aplicada e verificada no Supabase (19/11/2026)
 
-Migração nova **`supabase/migrations/20261119140000_custom_badge_templates.sql`**, ainda não aplicada no Supabase por esta conversa. Cria `badge_art_assets`, `badge_templates`, `badge_template_versions`, bucket privado `siep-badge-art`, regras RLS/Storage e RPCs de preparação/finalização da arte, leitura/gravação do modelo e histórico. Acrescenta referência imutável à versão em `event_badges` e atualiza emissão mantendo autorização/aprovações existentes. Isolamento por instituição/evento e concorrência por versão esperada. Versões e artes históricas não devem ser removidas.
+O checkout foi atualizado pela `main` até `e8af60d`. A credencial segura desta conversa autorizou a consulta de leitura e a execução de SQL pela Management API do projeto `oshzcmmbhxvmchjgxztp`.
 
-Último estado confirmado do banco remoto antes desta etapa: **29 migrações aplicadas e 33 tabelas públicas com RLS**. Checkout passa a ter **30 migrações e estrutura prevista de 36 tabelas públicas** depois da aplicação; confirmar o estado real remoto antes de executar. Não editar migrações já aplicadas.
+A migração `20261119140000_custom_badge_templates` foi validada com rollback e depois aplicada com as asserções SQL aprovadas nas duas execuções. O histórico remoto e o catálogo confirmaram **30 migrações, 36 tabelas públicas com RLS** e o bucket privado `siep-badge-art`. A contagem e o conteúdo das 33 tabelas anteriores foram comparados antes e depois, desconsiderando a coluna nova `template_version_id`. Os três crachás existentes foram preservados com essa referência nula e continuam elegíveis para reimpressão no layout anterior. Nenhum modelo de teste ficou gravado.
 
-Compatibilidade temporária: se as novas RPCs ainda não existirem (PGRST202/42883), o histórico usa a consulta anterior com RLS e o editor permite baixar gabaritos, mas desabilita salvar, com aviso de que a gravação de modelos ainda está indisponível. Outros erros, inclusive autorização, não recebem esse fallback. Isso permite continuar usando crachás existentes antes da migração.
+As asserções no PostgreSQL remoto cobriram preparação e finalização da arte com metadados simulados de Storage, gravação e versionamento do modelo, emissão e reimpressão, com reversão dos registros de teste. O proxy devolveu 403 ao conectar ao domínio HTTP do projeto, então ainda falta verificar o fluxo autenticado pelo navegador com upload e download reais no Storage.
 
-### Credencial: resultado exato e próximo passo
+Nesta retomada também passaram os 113 testes JavaScript, o build (com aviso de tamanho dos chunks) e o fluxo Chromium com API simulada. Uma nova validação remota após a aplicação passou sem migrações pendentes.
 
-O usuário atualizou `SUPABASE_ACCESS_TOKEN` pelo campo seguro do editor do ambiente, que abre outra conversa. Uma captura dessa outra conversa relata consulta de leitura à Management API com **HTTP 200**. Neste chat, consultas novas a `https://api.supabase.com/v1/projects` continuaram retornando **HTTP 401**, inclusive após a atualização. Portanto houve resultados distintos entre sessões; o motivo não foi determinado. O status `ready` do segredo não comprova validade, nem distingue valor novo/antigo. Não solicitar outro token nem pedir segredo pelo chat. Não copiar credenciais para arquivos, código ou documentação.
+O fallback para ambientes sem as RPCs continua restrito aos erros PGRST202/42883. Nesses ambientes, o editor permite baixar gabaritos, avisa que a gravação está indisponível e o histórico usa a consulta anterior com RLS.
 
-Retomar pela conversa com acesso válido: confirmar por consulta somente de leitura que o projeto **`oshzcmmbhxvmchjgxztp`** está acessível; ler este documento e inspecionar `git status`/`main` antes de alterar. Depois executar `python scripts/supabase_migrate.py --project-ref oshzcmmbhxvmchjgxztp` (validação sem aplicação) e, passando, o mesmo comando com `--apply`, dentro do escopo já autorizado de migrações versionadas. Conferir o histórico real e executar as asserções, preservando todos os dados. Atualizar este documento com o resultado real e confirmar o editor/arte/emissão/reimpressão no ambiente com acesso. Não afirmar conclusão remota antes dessa verificação.
+### Editor com prévia lado a lado e QR Code
+
+A arte enviada e a prévia preenchida aparecem lado a lado em telas largas. Modelos iniciais dos três perfis incluem o campo QR Code, que pode ser movido, redimensionado ou removido. Nos modelos já salvos, o campo pode ser incluído em **Adicionar campo**. O código contém somente o identificador da emissão no formato `urn:uuid:<id>`.
+
+A migração `20261119150000_optional_badge_qr` foi validada com rollback e aplicada no Supabase. O projeto tem 31 migrações. A comparação antes e depois confirmou que emissões, modelos, versões e artes existentes foram preservados. Os testes SQL passaram e o Chromium com API simulada conferiu que o QR aparece na impressão e é mantido na reimpressão da mesma emissão após sua remoção do modelo.
 
 ### Evidências e limites desta entrega
 
 Aprovados localmente: **113 testes JS**, build, **19 suítes SQL + 3 cenários de concorrência** e fluxo Chromium com API simulada. SQL novo cobre permissões, isolamento, arte inválida/ausente, obrigatoriedade de campos, limites, versão concorrente, preservação histórica e aprovação. Chromium cobre download dos gabaritos, configuração da arte, posição numérica, campos mínimos, celular, emissão com arte/dados, versão nova e reimpressão antiga, além do fallback sem RPC. O fluxo completo anterior também passou. Build mantém aviso de chunks grandes; não é falha de compilação.
 
-Artefatos temporários desta sessão: `/tmp/gabarito-cracha-atleta.pdf`, `/tmp/gabarito-cracha-atleta.png`, logs `/tmp/siep-template-unit.log`, `/tmp/siep-template-build.log`, `/tmp/siep-template-browser.log`, `/tmp/siep-template-db.log` e `/tmp/siep-template-print.log`. Esses arquivos temporários podem não existir em outro ambiente; gerar novamente pelos botões ou testes. Teste de impressão anterior desta rodada: cinco crachás, zero cortes, duas páginas A4. Não representa validação real HTTP de Auth/Storage/site publicado nem teste de carga no Supabase Free. A migração nova e suas asserções ainda precisam ser executadas remotamente.
+Artefatos temporários desta sessão: `/tmp/gabarito-cracha-atleta.pdf`, `/tmp/gabarito-cracha-atleta.png`, logs `/tmp/siep-template-unit.log`, `/tmp/siep-template-build.log`, `/tmp/siep-template-browser.log`, `/tmp/siep-template-db.log` e `/tmp/siep-template-print.log`. Esses arquivos temporários podem não existir em outro ambiente; gerar novamente pelos botões ou testes. Teste de impressão anterior desta rodada: cinco crachás, zero cortes, duas páginas A4. Não representa validação real HTTP de Auth/Storage/site publicado nem teste de carga no Supabase Free. O resultado das asserções remotas desta retomada está na seção acima.
 
 ## Relatórios somente para geração — sem lista automática de nomes
 

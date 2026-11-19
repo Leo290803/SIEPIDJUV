@@ -1,5 +1,6 @@
 import React,{useLayoutEffect,useRef,useState} from "react";
 import {customBadgeCss,badgeFieldText} from "./badgeTemplates.js";
+import BadgeQr from "./BadgeQr.jsx";
 import { createRoot } from "react-dom/client";
 import logo from "../Gemini_Generated_Image_wvkarowvkarowvka-removebg-preview.png";
 export const badgePrintCss = `
@@ -21,7 +22,7 @@ function CustomBadge({badge,photo,background}) {
  const s=badge.snapshot,t=s.badge_template;
  return <article className="event-badge art-badge" data-template-version={t.version}>
   {background&&<img className="badge-art-background" src={background} style={{objectFit:t.layout.fit}} alt="Arte personalizada do crachá"/>}
-  {t.layout.fields.map(f=><div key={f.key} className="badge-art-field" data-font-size={f.key==='photo'?undefined:f.fontSize} style={{left:f.x+'%',top:f.y+'%',width:f.w+'%',height:f.h+'%',fontSize:f.fontSize+'pt',color:f.color,textAlign:f.align}}>{f.key==='photo'?<img className="badge-portrait" src={photo} alt={'Foto de '+s.person_name}/>:<span>{badgeFieldText(s,badge,f.key)}</span>}</div>)}
+  {t.layout.fields.map(f=><div key={f.key} className="badge-art-field" data-font-size={['photo','qr_code'].includes(f.key)?undefined:f.fontSize} style={{left:f.x+'%',top:f.y+'%',width:f.w+'%',height:f.h+'%',fontSize:f.fontSize+'pt',color:f.color,textAlign:f.align}}>{f.key==='photo'?<img className="badge-portrait" src={photo} alt={'Foto de '+s.person_name}/>:f.key==='qr_code'?<BadgeQr badgeId={badge.id}/>:<span>{badgeFieldText(s,badge,f.key)}</span>}</div>)}
  </article>;
 }
 function PrintSheet({popup,badges,images,backgrounds,logoSrc}) {
