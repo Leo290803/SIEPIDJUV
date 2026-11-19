@@ -2,6 +2,8 @@ import { registrationStatusLabel } from "../data/peopleMapping.js";
 import { MAX_EXPORT_ROWS } from "./exportPages.js";
 import { createReportPdf } from "./exportPdf.js";
 
+const reportStatuses = new Set(["submitted", "correction_requested", "approved"]);
+
 const registrationColumns = [
   { key: "category", label: "Categoria" },
   { key: "proof", label: "Prova" },
@@ -27,6 +29,9 @@ function assignmentsByRegistration(assignments) {
 }
 
 export async function createSchoolRegistrationsPdf({api, tenant, school, event, status, query, modalityId, signal}) {
+  if (status !== "all" && !reportStatuses.has(status)) {
+    throw Error("O PDF inclui apenas inscrições enviadas, em correção ou aprovadas. Altere o filtro de situação.");
+  }
   const categories = new Map(event.categories.map(category => [category.id, category]));
   const roles = new Map((event._staffRoles || []).map(role => [role.id, role.name]));
   const seen = new Set();
@@ -60,6 +65,7 @@ export async function createSchoolRegistrationsPdf({api, tenant, school, event, 
         throw Error("A consulta retornou inscrições fora do escopo do relatório ou repetidas. Tente novamente.");
       }
       seen.add(registration.id);
+      if (!reportStatuses.has(registration.status)) continue;
       for (const {person_id,staff_role_id} of assigned.get(registration.id) || []) {
         people.add(person_id);
         if (!commission.has(person_id)) commission.set(person_id,{name:staff.get(person_id),roles:new Set()});
@@ -127,7 +133,7 @@ export async function createSchoolRegistrationsPdf({api, tenant, school, event, 
   const eventLabel = [event.name,event.year].filter(Boolean).join(" · ");
   const filters = [
     `Evento: ${eventLabel}`,
-    `Situação: ${registrationStatusLabel[status] || "Todas as situações"}`,
+    `Situação: ${registrationStatusLabel[status] || "Enviadas, em correção e aprovadas"}`,
     ...(query.trim() ? [`Busca: ${query.trim()}`] : []),
   ];
   return createReportPdf({

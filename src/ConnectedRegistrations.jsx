@@ -421,7 +421,7 @@ export default function ConnectedRegistrations({
       const pdf = await createSchoolRegistrationsPdf({api,tenant,school,event,status,query,modalityId:pdfModality,signal:controller.signal});
       controller.signal.throwIfAborted();
       if (pdf) pdf.save("siep-inscricoes-da-escola.pdf");
-      else setPdfError("Nenhuma inscrição corresponde aos filtros selecionados.");
+      else setPdfError("Nenhuma inscrição enviada, em correção ou aprovada corresponde aos filtros selecionados.");
     } catch (error) {
       if (!controller.signal.aborted) setPdfError(readableError(error));
     } finally {
@@ -620,7 +620,7 @@ export default function ConnectedRegistrations({
             <select
               aria-label="Situação das inscrições"
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => {setStatus(e.target.value);setPdfError("");}}
             >
               <option value="all">Todas as situações</option>
               {Object.entries(registrationStatusLabel).map(([key, label]) => (

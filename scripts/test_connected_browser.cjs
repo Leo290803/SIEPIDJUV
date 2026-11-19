@@ -1020,7 +1020,7 @@ try {
     ...Array.from({length:100},()=>({...schoolPdfFixture,id:randomUUID()})),
     {...schoolPdfFixture,id:randomUUID(),school_id:randomUUID()},
     {...schoolPdfFixture,id:randomUUID(),event_id:randomUUID()},
-    {...schoolPdfFixture,id:randomUUID(),status:'draft'},
+    ...['draft','cancelled','rejected','submitted','approved'].map(status=>({...schoolPdfFixture,id:randomUUID(),status})),
   );
   await page.getByLabel('Situação das inscrições',{exact:true}).selectOption('correction_requested');
   const schoolPdfDownload=page.waitForEvent('download');
@@ -1051,6 +1051,22 @@ try {
     assert.ok(athleticsText.stdout.includes(pdfStaffName));
     assert.ok(!athleticsText.stdout.includes('Futsal'));
   }
+  await page.getByLabel('Modalidade do PDF',{exact:true}).selectOption('');
+  await page.getByLabel('Situação das inscrições',{exact:true}).selectOption('all');
+  const activePdf=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Baixar relatório em PDF',exact:true}).click();
+  const activePdfPath='/tmp/siep-inscricoes-enviadas.pdf';
+  await (await activePdf).saveAs(activePdfPath);
+  const activePdfText=require('node:child_process').spawnSync('pdftotext',[activePdfPath,'-'],{encoding:'utf8'});
+  if(!activePdfText.error){
+    assert.equal(activePdfText.status,0);
+    assert.match(activePdfText.stdout,/Inscrições: 105/);
+    for(const status of ['Enviada','Aprovada','Correção solicitada'])assert.ok(activePdfText.stdout.includes(status));
+    assert.doesNotMatch(activePdfText.stdout,/Rascunho|Cancelada|Indeferida/);
+  }
+  await page.getByLabel('Situação das inscrições',{exact:true}).selectOption('draft');
+  await page.getByRole('button',{name:'Baixar relatório em PDF',exact:true}).click();
+  await page.getByText('O PDF inclui apenas inscrições enviadas, em correção ou aprovadas. Altere o filtro de situação.',{exact:true}).waitFor();
   tables.registrations.splice(originalRegistrationCount);
   tables.registration_staff.splice(-2);
   tables.event_categories.splice(-2);
