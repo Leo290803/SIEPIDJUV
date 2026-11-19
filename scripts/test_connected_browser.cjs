@@ -19,6 +19,7 @@ try {
   const staffReviews=new Map(),developmentImages=new Map();
   let notificationFailure=false,completionIssues=[],loseCompletionResponse=false;
   const completionReceipts=new Map(),badgeTemplates=new Map(),artAssets=new Map();
+  const persistedBadgeArt=new Map();
   let nextArtBytes=null,templateServiceMissing=false;
   const browser = await chromium.launch({
     executablePath:
@@ -198,12 +199,16 @@ try {
       if(templateServiceMissing&&['siep_badge_history','siep_badge_template'].includes(table))return response(route,{code:'PGRST202',message:'Function not found'},404);
       if(table==='siep_badge_history')return response(route,tables.event_badges.filter(b=>b.institution_id===body.p_institution_id&&b.event_id===body.p_event_id&&(!body.p_school_id||b.school_id===body.p_school_id)).sort((a,b)=>b.issued_at.localeCompare(a.issued_at)).slice(0,100));
       if(table==='siep_badge_template')return response(route,badgeTemplates.get(body.p_event_id+':'+body.p_role)||null);
-      if(table==='siep_prepare_badge_art'){const id=randomUUID(),a={id,bucket:'siep-badge-art',path:tenant+'/'+body.p_event_id+'/'+id+'.png',name:body.p_name,bytes:nextArtBytes||portrait,status:'pending'};artAssets.set(id,a);return response(route,{id,bucket:a.bucket,path:a.path});}
+      if(table==='siep_prepare_badge_art'){const id=randomUUID(),a={id,bucket:'siep-badge-art',path:tenant+'/'+body.p_event_id+'/'+id+'.png',name:body.p_name,bytes:persistedBadgeArt.get(body.p_name)||nextArtBytes||portrait,status:'pending'};artAssets.set(id,a);return response(route,{id,bucket:a.bucket,path:a.path});}
       if(table==='siep_finalize_badge_art'){const a=artAssets.get(body.p_art_id);assert.ok(uploadedPaths.has(a.path));a.status='uploaded';return response(route,null);}
       if(table==='siep_save_badge_template'){
         const key=body.p_event_id+':'+body.p_role,old=badgeTemplates.get(key);
         if((old?.version||0)!==body.p_expected_version)return response(route,{code:'40001',message:'Modelo alterado'},409);
-        const asset=artAssets.get(body.p_background_id),model={id:old?.id||randomUUID(),version_id:randomUUID(),version:(old?.version||0)+1,role:body.p_role,layout:structuredClone(body.p_layout),background:asset?{id:asset.id,bucket:asset.bucket,objectPath:asset.path,name:asset.name}:null};
+        const attachment=id=>{
+          const asset=artAssets.get(id);
+          return asset?{id:asset.id,bucket:asset.bucket,objectPath:asset.path,name:asset.name}:null;
+        };
+        const model={id:old?.id||randomUUID(),version_id:randomUUID(),version:(old?.version||0)+1,role:body.p_role,layout:structuredClone(body.p_layout),background:attachment(body.p_background_id),reverse_background:attachment(body.p_reverse_background_id)};
         badgeTemplates.set(key,model);return response(route,model);
       }
       if(['siep_staff_conference_page','siep_staff_conference_detail','siep_review_staff'].includes(table)){
@@ -934,7 +939,7 @@ try {
   await schoolRegistrationForm.waitFor({state:'detached'});
   await page.getByText('Ainda não enviado à Secretaria',{exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Enviar para análise',exact:true}).count(),0);
-  await page.getByRole('button',{name:'Concluir inscrição',exact:true}).click();
+  await page.getByRole('table').getByRole('button',{name:'Concluir inscrição',exact:true}).click();
   loseCompletionResponse=true;
   await schoolRegistrationForm.getByRole('button',{name:'Concluir inscrição',exact:true}).click();
   await schoolRegistrationForm.getByRole('alert').waitFor();
@@ -1142,6 +1147,13 @@ try {
   nextArtBytes=Buffer.from(blueArt,'base64');
   await templateDialog.getByLabel('Arte do crachá',{exact:true}).setInputFiles({name:'arte-atleta.png',mimeType:'image/png',buffer:nextArtBytes});
   await templateDialog.getByRole('img',{name:'Arte de fundo do modelo',exact:true}).waitFor();
+  await templateDialog.getByRole('button',{name:'Verso',exact:true}).click();
+  const reverseArt=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=86;c.height=130;const ctx=c.getContext('2d');ctx.fillStyle='#c13744';ctx.fillRect(0,0,86,130);return c.toDataURL('image/png').split(',')[1];});
+  persistedBadgeArt.set('verso-atleta.png',Buffer.from(reverseArt,'base64'));
+  await templateDialog.getByLabel('Arte do verso',{exact:true}).setInputFiles({name:'verso-atleta.png',mimeType:'image/png',buffer:Buffer.from(reverseArt,'base64')});
+  await templateDialog.getByRole('img',{name:'Arte personalizada do verso'}).first().waitFor();
+  await templateDialog.getByRole('button',{name:'Frente',exact:true}).click();
+
   await templateDialog.getByLabel('Campo do crachá',{exact:true}).selectOption('person_name');
   await templateDialog.getByLabel('Esquerda (mm)',{exact:true}).fill('5');
   assert.equal(await templateDialog.getByRole('button',{name:'Remover campo',exact:true}).count(),0);
@@ -1156,6 +1168,9 @@ try {
   await badgePopup.locator('.badge-credential').waitFor();
   assert.equal(await badgePopup.locator('.event-badge').count(),2);
   await badgePopup.getByLabel('Verso do crachá').waitFor();
+  await badgePopup.getByRole('img',{name:'Arte personalizada do verso'}).waitFor();
+  const issuedModel=tables.event_badges[0].snapshot.badge_template;
+  assert.notEqual(issuedModel.background.id,issuedModel.reverse_background.id);
   await badgePopup.getByText('Atleta conectado',{exact:true}).waitFor();
   await badgePopup.getByText('Escola conectada',{exact:true}).waitFor();
   await badgePopup.getByRole('img',{name:'Arte personalizada do crachá',exact:true}).waitFor();
@@ -1184,12 +1199,17 @@ try {
   await templateDialog.getByLabel('Campo do crachá',{exact:true}).selectOption('qr_code');
   await templateDialog.getByRole('button',{name:'Remover campo',exact:true}).click();
   assert.equal(await templateDialog.locator('.badge-qr').count(),0);
+  await templateDialog.getByRole('button',{name:'Verso',exact:true}).click();
+  await templateDialog.getByRole('button',{name:'Restaurar verso padrão',exact:true}).click();
+  await templateDialog.getByRole('img',{name:'Arte personalizada do verso'}).first().waitFor({state:'detached'});
+
   await templateDialog.getByRole('button',{name:'Salvar modelo',exact:true}).click();await templateDialog.getByText('Modelo salvo. Será usado nas próximas emissões deste perfil.',{exact:true}).waitFor();await templateDialog.getByRole('button',{name:'Fechar configuração do crachá',exact:true}).click();
   const reprintPopupPromise=page.waitForEvent('popup');
   await page.getByRole('button',{name:'Reimprimir',exact:true}).click();
   const reprintPopup=await reprintPopupPromise;
   await reprintPopup.locator('.badge-credential').waitFor();assert.equal(await reprintPopup.locator('.badge-credential').getAttribute('data-template-version'),'1');
   assert.equal(await reprintPopup.getByRole('img',{name:'QR Code da emissão'}).locator('path').getAttribute('d'),qrPath);
+  await reprintPopup.getByRole('img',{name:'Arte personalizada do verso'}).waitFor();
   await reprintPopup.close();
   assert.equal(tables.event_badges.length,1,'Reimprimir criou nova emissão');
   templateServiceMissing=true;
@@ -1230,6 +1250,7 @@ try {
   await page.getByRole('button',{name:'Emitir e abrir impressão',exact:true}).click();
   const mixedPrint=await mixedPrintPromise;
   await mixedPrint.locator('.event-badge').nth(1).waitFor();
+  assert.equal(await mixedPrint.getByRole('img',{name:'Arte personalizada do verso'}).count(),0);
   await mixedPrint.waitForFunction(()=>[...document.images].every(img=>img.complete&&img.naturalWidth>0));
   const staffCard=mixedPrint.locator('.event-badge').filter({hasText:'Técnico do crachá de teste'}),athleteCard=mixedPrint.locator('.event-badge').filter({hasText:'Atleta conectado'});
   await staffCard.getByText('CREF 123456-G/RR',{exact:true}).waitFor();

@@ -46,6 +46,12 @@ O modelo inicial do atleta inclui **Categorias**, com os nomes das categorias da
 
 **Categorias** é obrigatório nos modelos de atleta a partir da migração `20261119180000_require_badge_athlete_category`. Modelos antigos que ainda estiverem sem o campo precisam incluí-lo antes de novas emissões. Quando o evento usa o layout padrão sem modelo salvo, a categoria também aparece nas novas emissões. Crachás anteriores permanecem como foram emitidos.
 
+### Arte personalizada no verso
+
+O editor de modelos frente e verso permite selecionar **Verso**, enviar uma arte completa (PNG ou JPEG de até 5 MB na proporção de 86 × 130 mm), conferir a prévia, baixar gabaritos da face e restaurar o verso padrão. O envio e a restauração passam a valer ao salvar o modelo.
+
+A migração `20261119190000_badge_reverse_art` foi aplicada com as asserções remotas aprovadas. A arte usa o mesmo bucket privado e fica vinculada à versão da emissão, inclusive após restaurar o padrão. Foram conferidos os registros anteriores de emissões, versões, modelos e artes antes e depois da migração.
+
 ### Evidências e limites desta entrega
 
 Aprovados localmente: **113 testes JS**, build, **19 suítes SQL + 3 cenários de concorrência** e fluxo Chromium com API simulada. SQL novo cobre permissões, isolamento, arte inválida/ausente, obrigatoriedade de campos, limites, versão concorrente, preservação histórica e aprovação. Chromium cobre download dos gabaritos, configuração da arte, posição numérica, campos mínimos, celular, emissão com arte/dados, versão nova e reimpressão antiga, além do fallback sem RPC. O fluxo completo anterior também passou. Build mantém aviso de chunks grandes; não é falha de compilação.

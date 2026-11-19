@@ -285,3 +285,6 @@
 .badge-face-preview.badge-face-pair {grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:4px;}
 .badge-design-preview .designer-field[data-field] {border-color:transparent;}
 .badge-design-preview .designer-field[data-field]:hover,.badge-design-preview .designer-field[data-field]:focus-visible {border-color:#215888;}
+.badge-face-controls {display:flex;gap:8px;margin:14px 0;}
+.badge-face-controls button {min-width:88px;}
+.badge-art-field.designer-field:disabled {opacity:1;cursor:default;}

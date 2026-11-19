@@ -21,7 +21,7 @@ function fitCustomFields(root) {
  }
  return overflow;
 }
-function CustomBadge({badge,photo,background,logoSrc}) {
+function CustomBadge({badge,photo,background,reverseBackground,logoSrc}) {
  const s=badge.snapshot,t=s.badge_template;
  const credential=t.layout.theme===credentialTheme;
  const front=<article className={'event-badge art-badge'+(credential?' badge-credential':'')} data-template-version={t.version}>
@@ -29,24 +29,24 @@ function CustomBadge({badge,photo,background,logoSrc}) {
   {background&&<img className="badge-art-background" src={background} style={{objectFit:t.layout.fit}} alt="Arte personalizada do crachá"/>}
   {t.layout.fields.filter(f=>f.key!=='cref'||s.cref).map(f=><div key={f.key} data-field={f.key} className="badge-art-field" data-font-size={['photo','qr_code'].includes(f.key)?undefined:f.fontSize} style={{left:f.x+'%',top:f.y+'%',width:f.w+'%',height:f.h+'%',fontSize:f.fontSize+'pt',color:f.color,textAlign:f.align}}>{f.key==='photo'?<img className="badge-portrait" src={photo} alt={'Foto de '+s.person_name}/>:f.key==='qr_code'?<BadgeQr badgeId={badge.id}/>:<span>{badgeFieldText(s,badge,f.key)}</span>}</div>)}
  </article>;
- return credential?<div className="badge-print-pair">{front}<BadgeArtwork reverse eventName={s.event_name} edition={s.edition} logoSrc={logoSrc}/></div>:front;
+ return credential?<div className="badge-print-pair">{front}<BadgeArtwork reverse eventName={s.event_name} edition={s.edition} logoSrc={logoSrc} background={reverseBackground}/></div>:front;
 }
-function PrintSheet({popup,badges,images,backgrounds,logoSrc}) {
+function PrintSheet({popup,badges,images,backgrounds,reverseBackgrounds,logoSrc}) {
  const root=useRef(null),[overflow,setOverflow]=useState(false);
  useLayoutEffect(()=>{if(root.current)setOverflow(fitCustomFields(root.current));},[badges]);
  return <div ref={root}>
  <div className="print-tools"><p>Prévia dos crachás · 86 × 130 mm · A4. Use a impressão para imprimir ou salvar em PDF.</p>{overflow&&<p role="alert">Há texto que não cabe na área configurada. Aumente a área do campo no modelo e emita uma nova versão.</p>}<button className="primary" disabled={overflow} onClick={()=>{if([...popup.document.images].some(img=>!img.complete||!img.naturalWidth)){popup.alert('Aguarde o carregamento das fotos e artes antes de imprimir.');return;}if(fitCustomFields(root.current)){setOverflow(true);return;}popup.print();}}>Imprimir / Salvar PDF</button><button onClick={()=>popup.close()}>Fechar prévia</button></div>
- <div className="badge-pages">{badges.map((badge,index)=>{const s=badge.snapshot;if(s.badge_template)return <CustomBadge key={badge.id} badge={badge} photo={images[index]} background={backgrounds[index]} logoSrc={logoSrc}/>;return <article className={'event-badge'+((s.event_name.length+s.person_name.length+s.school_name.length)>200?' compact':'')} key={badge.id}>
+ <div className="badge-pages">{badges.map((badge,index)=>{const s=badge.snapshot;if(s.badge_template)return <CustomBadge key={badge.id} badge={badge} photo={images[index]} background={backgrounds[index]} reverseBackground={reverseBackgrounds[index]} logoSrc={logoSrc}/>;return <article className={'event-badge'+((s.event_name.length+s.person_name.length+s.school_name.length)>200?' compact':'')} key={badge.id}>
  <div className="badge-brand"><img src={logoSrc} alt="SIEP"/></div><div className="badge-institution">{s.institution_name}</div><div className="badge-event">{s.event_name}{s.edition&&<small>Edição {s.edition}</small>}</div><img className="badge-portrait" src={images[index]} alt={'Foto de '+s.person_name}/><div className={'badge-name'+(s.person_name.length>65?' long':'')}>{s.person_name}</div><span className="badge-role">{s.role_label}</span><div className={'badge-school'+(s.school_name.length>70?' long':'')}>{s.school_name}</div>{s.athlete_category&&<div className="badge-school">{s.athlete_category}</div>}{s.cref&&<div className="badge-school">{badgeFieldText(s,badge,'cref')}</div>}<div className="badge-code"><strong>{badge.id.slice(0,8).toUpperCase()} · V{badge.version}</strong>Emissão: {new Date(badge.issued_at).toLocaleDateString('pt-BR')}</div></article>;})}</div></div>;
 }
 export async function showBadgePrint(popup, badges, download) {
   const urls=[];
   try {
-    const images=[],backgrounds=[],cached=new Map();
+    const images=[],backgrounds=[],reverseBackgrounds=[],cached=new Map();
     async function asset(attachment){const key=attachment.bucket+'/'+attachment.objectPath;if(cached.has(key))return cached.get(key);const blob=await download(attachment);const bitmap=await createImageBitmap(blob);bitmap.close();const url=URL.createObjectURL(blob);urls.push(url);cached.set(key,url);return url;}
-    for(const badge of badges){if(popup.closed){urls.forEach(url=>URL.revokeObjectURL(url));return;}const s=badge.snapshot;images.push(await asset({bucket:s.photo_bucket,objectPath:s.photo_path}));backgrounds.push(s.badge_template?.background ? await asset(s.badge_template.background) : null);}
+    for(const badge of badges){if(popup.closed){urls.forEach(url=>URL.revokeObjectURL(url));return;}const s=badge.snapshot;images.push(await asset({bucket:s.photo_bucket,objectPath:s.photo_path}));backgrounds.push(s.badge_template?.background ? await asset(s.badge_template.background) : null);reverseBackgrounds.push(s.badge_template?.reverse_background ? await asset(s.badge_template.reverse_background) : null);}
     let logoSrc=null;
-    if(badges.some(b=>!b.snapshot.badge_template||b.snapshot.badge_template.layout.theme===credentialTheme)){
+    if(badges.some(b=>!b.snapshot.badge_template||(b.snapshot.badge_template.layout.theme===credentialTheme&&!b.snapshot.badge_template.reverse_background))){
     const logoResponse=await fetch(new URL(logo,window.location.href).href);
     if(!logoResponse.ok)throw Error("Não foi possível carregar a marca do crachá. Reabra a prévia.");
     logoSrc=URL.createObjectURL(await logoResponse.blob());urls.push(logoSrc);
@@ -56,7 +56,7 @@ export async function showBadgePrint(popup, badges, download) {
     popup.document.body.textContent="";
     const style=popup.document.createElement("style");style.textContent=badgePrintCss+customBadgeCss+badgeArtworkCss;popup.document.head.append(style);
     const root=popup.document.createElement("div");popup.document.body.append(root);
-    createRoot(root).render(<PrintSheet popup={popup} badges={badges} images={images} backgrounds={backgrounds} logoSrc={logoSrc}/>);
+    createRoot(root).render(<PrintSheet popup={popup} badges={badges} images={images} backgrounds={backgrounds} reverseBackgrounds={reverseBackgrounds} logoSrc={logoSrc}/>);
     popup.addEventListener("beforeunload",()=>urls.forEach(url=>URL.revokeObjectURL(url)),{once:true});
   } catch(error) { urls.forEach(url=>URL.revokeObjectURL(url));if(!popup.closed)popup.close();throw error; }
 }

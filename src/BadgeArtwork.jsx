@@ -1,15 +1,15 @@
 import React from 'react';
 import logo from '../Gemini_Generated_Image_wvkarowvkarowvka-removebg-preview.png';
 
-export function BadgeArtwork({reverse=false, eventName, edition, logoSrc=logo}) {
+export function BadgeArtwork({reverse=false, eventName, edition, logoSrc=logo, background}) {
   if (!reverse) return <div className="badge-stock-front" aria-hidden="true"><i/><i/><i/></div>;
 
   return <article className="event-badge art-badge badge-reverse" aria-label="Verso do crachá">
-    <div className="badge-reverse-content">
+    {background ? <img className="badge-art-background" src={background} alt="Arte personalizada do verso" style={{objectFit:'contain',background:'white'}}/> : <div className="badge-reverse-content">
       <div className="badge-reverse-logo"><img src={logoSrc} alt="SIEP"/></div>
       <strong>{eventName}</strong>
       {edition && <span>{edition}</span>}
-    </div>
+    </div>}
   </article>;
 }
 

@@ -162,7 +162,7 @@ export function portalRepository(client) {
     badgeTemplate: (event,role,signal) => queryPage("siep_badge_template",{p_event_id:event,p_role:role},signal),
     prepareBadgeArt: (event,file) => queryPage("siep_prepare_badge_art",{p_event_id:event,p_name:file.name,p_mime_type:file.type,p_size_bytes:file.size}),
     uploadBadgeArt: async (metadata,file) => {checked(await client.storage.from(metadata.bucket).upload(metadata.path,file,{contentType:file.type,upsert:false}));checked(await client.rpc("siep_finalize_badge_art",{p_art_id:metadata.id}));},
-    saveBadgeTemplate: (event,role,version,layout,background) => queryPage("siep_save_badge_template",{p_event_id:event,p_role:role,p_expected_version:version,p_layout:layout,p_background_id:background||null}),
+    saveBadgeTemplate: (event,role,version,layout,background,reverseBackground) => queryPage("siep_save_badge_template",{p_event_id:event,p_role:role,p_expected_version:version,p_layout:layout,p_background_id:background||null,p_reverse_background_id:reverseBackground||null}),
     issueBadges: async (event, entries) => checked(await client.rpc("siep_issue_event_badges", { p_event_id:event, p_entries:entries })),
     badgeHistory: async (tenant,event,school) => {
       try {return await queryPage("siep_badge_history",{p_institution_id:tenant,p_event_id:event,p_school_id:school||null});}

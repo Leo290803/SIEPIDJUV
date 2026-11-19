@@ -1,5 +1,5 @@
 do $$
-declare tenant uuid:=gen_random_uuid();other_tenant uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();school_user uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();school uuid:=gen_random_uuid();ev uuid:=gen_random_uuid();other_ev uuid:=gen_random_uuid();sport uuid:=gen_random_uuid();cat uuid:=gen_random_uuid();person uuid:=gen_random_uuid();guardian uuid:=gen_random_uuid();part uuid;reg jsonb;art jsonb;photo jsonb;layout jsonb;changed jsonb;model jsonb;first_version uuid;first_badge uuid;issued jsonb;history jsonb;denied boolean;
+declare tenant uuid:=gen_random_uuid();other_tenant uuid:=gen_random_uuid();admin_user uuid:=gen_random_uuid();school_user uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();school uuid:=gen_random_uuid();ev uuid:=gen_random_uuid();other_ev uuid:=gen_random_uuid();sport uuid:=gen_random_uuid();cat uuid:=gen_random_uuid();person uuid:=gen_random_uuid();guardian uuid:=gen_random_uuid();part uuid;reg jsonb;art jsonb;reverse_art jsonb;photo jsonb;layout jsonb;changed jsonb;model jsonb;first_version uuid;first_badge uuid;issued jsonb;history jsonb;denied boolean;
 begin
  begin
  insert into auth.users(id) values(admin_user),(school_user),(outsider);
@@ -46,12 +46,22 @@ begin
  denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,jsonb_set(changed,'{theme}','"unknown"'));exception when check_violation then denied:=true;end;if not denied then raise exception 'Tema desconhecido aceito';end if;
  changed:=jsonb_set(changed,'{fields}',(changed->'fields')||'{"key":"qr_code","x":72,"y":40,"w":22,"h":14.55,"fontSize":11,"color":"#163453","align":"center"}'::jsonb);
  denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,jsonb_set(changed,'{fields,5,w}','2'));exception when check_violation then denied:=true;end;if not denied then raise exception 'QR Code pequeno aceito';end if;
- model:=public.siep_save_badge_template(ev,'athlete',1,changed,(art->>'id')::uuid);
+ reverse_art:=public.siep_prepare_badge_art(ev,'verso.png','image/png',23);
+ denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,changed,(art->>'id')::uuid,(reverse_art->>'id')::uuid);exception when check_violation then denied:=true;end;if not denied then raise exception 'Verso sem upload foi aceito';end if;
+ insert into storage.objects(bucket_id,name,owner_id,metadata) values('siep-badge-art',reverse_art->>'path',admin_user::text,'{"size":23,"mimetype":"image/png"}');
+ perform public.siep_finalize_badge_art((reverse_art->>'id')::uuid);
+ model:=public.siep_save_badge_template(ev,'athlete',1,changed,(art->>'id')::uuid,(reverse_art->>'id')::uuid);
+ if model#>>'{reverse_background,objectPath}' is distinct from reverse_art->>'path' then raise exception 'Verso não foi salvo';end if;
  issued:=public.siep_issue_event_badges(ev,jsonb_build_array(jsonb_build_object('person_id',person,'school_id',school,'role','athlete')));
- if issued#>>'{0,snapshot,badge_template,version}'<>'2' or issued#>>'{0,snapshot,badge_template,layout,fields,5,key}' is distinct from 'qr_code' or issued#>>'{0,snapshot,badge_template,layout,theme}' is distinct from 'credential-v1' then raise exception 'Emissão nova usou versão antiga';end if;
+ if issued#>>'{0,snapshot,badge_template,version}'<>'2' or issued#>>'{0,snapshot,badge_template,layout,fields,5,key}' is distinct from 'qr_code' or issued#>>'{0,snapshot,badge_template,layout,theme}' is distinct from 'credential-v1' or issued#>>'{0,snapshot,badge_template,reverse_background,objectPath}' is distinct from reverse_art->>'path' then raise exception 'Emissão nova usou versão antiga';end if;
  history:=public.siep_badge_history(tenant,ev,school);
  if not exists(select 1 from jsonb_array_elements(history) h where h->>'id'=first_badge::text and h#>>'{snapshot,badge_template,version}'='1' and h#>>'{snapshot,badge_template,layout,fields,1,x}'='5' and h#>>'{snapshot,badge_template,layout,theme}' is null) then raise exception 'Reimpressão trocou posição/arte antiga';end if;
- perform public.siep_save_badge_template(ev,'athlete',2,changed,null);
+ model:=public.siep_save_badge_template(ev,'athlete',2,changed,null);
+ if model#>>'{reverse_background,objectPath}' is distinct from reverse_art->>'path' then raise exception 'Cliente antigo perdeu a arte do verso';end if;
+ model:=public.siep_save_badge_template(ev,'athlete',3,changed,null,null);
+ if model#>>'{reverse_background,id}' is not null then raise exception 'Verso padrão não foi restaurado';end if;
+ history:=public.siep_badge_history(tenant,ev,school);
+ if not exists(select 1 from jsonb_array_elements(history) h where h->>'id'=issued#>>'{0,id}' and h#>>'{snapshot,badge_template,reverse_background,objectPath}'=reverse_art->>'path') then raise exception 'Reimpressão perdeu a arte do verso';end if;
  if not exists(select 1 from storage.objects where bucket_id='siep-badge-art' and name=art->>'path') then raise exception 'Arte histórica inacessível';end if;
  execute 'reset role';denied:=false;begin update public.badge_template_versions set layout='{}' where id=first_version;exception when check_violation then denied:=true;end;if not denied then raise exception 'Histórico do modelo alterado';end if;
  denied:=false;begin delete from public.badge_art_assets where id=(art->>'id')::uuid;exception when foreign_key_violation then denied:=true;end;if not denied then raise exception 'Arte histórica excluída';end if;
