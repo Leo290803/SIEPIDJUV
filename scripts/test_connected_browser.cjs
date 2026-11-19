@@ -996,7 +996,8 @@ try {
   const pdfSport={id:randomUUID(),event_id:schoolPdfFixture.event_id,institution_id:tenant,name:'Atletismo',classification:'individual',enabled:true};
   const pdfCategory={...tables.event_categories[0],id:randomUUID(),modality_id:pdfSport.id};
   tables.event_modalities.push(pdfSport);
-  tables.event_categories.push(pdfCategory);
+  const boysCategory={...tables.event_categories[0],id:randomUUID(),name:'12 a 14 anos · Masculino',gender:'Masculino'};
+  tables.event_categories.push(pdfCategory,boysCategory);
   await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/inscricoes');
   await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
   assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
@@ -1009,9 +1010,13 @@ try {
   const pdfStaffLink=tables.school_people.find(link=>link.role==='staff'&&link.school_id===schoolPdfFixture.school_id);
   assert.ok(pdfStaffLink);
   const pdfStaffName=tables.people.find(person=>person.id===pdfStaffLink.person_id).full_name;
-  tables.registration_staff.push({registration_id:athleticsRegistration.id,person_id:pdfStaffLink.person_id});
+  tables.registration_staff.push(
+    {registration_id:athleticsRegistration.id,person_id:pdfStaffLink.person_id},
+    {registration_id:schoolPdfFixture.id,person_id:pdfStaffLink.person_id},
+  );
   tables.registrations.push(
     athleticsRegistration,
+    {...schoolPdfFixture,id:randomUUID(),category_id:boysCategory.id,proof_id:null},
     ...Array.from({length:100},()=>({...schoolPdfFixture,id:randomUUID()})),
     {...schoolPdfFixture,id:randomUUID(),school_id:randomUUID()},
     {...schoolPdfFixture,id:randomUUID(),event_id:randomUUID()},
@@ -1029,8 +1034,10 @@ try {
   const schoolPdfText=require('node:child_process').spawnSync('pdftotext',[schoolPdfPath,'-'],{encoding:'utf8'});
   if(!schoolPdfText.error){
     assert.equal(schoolPdfText.status,0);
-    for(const expected of ['Atleta conectado','Escola conectada','Futsal','Correção solicitada','Inscrições: 102','Futsal · Atletas inscritos','Atletismo · Comissão técnica',pdfStaffName])assert.ok(schoolPdfText.stdout.includes(expected),expected);
+    for(const expected of ['Atleta conectado','Escola conectada','Futsal','Correção solicitada','Inscrições: 103','Futsal · Feminino','Futsal · Masculino','Comissão técnica',pdfStaffName])assert.ok(schoolPdfText.stdout.includes(expected),expected);
     assert.ok(!schoolPdfText.stdout.includes('52998224725'));
+    assert.ok(!/· Comissão técnica/.test(schoolPdfText.stdout));
+    assert.equal(schoolPdfText.stdout.split('Comissão técnica').at(-1).split(pdfStaffName).length-1,1);
   }
   await page.getByLabel('Modalidade do PDF',{exact:true}).selectOption(pdfSport.id);
   const athleticsPdf=page.waitForEvent('download');
@@ -1040,13 +1047,13 @@ try {
   const athleticsText=require('node:child_process').spawnSync('pdftotext',[athleticsPdfPath,'-'],{encoding:'utf8'});
   if(!athleticsText.error){
     assert.equal(athleticsText.status,0);
-    assert.ok(athleticsText.stdout.includes('Atletismo · Comissão técnica'));
+    assert.ok(athleticsText.stdout.includes('Comissão técnica'));
     assert.ok(athleticsText.stdout.includes(pdfStaffName));
     assert.ok(!athleticsText.stdout.includes('Futsal'));
   }
   tables.registrations.splice(originalRegistrationCount);
-  tables.registration_staff.pop();
-  tables.event_categories.pop();
+  tables.registration_staff.splice(-2);
+  tables.event_categories.splice(-2);
   tables.event_modalities.pop();
   await page.getByLabel('Modalidade do PDF',{exact:true}).selectOption('');
   await page.getByLabel('Situação das inscrições',{exact:true}).selectOption('all');

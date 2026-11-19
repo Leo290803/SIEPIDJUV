@@ -25,15 +25,16 @@ export async function createReportPdf({ title, institution, columns, rows, secti
     if (index > 0) { doc.addPage(); y = 17; }
     for (const table of group.tables) {
       const headings = table.columns.map(column => column.label);
-      const head = group.title
-        ? [[{content: `${group.title} · ${table.title}`, colSpan:headings.length}], headings]
+      const title = [group.title, table.title].filter(Boolean).join(" · ");
+      const head = title
+        ? [[{content:title, colSpan:headings.length}], headings]
         : [headings];
       autoTable(doc, {
         startY: y, margin: { top: 17, right: margin, bottom: 16, left: margin },
         head, body: table.rows.map(row => table.columns.map(column => String(row.cells[column.key] ?? ""))),
         theme: "striped", styles: { font: "helvetica", fontSize: 8, cellPadding: 2.5, overflow: "linebreak", minCellWidth: 20, textColor: [43, 61, 81] },
         headStyles: { fillColor: [31, 77, 127], textColor: 255, fontStyle: "bold" }, alternateRowStyles: { fillColor: [243, 247, 251] },
-        rowPageBreak: "avoid", horizontalPageBreak: !group.title, horizontalPageBreakRepeat: 0,
+        rowPageBreak: "avoid", horizontalPageBreak: !title, horizontalPageBreakRepeat: 0,
       });
       y = doc.lastAutoTable.finalY + 8;
     }
