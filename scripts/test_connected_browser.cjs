@@ -1132,6 +1132,8 @@ try {
   await templateDialog.locator('.badge-qr').waitFor();
   assert.equal(await templateDialog.getByLabel('Verso do crachá').count(),2);
   await templateDialog.screenshot({path:'/tmp/siep-credencial-frente-verso.png'});
+  await templateDialog.getByLabel('Campo do crachá',{exact:true}).selectOption('categories');
+  assert.equal(await templateDialog.getByRole('button',{name:'Remover campo',exact:true}).count(),0);
   const guidePdf=page.waitForEvent('download');await templateDialog.getByRole('button',{name:'Baixar gabarito PDF',exact:true}).click();await (await guidePdf).saveAs('/tmp/gabarito-cracha-atleta.pdf');
   assert.equal(fs.readFileSync('/tmp/gabarito-cracha-atleta.pdf').subarray(0,4).toString(),'%PDF');
   const guidePng=page.waitForEvent('download');await templateDialog.getByRole('button',{name:'Baixar imagem-guia PNG',exact:true}).click();await (await guidePng).saveAs('/tmp/gabarito-cracha-atleta.png');

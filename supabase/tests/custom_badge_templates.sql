@@ -12,6 +12,7 @@ begin
  insert into public.people(id,institution_id,full_name,birth_date,cpf,gender) values(person,tenant,'Nome para a arte','2010-01-01','52998224725','Feminino'),(guardian,tenant,'Responsável','1990-01-01','11144477735','Feminino');
  insert into public.school_people(institution_id,school_id,person_id,role,status,user_id) values(tenant,school,person,'athlete','approved',null),(tenant,school,guardian,'responsible','approved',school_user);
  layout:='{"width":86,"height":130,"fit":"contain","fields":[{"key":"photo","x":31,"y":20,"w":38,"h":33,"fontSize":12,"color":"#163453","align":"center"},{"key":"person_name","x":5,"y":57,"w":90,"h":12,"fontSize":14,"color":"#163453","align":"center"},{"key":"school_name","x":5,"y":73,"w":90,"h":9,"fontSize":10,"color":"#163453","align":"center"},{"key":"modalities","x":5,"y":85,"w":90,"h":10,"fontSize":10,"color":"#163453","align":"center"}]}';
+ layout:=jsonb_set(layout,'{fields}',(layout->'fields')||'{"key":"categories","x":5,"y":95,"w":90,"h":4,"fontSize":9,"color":"#163453","align":"center"}'::jsonb);
  perform set_config('request.jwt.claim.sub',school_user::text,true);execute 'set local role authenticated';
  denied:=false;begin perform public.siep_prepare_badge_art(ev,'arte.png','image/png',20);exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Escola enviou arte';end if;
  denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',0,layout);exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Escola configurou modelo';end if;
@@ -25,6 +26,7 @@ begin
  denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',0,layout);exception when serialization_failure then denied:=true;end;if not denied then raise exception 'Revisão antiga aceita';end if;
  denied:=false;begin perform public.siep_save_badge_template(other_ev,'athlete',0,layout,(art->>'id')::uuid);exception when check_violation then denied:=true;end;if not denied then raise exception 'Arte de outro evento aceita';end if;
  denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,jsonb_set(layout,'{fields,0,x}','99'));exception when check_violation then denied:=true;end;if not denied then raise exception 'Campo fora do crachá aceito';end if;
+ denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,layout#-'{fields,4}');exception when check_violation then denied:=true;end;if not denied then raise exception 'Categoria obrigatória removida';end if;
  denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,layout#-'{fields,1}');exception when check_violation then denied:=true;end;if not denied then raise exception 'Nome obrigatório removido';end if;
  changed:=jsonb_set(layout,'{fields,3,key}','"functions"');
  changed:=jsonb_set(changed,'{fields}',(changed->'fields')||'{"key":"cref","x":7,"y":59.7,"w":86,"h":4.1,"fontSize":9,"color":"#163453","align":"center"}'::jsonb);
@@ -43,10 +45,10 @@ begin
  changed:=jsonb_set(layout,'{fields,1,x}','7')||'{"theme":"credential-v1"}'::jsonb;
  denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,jsonb_set(changed,'{theme}','"unknown"'));exception when check_violation then denied:=true;end;if not denied then raise exception 'Tema desconhecido aceito';end if;
  changed:=jsonb_set(changed,'{fields}',(changed->'fields')||'{"key":"qr_code","x":72,"y":40,"w":22,"h":14.55,"fontSize":11,"color":"#163453","align":"center"}'::jsonb);
- denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,jsonb_set(changed,'{fields,4,w}','2'));exception when check_violation then denied:=true;end;if not denied then raise exception 'QR Code pequeno aceito';end if;
+ denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,jsonb_set(changed,'{fields,5,w}','2'));exception when check_violation then denied:=true;end;if not denied then raise exception 'QR Code pequeno aceito';end if;
  model:=public.siep_save_badge_template(ev,'athlete',1,changed,(art->>'id')::uuid);
  issued:=public.siep_issue_event_badges(ev,jsonb_build_array(jsonb_build_object('person_id',person,'school_id',school,'role','athlete')));
- if issued#>>'{0,snapshot,badge_template,version}'<>'2' or issued#>>'{0,snapshot,badge_template,layout,fields,4,key}' is distinct from 'qr_code' or issued#>>'{0,snapshot,badge_template,layout,theme}' is distinct from 'credential-v1' then raise exception 'Emissão nova usou versão antiga';end if;
+ if issued#>>'{0,snapshot,badge_template,version}'<>'2' or issued#>>'{0,snapshot,badge_template,layout,fields,5,key}' is distinct from 'qr_code' or issued#>>'{0,snapshot,badge_template,layout,theme}' is distinct from 'credential-v1' then raise exception 'Emissão nova usou versão antiga';end if;
  history:=public.siep_badge_history(tenant,ev,school);
  if not exists(select 1 from jsonb_array_elements(history) h where h->>'id'=first_badge::text and h#>>'{snapshot,badge_template,version}'='1' and h#>>'{snapshot,badge_template,layout,fields,1,x}'='5' and h#>>'{snapshot,badge_template,layout,theme}' is null) then raise exception 'Reimpressão trocou posição/arte antiga';end if;
  perform public.siep_save_badge_template(ev,'athlete',2,changed,null);

@@ -1,7 +1,7 @@
 export const badgeFields={photo:'Foto',person_name:'Nome',school_name:'Escola',role_label:'Perfil',event_name:'Evento',edition:'Edição',modalities:'Modalidades',categories:'Categorias',proofs:'Provas',functions:'Função',code:'Código e versão',qr_code:'QR Code',cref:'CREF'};
 export const badgeRoles={athlete:'Atleta',staff:'Comissão técnica',responsible:'Responsável escolar'};
 export function allowedFields(role){return Object.keys(badgeFields).filter(key=>role==='athlete'?!['functions','cref'].includes(key):role==='staff'?key!=='proofs':!['modalities','categories','proofs','cref'].includes(key));}
-export function requiredFields(role){return ['photo','person_name','school_name',role==='athlete'?'modalities':role==='staff'?'functions':'role_label'];}
+export function requiredFields(role){return ['photo','person_name','school_name',...(role==='athlete'?['modalities','categories']:[role==='staff'?'functions':'role_label'])];}
 const field=(key,x,y,w,h,fontSize=11)=>({key,x,y,w,h,fontSize,color:'#163453',align:'center'});
 export const credentialTheme = 'credential-v1';
 export function defaultBadgeLayout(role){
@@ -26,6 +26,7 @@ export function validateBadgeLayout(role,layout){
  if(!badgeRoles[role]||layout?.width!==86||layout?.height!==130||(layout.theme!==undefined&&layout.theme!==credentialTheme)||!['contain','cover'].includes(layout?.fit)||!Array.isArray(layout?.fields)||layout.fields.length>12)return 'Modelo de crachá inválido.';
  const keys=new Set();for(const f of layout.fields){if(!allowedFields(role).includes(f.key)||keys.has(f.key))return 'Campo repetido ou incompatível com o perfil.';keys.add(f.key);if(![f.x,f.y,f.w,f.h,f.fontSize].every(Number.isFinite)||f.x<0||f.y<0||f.w<2||f.h<2||f.x+f.w>100.001||f.y+f.h>100.001||f.fontSize<6||f.fontSize>28||!/^#[0-9a-f]{6}$/i.test(f.color)||!['left','center','right'].includes(f.align))return 'Ajuste as medidas, fonte e cor: todos os campos devem caber no crachá.';}
  if(layout.fields.some(f=>f.key==='qr_code'&&(Math.round(f.w*8.6)<150||Math.round(f.h*13)<150)))return 'O QR Code precisa de pelo menos 15 mm de largura e altura.';
+ if(role==='athlete'&&!keys.has('categories'))return 'Adicione o campo Categorias ao modelo de atleta.';
  return requiredFields(role).every(key=>keys.has(key))?'':'Mantenha os campos obrigatórios deste perfil.';
 }
 export function sampleBadgeData(role){return {person_name:role==='athlete'?'Nome completo do atleta':'Nome completo do profissional',school_name:'Escola Estadual de Exemplo',event_name:'Jogos Escolares de Roraima',edition:'2026',role_label:badgeRoles[role],modalities:'Atletismo / Futsal',categories:'12 a 14 anos',proofs:'100 metros',functions:role==='staff'?'Técnico / Auxiliar técnico':'Responsável escolar',code:'ABC12345 · V1',cref:'CREF 000000-G/RR'};}

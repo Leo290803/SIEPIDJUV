@@ -54,7 +54,7 @@ begin
    if result#>>'{snapshot,cref}' is distinct from '123456-G/RR' then raise exception 'CREF da escola não foi registrado na emissão';end if;
    first_staff_badge:=(result->>'id')::uuid;old_staff_snapshot:=result->'snapshot';
   elsif result->>'role'='athlete' then
-   if result#>>'{snapshot,categories}' is distinct from 'Livre' or result#>>'{snapshot,cref}' is not null then raise exception 'Categoria/CREF incorretos para atleta';end if;
+   if result#>>'{snapshot,athlete_category}' is distinct from 'Livre' or result#>>'{snapshot,cref}' is not null then raise exception 'Categoria/CREF incorretos para atleta';end if;
    if result->>'photo_id'<>athlete_photo->>'id' or result#>>'{snapshot,person_name}'<>'Atleta correto' or result#>>'{snapshot,role_label}'<>'Atleta' then raise exception 'Dados/foto/papel do atleta incorretos';end if;
   else raise exception 'Papel inesperado';end if;
  end loop;
