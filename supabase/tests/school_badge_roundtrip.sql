@@ -13,6 +13,7 @@ begin
  insert into public.event_staff_roles(id,institution_id,event_id,name) values(staff_role,tenant,ev,'Técnico');
  insert into public.people(id,institution_id,full_name,birth_date,cpf,gender) values(athlete,tenant,'Atleta correto','2010-01-01','52998224725','Feminino'),(professional,tenant,'Técnico correto','1990-01-01','12345678909','Masculino'),(guardian,tenant,'Gestor escolar','1980-01-01','11144477735','Feminino');
  insert into public.school_people(institution_id,school_id,person_id,role,status,user_id,position) values(tenant,school,athlete,'athlete','approved',null,null),(tenant,school,professional,'staff','approved',null,'Técnico'),(tenant,school,guardian,'responsible','approved',school_user,null);
+ update public.school_people set professional_registration=' 123456-G/RR ' where person_id=professional and school_id=school and role='staff';
  perform set_config('request.jwt.claim.sub',school_user::text,true);execute 'set local role authenticated';
  result:=public.siep_save_participation(ev,school,athlete,array[cat],'{}',true);part:=(result->>'id')::uuid;
  result:=public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,jsonb_build_array(jsonb_build_object('participation_id',part,'slot_number',1)),jsonb_build_array(jsonb_build_object('person_id',professional,'staff_role_id',staff_role)));registration:=(result->>'id')::uuid;v:=(result->>'revision')::integer;
@@ -50,8 +51,10 @@ begin
   if result#>>'{snapshot,event_name}'<>'Evento correto' or result#>>'{snapshot,school_name}'<>'Escola correta' then raise exception 'Contexto do crachá incorreto';end if;
   if result->>'role'='staff' then
    if result->>'photo_id'<>staff_photo->>'id' or result#>>'{snapshot,person_name}'<>'Técnico correto' or result#>>'{snapshot,role_label}'<>'Comissão técnica' then raise exception 'Dados/foto/papel da comissão incorretos';end if;
+   if result#>>'{snapshot,cref}' is distinct from '123456-G/RR' then raise exception 'CREF da escola não foi registrado na emissão';end if;
    first_staff_badge:=(result->>'id')::uuid;old_staff_snapshot:=result->'snapshot';
   elsif result->>'role'='athlete' then
+   if result#>>'{snapshot,categories}' is distinct from 'Livre' or result#>>'{snapshot,cref}' is not null then raise exception 'Categoria/CREF incorretos para atleta';end if;
    if result->>'photo_id'<>athlete_photo->>'id' or result#>>'{snapshot,person_name}'<>'Atleta correto' or result#>>'{snapshot,role_label}'<>'Atleta' then raise exception 'Dados/foto/papel do atleta incorretos';end if;
   else raise exception 'Papel inesperado';end if;
  end loop;

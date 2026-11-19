@@ -40,6 +40,10 @@ O modelo inicial passou a usar uma frente verde com foto circular, faixas de dad
 
 A migração `20261119160000_badge_credential_theme` foi validada com rollback e aplicada com as asserções remotas aprovadas. O banco tem 32 migrações. Os 113 testes JavaScript, o build e o fluxo Chromium com API simulada passaram, incluindo impressão e reimpressão.
 
+### Categoria e CREF na impressão
+
+O modelo inicial do atleta inclui **Categorias**, com os nomes das categorias das inscrições aprovadas. O modelo inicial da comissão técnica inclui **CREF**, preenchido pelo registro profissional do vínculo com a escola e omitido na impressão quando o cadastro está vazio. Modelos já salvos podem receber o campo em **Adicionar campo**. A migração `20261119170000_badge_staff_cref` registra o CREF nas novas emissões, sem alterar o histórico.
+
 ### Evidências e limites desta entrega
 
 Aprovados localmente: **113 testes JS**, build, **19 suítes SQL + 3 cenários de concorrência** e fluxo Chromium com API simulada. SQL novo cobre permissões, isolamento, arte inválida/ausente, obrigatoriedade de campos, limites, versão concorrente, preservação histórica e aprovação. Chromium cobre download dos gabaritos, configuração da arte, posição numérica, campos mínimos, celular, emissão com arte/dados, versão nova e reimpressão antiga, além do fallback sem RPC. O fluxo completo anterior também passou. Build mantém aviso de chunks grandes; não é falha de compilação.

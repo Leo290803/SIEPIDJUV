@@ -327,9 +327,11 @@ try {
           for(const badge of previous)badge.is_current=false;
           const badge={id:randomUUID(),institution_id:tenant,event_id:event.id,person_id:person.id,school_id:school.id,role:entry.role,photo_id:photo.id,version:previous.length+1,is_current:true,issued_at:new Date().toISOString(),snapshot:{event_name:event.name,edition:event.edition,institution_name:'IDJUV',person_name:person.full_name,school_name:school.name,role_label:entry.role==='athlete'?'Atleta':'Comissão técnica',photo_bucket:photo.bucket_id,photo_path:photo.object_path}};
           badge.snapshot.badge_template=structuredClone(badgeTemplates.get(event.id+':'+entry.role)||null);
-          const categories=tables.registrations.filter(r=>r.event_id===event.id&&r.school_id===school.id&&r.status==='approved').map(r=>tables.event_categories.find(c=>c.id===r.category_id)).filter(Boolean);
+          const assignments=entry.role==='staff'?tables.registration_staff:tables.registration_athletes;
+          const categories=tables.registrations.filter(r=>r.event_id===event.id&&r.school_id===school.id&&r.status==='approved'&&assignments.some(a=>a.registration_id===r.id&&a.person_id===person.id)).map(r=>tables.event_categories.find(c=>c.id===r.category_id)).filter(Boolean);
           badge.snapshot.modalities=[...new Set(categories.map(c=>tables.event_modalities.find(m=>m.id===c.modality_id)?.name).filter(Boolean))].join(' / ');
           badge.snapshot.categories=[...new Set(categories.map(c=>c.name))].join(' / ');
+          if(entry.role==='staff')badge.snapshot.cref=tables.school_people.find(l=>l.person_id===person.id&&l.school_id===school.id&&l.role==='staff')?.professional_registration;
           badge.snapshot.functions=entry.role==='staff'?'Técnico':'Responsável escolar';
           issued.push(badge);tables.event_badges.push(badge);
         }
@@ -1156,6 +1158,7 @@ try {
   await badgePopup.getByText('Escola conectada',{exact:true}).waitFor();
   await badgePopup.getByRole('img',{name:'Arte personalizada do crachá',exact:true}).waitFor();
   await badgePopup.getByText('Futsal',{exact:true}).waitFor();
+  await badgePopup.getByText('12 a 14 anos',{exact:true}).waitFor();
   const qrPath=await badgePopup.getByRole('img',{name:'QR Code da emissão'}).locator('path').getAttribute('d');
   assert.ok(qrPath.length>500);
   assert.equal(await badgePopup.locator('.badge-credential').getAttribute('data-template-version'),'1');
@@ -1200,7 +1203,7 @@ try {
   // Profissional distinto: foto própria e aprovação técnica antes do lote misto.
   const printStaff={id:randomUUID(),institution_id:tenant,full_name:'Técnico do crachá de teste',cpf:'12345678909',birth_date:'1990-02-03',gender:'Masculino',archived:false,contact:{},updated_at:new Date().toISOString()};
   tables.people.push(printStaff);
-  tables.school_people.push({id:randomUUID(),institution_id:tenant,person_id:printStaff.id,school_id:registration.school_id,role:'staff',position:'Técnico',status:'approved',version:1,archived:false});
+  tables.school_people.push({id:randomUUID(),institution_id:tenant,person_id:printStaff.id,school_id:registration.school_id,role:'staff',position:'Técnico',professional_registration:'123456-G/RR',status:'approved',version:1,archived:false});
   tables.registration_staff.push({id:randomUUID(),institution_id:tenant,event_id:registration.event_id,school_id:registration.school_id,registration_id:registration.id,person_id:printStaff.id,staff_role_id:staffRole.id});
   const printPhoto={id:randomUUID(),institution_id:tenant,person_id:printStaff.id,bucket_id:'siep-development-photos',object_path:'development/print-staff-test.png',original_name:'tecnico.png',status:'uploaded',is_current:true};
   tables.person_photos.push(printPhoto);
@@ -1227,6 +1230,7 @@ try {
   await mixedPrint.locator('.event-badge').nth(1).waitFor();
   await mixedPrint.waitForFunction(()=>[...document.images].every(img=>img.complete&&img.naturalWidth>0));
   const staffCard=mixedPrint.locator('.event-badge').filter({hasText:'Técnico do crachá de teste'}),athleteCard=mixedPrint.locator('.event-badge').filter({hasText:'Atleta conectado'});
+  await staffCard.getByText('CREF 123456-G/RR',{exact:true}).waitFor();
   await staffCard.getByText('Comissão técnica',{exact:true}).waitFor();await athleteCard.getByText('Atleta',{exact:true}).waitFor();
   assert.equal(await mixedPrint.getByText('Escola conectada',{exact:true}).count(),2);
   const samplePixel=async el=>{const c=document.createElement('canvas');c.width=1;c.height=1;const context=c.getContext('2d');context.drawImage(el,0,0,1,1);return [...context.getImageData(0,0,1,1).data];};

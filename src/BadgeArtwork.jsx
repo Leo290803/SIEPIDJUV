@@ -20,7 +20,7 @@ export const badgeArtworkCss = `
 .badge-stock-front i:nth-child(3){top:12%;left:-19%;width:46%;background:#118759;transform:rotate(-15deg)}
 .badge-stock-front::after{content:"";position:absolute;inset:91% 0 0;background:repeating-linear-gradient(138deg,#ffffff0d 0 4%,transparent 4% 8%)}
 .badge-credential .badge-art-field[data-field="photo"]{background:#e3ebea;border-radius:50%;border:2px solid white}
-.badge-credential .badge-art-field[data-field="person_name"],.badge-credential .badge-art-field[data-field="school_name"],.badge-credential .badge-art-field[data-field="modalities"],.badge-credential .badge-art-field[data-field="functions"],.badge-credential .badge-art-field[data-field="code"]{background:#fff;font-weight:700}
+.badge-credential .badge-art-field[data-field="person_name"],.badge-credential .badge-art-field[data-field="school_name"],.badge-credential .badge-art-field[data-field="modalities"],.badge-credential .badge-art-field[data-field="functions"],.badge-credential .badge-art-field[data-field="categories"],.badge-credential .badge-art-field[data-field="cref"],.badge-credential .badge-art-field[data-field="code"]{background:#fff;font-weight:700}
 .badge-credential .badge-art-field[data-field="event_name"]{font-weight:800;text-transform:uppercase}
 .badge-credential .badge-art-field[data-field="role_label"]{background:#ffc842;font-weight:800;text-transform:uppercase}
 .event-badge.badge-reverse{background:radial-gradient(ellipse at 0 103%,#d9eee7 0 28%,transparent 28.2%),linear-gradient(150deg,white 0 69%,#edf4f8 69.2% 77%,white 77.2% 83%,#d9eee7 83.2%);display:grid;place-items:center;container-type:inline-size;color:#163453;text-align:center}

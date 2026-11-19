@@ -26,7 +26,10 @@ begin
  denied:=false;begin perform public.siep_save_badge_template(other_ev,'athlete',0,layout,(art->>'id')::uuid);exception when check_violation then denied:=true;end;if not denied then raise exception 'Arte de outro evento aceita';end if;
  denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,jsonb_set(layout,'{fields,0,x}','99'));exception when check_violation then denied:=true;end;if not denied then raise exception 'Campo fora do crachá aceito';end if;
  denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,layout#-'{fields,1}');exception when check_violation then denied:=true;end;if not denied then raise exception 'Nome obrigatório removido';end if;
- changed:=jsonb_set(layout,'{fields,3,key}','"functions"');perform public.siep_save_badge_template(ev,'staff',0,changed);
+ changed:=jsonb_set(layout,'{fields,3,key}','"functions"');
+ changed:=jsonb_set(changed,'{fields}',(changed->'fields')||'{"key":"cref","x":7,"y":59.7,"w":86,"h":4.1,"fontSize":9,"color":"#163453","align":"center"}'::jsonb);
+ perform public.siep_save_badge_template(ev,'staff',0,changed);
+ denied:=false;begin perform public.siep_save_badge_template(ev,'athlete',1,jsonb_set(changed,'{fields,3,key}','"modalities"'));exception when check_violation then denied:=true;end;if not denied then raise exception 'Atleta aceitou campo de CREF';end if;
  if public.siep_badge_template(ev,'staff')->>'id'=model->>'id' then raise exception 'Modelos de perfis não foram separados';end if;
  reg:=public.siep_save_participation(ev,school,person,array[cat],'{}',true);part:=(reg->>'id')::uuid;
  reg:=public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,jsonb_build_array(jsonb_build_object('participation_id',part,'slot_number',1)),'[]');
