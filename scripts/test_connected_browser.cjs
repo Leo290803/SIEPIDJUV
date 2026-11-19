@@ -272,7 +272,7 @@ try {
         const scope=body.p_school_id,filters=body.p_filters||{},mode=body.p_mode;
         const event=filters.eventId||tables.school_event_contexts.find(c=>c.school_id===scope)?.event_id;
         const pmap=new Map(tables.people.map(p=>[p.id,p])),smap=new Map(tables.schools.map(s=>[s.id,s]));
-        let links=[],registrations=[],total=0;
+        let links=[],registrations=[],total=0,registrationGroups=[];
         if(mode==='people'){
           links=tables.school_people.filter(l=>l.role===body.p_role&&(!scope||l.school_id===scope)&&(!filters.schoolId||l.school_id===filters.schoolId)).filter(l=>{
             const p=pmap.get(l.person_id),archived=p.archived||l.archived||(['athlete','staff'].includes(l.role)&&l.status!=='approved');
@@ -284,7 +284,21 @@ try {
         }
         if(mode==='registrations'){
           registrations=tables.registrations.filter(r=>(!scope||r.school_id===scope)&&(!event||r.event_id===event)&&(!filters.excludeCancelled||r.status!=='cancelled')&&(!filters.status||filters.status==='all'||r.status===filters.status)&&normalize([tables.events.find(e=>e.id===r.event_id)?.name,smap.get(r.school_id)?.name].join(' ')).includes(normalize(filters.query||'')));
-          total=registrations.length;registrations=registrations.slice(body.p_offset,body.p_offset+body.p_limit);
+          if(filters.browseRegistrations){
+            const categories=new Map(tables.event_categories.map(c=>[c.id,c])),groups=new Map();
+            for(const r of registrations){
+              const group=groups.get(r.category_id)||{category_id:r.category_id,modality_id:categories.get(r.category_id)?.modality_id,total:0,drafts:0,corrections:0,proofIds:new Set()};
+              group.total++;
+              if(r.status==='draft')group.drafts++;
+              if(r.status==='correction_requested')group.corrections++;
+              if(r.proof_id)group.proofIds.add(r.proof_id);
+              groups.set(r.category_id,group);
+            }
+            registrationGroups=[...groups.values()].map(({proofIds,...group})=>({...group,proofs:proofIds.size}));
+            registrations=registrations.filter(r=>(!filters.modalityId||categories.get(r.category_id)?.modality_id===filters.modalityId)&&(!filters.categoryId||r.category_id===filters.categoryId));
+          }
+          total=registrations.length;
+          registrations=filters.browseRegistrations&&!filters.modalityId?[]:registrations.slice(body.p_offset,body.p_offset+body.p_limit);
           if(body.p_detail_id&&!registrations.some(r=>r.id===body.p_detail_id)){const r=tables.registrations.find(r=>r.id===body.p_detail_id);if(r)registrations.push(r);}
         }
         const rids=new Set(registrations.map(r=>r.id));
@@ -297,7 +311,7 @@ try {
         }
         const parts=tables.event_participations.filter(p=>pids.has(p.person_id)&&(!scope||p.school_id===scope)),partids=new Set(parts.map(p=>p.id));
         const selected={...tables,people:tables.people.filter(p=>pids.has(p.id)),school_people:links,person_photos:tables.person_photos.filter(p=>pids.has(p.person_id)),event_participations:parts,participation_categories:tables.participation_categories.filter(p=>partids.has(p.participation_id)),participant_documents:tables.participant_documents.filter(p=>partids.has(p.participation_id)),membership_decisions:[],registrations,registration_athletes:allocations,registration_staff:assigned,school_event_contexts:tables.school_event_contexts.filter(c=>c.school_id===scope),notifications:mode==='notifications'?tables.notifications:[]};
-        return response(route,{tables:selected,total,summary:{pendingLinks:tables.school_people.filter(l=>l.role==='responsible'&&l.status==='pending').length,submitted:tables.registrations.filter(r=>r.status==='submitted').length,unread:tables.notifications.filter(n=>!n.read_at).length}});
+        return response(route,{tables:selected,total,summary:{registrationGroups,pendingLinks:tables.school_people.filter(l=>l.role==='responsible'&&l.status==='pending').length,submitted:tables.registrations.filter(r=>r.status==='submitted').length,unread:tables.notifications.filter(n=>!n.read_at).length}});
       }
       if(table==='siep_read_development_photo'){
         assert.ok(tables.person_photos.some(p=>p.bucket_id==='siep-development-photos'&&p.object_path===body.p_path));
@@ -950,6 +964,7 @@ try {
   completionIssues=[];
   await page.getByRole('button',{name:'Salvar rascunho',exact:true}).click();
   await schoolRegistrationForm.waitFor({state:'detached'});
+  await page.getByRole('button',{name:'Ver inscrições de Futsal',exact:true}).click();
   await page.getByText('Ainda não enviado à Secretaria',{exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Enviar para análise',exact:true}).count(),0);
   await page.getByRole('table').getByRole('button',{name:'Concluir inscrição',exact:true}).click();
@@ -998,12 +1013,35 @@ try {
   tables.event_modalities.push(pdfSport);
   const boysCategory={...tables.event_categories[0],id:randomUUID(),name:'12 a 14 anos · Masculino',gender:'Masculino'};
   tables.event_categories.push(pdfCategory,boysCategory);
+  const proofFixtures=['100 metros','Salto em distância'].map(name=>({
+    id:randomUUID(),institution_id:tenant,event_id:schoolPdfFixture.event_id,category_id:pdfCategory.id,name,kind:'individual',enabled:true,
+  }));
+  tables.event_proofs.push(...proofFixtures);
+  tables.registrations.push(...proofFixtures.map(proof=>({...schoolPdfFixture,id:randomUUID(),category_id:pdfCategory.id,proof_id:proof.id})));
   await page.goto(origin+'/escola/'+tenant+'/escolas/'+tables.schools[0].id+'/inscricoes');
-  await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
+  await page.getByRole('button',{name:'Ver inscrições de Atletismo',exact:true}).waitFor();
+  await page.screenshot({path:'/tmp/siep-escola-modalidades.png',fullPage:true});
+  assert.equal(await page.getByRole('cell',{name:'100 metros'}).count(),0);
+  await page.getByRole('button',{name:'Ver inscrições de Atletismo',exact:true}).click();
+  const categoryButton=page.getByRole('button',{name:'Ver inscrições de '+pdfCategory.name,exact:true});
+  await categoryButton.waitFor();
+  assert.equal(await page.getByRole('cell',{name:'100 metros'}).count(),0);
+  await categoryButton.click();
+  await page.getByText('100 metros',{exact:true}).waitFor();
+  await page.getByText('Salto em distância',{exact:true}).waitFor();
+  await page.screenshot({path:'/tmp/siep-escola-provas.png',fullPage:true});
+  assert.equal(await page.getByRole('table').locator('tbody tr').count(),2);
+  assert.ok(queryCalls.some(({table,body})=>table==='siep_portal_page'&&body.p_filters.categoryId===pdfCategory.id&&body.p_filters.modalityId===pdfSport.id));
+  await page.getByRole('button',{name:'Voltar para Atletismo',exact:true}).click();
+  await page.getByRole('button',{name:'Voltar às modalidades',exact:true}).click();
+  await page.getByRole('button',{name:'Ver inscrições de Futsal',exact:true}).waitFor();
+  tables.event_proofs.splice(-2);
+  tables.registrations.splice(originalRegistrationCount);
   assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
   const cancelledRow={...schoolPdfFixture,id:randomUUID(),status:'cancelled'};
   tables.registrations.push(cancelledRow);
   await page.goto(page.url()+'?tipo=comissao');
+  await page.getByRole('button',{name:'Ver inscrições de Futsal',exact:true}).click();
   await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
   assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
   assert.equal(await page.getByRole('region',{name:'Conferência da comissão técnica'}).count(),0);
@@ -1121,6 +1159,7 @@ try {
   await schoolReview.getByRole('alert').filter({hasText:'Não foi possível confirmar o reenvio.'}).waitFor();
   await schoolReview.getByRole('button',{name:'Salvar correções e reenviar',exact:true}).click();
   await schoolReview.waitFor({state:'detached'});
+  await page.getByRole('button',{name:'Ver inscrições de Futsal',exact:true}).click();
   await page.getByRole('cell',{name:'Enviada',exact:true}).waitFor();
   isAdmin=true;
   await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');

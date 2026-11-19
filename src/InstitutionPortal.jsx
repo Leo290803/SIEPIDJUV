@@ -114,7 +114,7 @@ export default function InstitutionPortal({
       .finally(()=>{if(active && sequence===loadSequence.current)setDataLoading(false);});
     return ()=>{active=false;controller.abort();};
   },[api,tenant,scope,planKey,refreshKey]);
-  const remote = {total:data.total || 0,offset:list.offset,limit:JSON.parse(planKey).limit,loading:dataLoading,filters:list.filters,
+  const remote = {summary:data.summary,total:data.total || 0,offset:list.offset,limit:JSON.parse(planKey).limit,loading:dataLoading,filters:list.filters,
     onFilters:filters=>setListState({scope,filters,offset:0}),
     onPage:offset=>setListState({...list,scope,offset})};
   const school = schools.find((s) => s.id === schoolId);

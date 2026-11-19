@@ -44,6 +44,14 @@ begin
  denied:=false;begin perform public.siep_report_page(t,'{}','','name','asc',0,501);exception when sqlstate '22023' then denied:=true;end;if not denied then raise exception 'Limite ignorado';end if;
  update public.people set full_name='Ana atualizada' where id=p;
  denied:=false;begin perform public.siep_report_page(t,'{}','','name','asc',0,25,snapshot);exception when sqlstate '40001' then denied:=true;end;if not denied then raise exception 'Exportação não detectou alteração';end if;
+ result:=public.siep_portal_page(t,'registrations',s,null,'{"browseRegistrations":true}',0,1);
+ if result->>'total'<>'1' or jsonb_array_length(result#>'{tables,registrations}')<>0
+   or result#>>'{summary,registrationGroups,0,modality_id}' is distinct from m::text
+   or result#>>'{summary,registrationGroups,0,total}' is distinct from '1' then raise exception 'Resumo de modalidades incorreto';end if;
+ result:=public.siep_portal_page(t,'registrations',s,null,jsonb_build_object('browseRegistrations',true,'modalityId',m,'categoryId',c));
+ if result#>>'{tables,registrations,0,id}' is distinct from r::text then raise exception 'Lista da categoria não abriu a inscrição';end if;
+ result:=public.siep_portal_page(t,'registrations',s,null,jsonb_build_object('browseRegistrations',true,'modalityId',gen_random_uuid()));
+ if result->>'total'<>'0' then raise exception 'Filtro de modalidade não aplicado';end if;
  perform public.siep_transition_registration(r,(select revision from public.registrations where id=r),'cancelled','Cancelado no teste');
  result:=public.siep_portal_page(t,'registrations');if result->>'total'<>'1' or result#>>'{tables,registrations,0,status}'<>'cancelled' then raise exception 'Secretaria perdeu inscrição cancelada';end if;
  perform set_config('request.jwt.claim.sub',outsider::text,true);

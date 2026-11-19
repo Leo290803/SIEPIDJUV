@@ -288,3 +288,9 @@
 .badge-face-controls {display:flex;gap:8px;margin:14px 0;}
 .badge-face-controls button {min-width:88px;}
 .badge-art-field.designer-field:disabled {opacity:1;cursor:default;}
+.school-registration-groups {list-style:none;margin:0;padding:0;border:1px solid #dce3ed;border-radius:4px;}
+.school-registration-groups li+li {border-top:1px solid #e4e9f0;}
+.school-registration-groups button {width:100%;justify-content:space-between;padding:13px 15px;text-align:left;color:#223b59;}
+.school-registration-groups button:hover {background:#f3f7fc;}
+.school-registration-groups small {display:block;margin-top:4px;color:#586d82;font-size:.85rem;}
+.school-registration-drill {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}

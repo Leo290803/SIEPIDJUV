@@ -1,6 +1,7 @@
 import EventAthleteForm from "./EventAthleteForm.jsx";
 import RegistrationReview from "./RegistrationReview.jsx";
 import ServerPagination from "./ServerPagination.jsx";
+import SchoolRegistrationGroups from "./SchoolRegistrationGroups.jsx";
 import { useServerFilters } from "./data/useServerFilters.js";
 import React, { useEffect, useState, useRef } from "react";
 import { X, Plus, ClipboardList, FileDown } from "lucide-react";
@@ -409,6 +410,7 @@ export default function ConnectedRegistrations({
     [busy, setBusy] = useState(false);
   const pdfRequest = useRef(null);
   const [pdfModality,setPdfModality] = useState("");
+  const [modalityId,setModalityId] = useState(""),[categoryId,setCategoryId] = useState("");
   const [generatingPdf,setGeneratingPdf] = useState(false), [pdfError,setPdfError] = useState("");
   useEffect(() => () => pdfRequest.current?.abort(), []);
   async function downloadRegistrationsPdf() {
@@ -472,8 +474,17 @@ export default function ConnectedRegistrations({
     setHistory(null);
     onRoute?.(null);
   };
-  useServerFilters(remote, {query, status, eventId:eventFilter,schoolId:schoolFilter});
   const schoolList = !!school && !!event && !manager;
+  const modality = schoolList ? event.modalities.find(item=>item.id===modalityId) : null;
+  const selectedCategory = modality ? event.categories.find(item=>item.id===categoryId) : null;
+  const showGroups = schoolList && (!modality || (modality.classification !== "Coletiva" && !selectedCategory));
+  const scopeLoading = !!(schoolList && remote && (remote.loading ||
+    modalityId !== (remote.filters.modalityId || "") || categoryId !== (remote.filters.categoryId || "")));
+  useServerFilters(remote, {
+    query,status,eventId:eventFilter,schoolId:schoolFilter,
+    ...(schoolList && modalityId ? {modalityId} : {}),
+    ...(schoolList && categoryId ? {categoryId} : {}),
+  });
   const visibleRegistrations = schoolList ? data.registrations.filter(r=>r.status !== "cancelled") : data.registrations;
   const rows = remote ? visibleRegistrations : visibleRegistrations.filter(
     (r) =>
@@ -490,7 +501,9 @@ export default function ConnectedRegistrations({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
-  const visibleTotal = remote?.total ?? rows.length;
+  const groups = remote?.summary?.registrationGroups || [];
+  const groupTotal = groups.filter(group=>!modality||group.modality_id===modality.id).reduce((sum,group)=>sum+group.total,0);
+  const visibleTotal = showGroups ? groupTotal : remote?.total ?? rows.length;
   const ev = (r) => events.find((e) => e.id === r.event_id),
     sc = (r) => schools.find((s) => s.id === r.school_id);
   async function openReview(r) {
@@ -656,12 +669,22 @@ export default function ConnectedRegistrations({
           </div>
         </div>
         {pdfError && <p className="school-error" role="alert">{pdfError}</p>}
+        {schoolList && modality && <div className="school-registration-drill">
+          <button type="button" className="secondary" onClick={()=>{
+            if (selectedCategory) setCategoryId("");
+            else setModalityId("");
+          }}>{selectedCategory ? `Voltar para ${modality.name}` : "Voltar às modalidades"}</button>
+          <h2>{[modality.name,selectedCategory?.name].filter(Boolean).join(" · ")}</h2>
+        </div>}
+        {showGroups ? <SchoolRegistrationGroups event={event} groups={groups} modality={modality}
+          onModality={id=>{setModalityId(id);setCategoryId("");}} onCategory={setCategoryId} loading={scopeLoading}/>
+        : scopeLoading ? <p role="status">Carregando inscrições…</p> :
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
                 {!schoolList&&<th>Evento / escola</th>}
-                <th>Modalidade / categoria / prova</th>
+                <th>{selectedCategory ? "Prova" : modality ? "Categoria / prova" : "Modalidade / categoria / prova"}</th>
                 <th>Atletas</th>
                 <th>Situação</th>
                 <th>Ações</th>
@@ -680,8 +703,8 @@ export default function ConnectedRegistrations({
                       <div>{sc(r)?.name}</div>
                     </td>}
                     <td>
-                      {category?.modality} · {category?.name}
-                      {proof && <div>{proof.name}</div>}
+                      {!selectedCategory && [!modality && category?.modality,category?.name].filter(Boolean).join(" · ")}
+                      {proof ? <div>{proof.name}</div> : selectedCategory && "Sem prova específica"}
                     </td>
                     <td>
                       {
@@ -753,9 +776,9 @@ export default function ConnectedRegistrations({
               )}
             </tbody>
           </table>
-        </div>
+        </div>}
       </div>
-      {remote && <ServerPagination {...remote} />}
+      {remote && !showGroups && !scopeLoading && <ServerPagination {...remote} />}
       {(starting || editing) && (
         <RegistrationEditor
           key={editing?.id || "new"}
