@@ -31,6 +31,7 @@ export default function RegistrationReview({history, event, school, data, api, m
   const category = event?.categories.find(c => c.id === r.category_id);
   const proof = category?.proofs.find(p => p.id === r.proof_id);
   const roster = data.allocations.filter(a => a.registration_id === r.id && a.active !== false);
+  const assignedStaff = data.registrationStaff.filter(item=>item.registration_id===r.id);
   const currentIndex = Math.min(athleteIndex, Math.max(0, roster.length-1));
   const latest = [...history.decisions].sort((a,b) => b.created_at.localeCompare(a.created_at))[0];
   const policy = event ? guardianPolicy(event) : null;
@@ -63,7 +64,7 @@ export default function RegistrationReview({history, event, school, data, api, m
         return <section className="panel review-person" key={allocation.id || allocation.person_id}>
           <h4>{person.name} · Vaga {allocation.slot_number}</h4>
           <dl className="review-data"><div><dt>CPF</dt><dd>{person.cpf}</dd></div><div><dt>Nascimento</dt><dd>{person.birth?.split("-").reverse().join("/")}</dd></div><div><dt>Sexo</dt><dd>{person.gender}</dd></div><div><dt>Cadastro no evento</dt><dd>{profile?.status === "complete" ? "Concluído" : profile?.status || "Não localizado"}</dd></div></dl>
-          {person.photo ? <PrivateFile key={person.photo.id} attachment={person.photo} api={api} photo /> : <p>Sem foto de identificação. A foto geral é opcional.</p>}
+          {person.photo ? <PrivateFile key={person.photo.id} attachment={person.photo} api={api} photo /> : <p>Sem foto de identificação. A foto é obrigatória para emitir o crachá.</p>}
           {note(person.name)}
           <h4>Documentos do evento</h4>
           {!requirements.length && !Object.keys(documents).length && <p>Nenhum documento solicitado.</p>}
@@ -72,8 +73,16 @@ export default function RegistrationReview({history, event, school, data, api, m
           {policy?.enabled && isMinorAt(person.birth, policy.referenceDate) && guardianFields.some(field => policy.fields[field.key] !== "hidden" && profile?.additionalData?.[field.key]) && <><h4>Responsável legal informado</h4><dl className="review-data">{guardianFields.map(field => policy.fields[field.key] !== "hidden" && profile?.additionalData?.[field.key] && <div key={field.key}><dt>{field.label}</dt><dd>{profile.additionalData[field.key]}</dd></div>)}</dl></>}
         </section>;
       })}
-      {data.registrationStaff.some(s => s.registration_id === r.id) && <p className="info-box">Profissionais vinculados: {data.registrationStaff.filter(s => s.registration_id === r.id).map(a => {const p=data.staff.find(p=>p.personId===a.person_id&&p.schoolId===r.school_id);const role=event?._staffRoles?.find(role=>role.id===a.staff_role_id);return `${p?.name || 'Profissional'}${role ? ' ('+role.name+')' : ''}`;}).join(', ')}. A conferência dos profissionais fica no tipo Comissão técnica.</p>}
-      {canReview && <div className="review-decisions"><p>As orientações serão enviadas à escola na justificativa. Confira e confirme a decisão na próxima etapa.</p><div className="staff-actions"><button className="primary" onClick={() => onDecision("approved", "Aprovar")}>Aprovar</button><button className="secondary" onClick={() => onDecision("correction_requested", "Solicitar correção", correctionReason)}>Solicitar correção</button><button className="secondary" onClick={() => onDecision("rejected", "Indeferir")}>Indeferir</button></div></div>}
+      <section className="panel">
+        <h3>Comissão técnica vinculada</h3>
+        <p>{assignedStaff.length ? assignedStaff.map(assignment=>{
+          const person=data.staff.find(p=>p.personId===assignment.person_id&&p.schoolId===r.school_id);
+          const role=event?._staffRoles?.find(item=>item.id===assignment.staff_role_id);
+          return [person?.name||"Profissional",role?.name].filter(Boolean).join(" · ");
+        }).join(", ") : "Nenhum profissional vinculado a esta inscrição."}</p>
+        {manager && <small>A aprovação dos profissionais é feita separadamente em Conferência da comissão técnica.</small>}
+      </section>
+      {canReview && <div className="review-decisions"><p>As orientações serão enviadas à escola na justificativa. Confira e confirme a decisão na próxima etapa.</p><div className="staff-actions"><button className="primary" onClick={() => onDecision("approved", "Aprovar inscrição")}>Aprovar inscrição</button><button className="secondary" onClick={() => onDecision("correction_requested", "Solicitar correção", correctionReason)}>Solicitar correção</button><button className="secondary" onClick={() => onDecision("rejected", "Indeferir")}>Indeferir</button></div></div>}
     </div> : <div role="tabpanel" aria-label="Histórico">
       <p>As versões abaixo preservam os dados enviados em cada etapa. A conferência mostra o cadastro atual.</p>
       {[...history.versions].sort((a,b) => b.revision-a.revision).map(version => <details className="panel" key={version.id}><summary>Versão {version.revision} · {registrationStatusLabel[version.status]} · {new Date(version.created_at).toLocaleString("pt-BR")}</summary><h3>Atletas</h3>{version.snapshot.athletes?.map(a => <p key={a.person.id}>{a.person.full_name} · Vaga {a.allocation.slot_number}</p>)}<h3>Comissão técnica</h3>{version.snapshot.staff?.map(s => <p key={s.person.id}>{s.person.full_name}</p>)}</details>)}

@@ -281,6 +281,12 @@ export function RegistrationEditor({
                   </p>
                 )}
                 <h3>Comissão técnica</h3>
+                <p className="form-note">Marque os profissionais que vão acompanhar esta inscrição.</p>
+                {professionals.length > 0 && <p className="form-note" role="status">
+                  {Object.values(staff).some(Boolean)
+                    ? `${Object.values(staff).filter(Boolean).length} profissional(is) selecionado(s)`
+                    : "Nenhum profissional selecionado."}
+                </p>}
                 {professionals.map((p) => (
                   <label key={p.id} className="checkbox">
                     <input
@@ -318,8 +324,7 @@ export function RegistrationEditor({
                   ))}
                 {!professionals.length && (
                   <p className="form-note">
-                    Nenhum profissional ativo com função habilitada neste
-                    evento.
+                    Para selecionar um profissional, cadastre-o em Comissão técnica da escola com uma função habilitada no evento.
                   </p>
                 )}
               </>

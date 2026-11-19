@@ -856,7 +856,12 @@ export default function InstitutionPortal({
                       </details>
                     </>
                   )}
-                  {conferenceSelector && !showPicker && <div className="conference-type"><label>Tipo de conferência<select aria-label="Tipo de conferência" value={staffConference?'comissao':'atletas'} onChange={e=>navigate(location.pathname+(e.target.value==='comissao'?'?tipo=comissao':''))}><option value="atletas">Atletas</option><option value="comissao">Comissão técnica</option></select></label></div>}
+                  {conferenceSelector && !showPicker && <div className="conference-type" role="group" aria-label="Tipo de conferência">
+                    <button type="button" className={staffConference ? "secondary" : "primary"} aria-pressed={!staffConference}
+                      onClick={()=>navigate(location.pathname)}>Inscrições de atletas</button>
+                    <button type="button" className={staffConference ? "primary" : "secondary"} aria-pressed={staffConference}
+                      onClick={()=>{if(!staffConference)navigate(location.pathname+"?tipo=comissao");}}>Conferência da comissão técnica</button>
+                  </div>}
                   {staffConference && !showPicker && <StaffConference api={api} tenant={tenant} events={events} schools={schools} schoolId={schoolArea?schoolId:undefined} manager={canManage&&!schoolArea} onReturn={schoolArea?()=>navigate(location.pathname):undefined}/>}
                   {(page === "Inscrições" || page === "Minhas inscrições") &&
                     !staffConference && !showPicker && (

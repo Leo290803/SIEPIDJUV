@@ -1037,20 +1037,20 @@ try {
   await page.getByRole('button',{name:'Ver inscrições de Futsal',exact:true}).waitFor();
   tables.event_proofs.splice(-2);
   tables.registrations.splice(originalRegistrationCount);
-  assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
+  assert.equal(await page.getByRole('group',{name:'Tipo de conferência',exact:true}).count(),0);
   const cancelledRow={...schoolPdfFixture,id:randomUUID(),status:'cancelled'};
   tables.registrations.push(cancelledRow);
   await page.goto(page.url()+'?tipo=comissao');
   await page.getByRole('button',{name:'Ver inscrições de Futsal',exact:true}).click();
   await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
-  assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
+  assert.equal(await page.getByRole('group',{name:'Tipo de conferência',exact:true}).count(),0);
   assert.equal(await page.getByRole('region',{name:'Conferência da comissão técnica'}).count(),0);
   assert.equal(await page.getByRole('columnheader',{name:'Evento / escola',exact:true}).count(),0);
   assert.equal(await page.getByRole('cell',{name:'Cancelada',exact:true}).count(),0);
   assert.equal(await page.getByText('1 inscrição',{exact:true}).count(),1);
   assert.ok(queryCalls.some(({table,body})=>table==='siep_portal_page'&&body.p_mode==='registrations'&&body.p_filters.excludeCancelled));
   tables.registrations.pop();
-  assert.equal(await page.getByRole('button',{name:'Aprovar',exact:true}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'Aprovar inscrição',exact:true}).count(),0);
   const athleticsRegistration={...schoolPdfFixture,id:randomUUID(),category_id:pdfCategory.id,proof_id:null};
   const pdfStaffLink=tables.school_people.find(link=>link.role==='staff'&&link.school_id===schoolPdfFixture.school_id);
   assert.ok(pdfStaffLink);
@@ -1164,10 +1164,10 @@ try {
   isAdmin=true;
   await page.goto(origin+'/secretaria/'+tenant+'/inscricoes');
   await page.getByRole("button", { name: "Conferir inscrição", exact: true }).click();
-  await page.getByRole("button", { name: "Aprovar", exact: true }).click();
+  await page.getByRole("button", { name: "Aprovar inscrição", exact: true }).click();
   await page.getByLabel("Justificativa *", { exact: true }).fill("Conferido");
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
-  await page.getByRole("dialog",{name:"Aprovar",exact:true}).waitFor({state:"detached"});
+  await page.getByRole("dialog",{name:"Aprovar inscrição",exact:true}).waitFor({state:"detached"});
   await page.getByRole("button",{name:"Fechar histórico",exact:true}).click();
   await page.getByRole("cell", { name: "Aprovada", exact: true }).waitFor();
   assert.deepEqual(registrationTransitions,[
@@ -1219,7 +1219,7 @@ try {
   await queueReview.getByRole('button',{name:'Inscrição anterior',exact:true}).click();
   await page.waitForURL('**/'+queueFixtures[0].id+'/historico');
   assert.equal(await queueReview.getByLabel('O que precisa de correção em Atleta conectado?',{exact:true}).inputValue(),'Conferir documento');
-  await queueReview.getByRole('button',{name:'Aprovar',exact:true}).click();
+  await queueReview.getByRole('button',{name:'Aprovar inscrição',exact:true}).click();
   await page.getByLabel('Justificativa *',{exact:true}).fill('Conferência da fila concluída');
   await page.getByRole('button',{name:'Confirmar e próxima inscrição',exact:true}).click();
   await page.waitForURL('**/'+queueFixtures[1].id+'/historico');
@@ -1238,7 +1238,7 @@ try {
   const staffRole=tables.event_staff_roles[0]||{id:randomUUID(),event_id:registration.event_id,institution_id:tenant,name:'Técnico'};
   if(!tables.event_staff_roles.some(r=>r.id===staffRole.id))tables.event_staff_roles.push(staffRole);
   tables.registration_staff.push(...[registration.id,extraStaffRegistration.id].map(id=>({id:randomUUID(),institution_id:tenant,event_id:registration.event_id,school_id:registration.school_id,person_id:tables.people[0].id,staff_role_id:staffRole.id,registration_id:id})));
-  await page.getByLabel('Tipo de conferência',{exact:true}).selectOption('comissao');
+  await page.getByRole('button',{name:'Conferência da comissão técnica',exact:true}).click();
   await page.getByText('1 profissionais no evento e escola',{exact:true}).waitFor();
   assert.equal(await page.getByRole('region',{name:'Conferência da comissão técnica',exact:true}).locator('tbody tr').count(),1);
   await page.getByText('Vinculado a 2 inscrições',{exact:true}).waitFor();
@@ -1264,7 +1264,7 @@ try {
   await page.getByRole('button',{name:'Conferir profissional',exact:true}).waitFor();
   await page.getByLabel('Buscar profissional na conferência',{exact:true}).fill('ninguém com esse nome');
   await page.getByText('Nenhum profissional vinculado a inscrições com estes filtros.',{exact:true}).waitFor();
-  await page.getByLabel('Tipo de conferência',{exact:true}).selectOption('atletas');
+  await page.getByRole('button',{name:'Inscrições de atletas',exact:true}).click();
   tables.registration_staff=originalAssignments;tables.registrations=tables.registrations.filter(r=>r.id!==extraStaffRegistration.id);
   const examplePhoto=tables.person_photos.find(p=>p.is_current&&p.person_id===tables.people[0].id);
   examplePhoto.bucket_id='siep-development-photos';examplePhoto.object_path='development/'+examplePhoto.id+'.png';
@@ -1379,7 +1379,8 @@ try {
   developmentImages.set(printPhoto.object_path,Buffer.from(redImage,'base64'));
   await page.getByLabel('Perfil dos crachás',{exact:true}).selectOption('staff');
   await page.getByText('Nenhum participante aprovado encontrado para estes filtros.',{exact:true}).waitFor();
-  await page.goto(origin+'/secretaria/'+tenant+'/inscricoes?tipo=comissao');
+  await page.getByRole('link',{name:'Conferir comissão técnica',exact:true}).click();
+  assert.equal(await page.getByLabel('Evento da comissão técnica',{exact:true}).inputValue(),registration.event_id);
   await page.getByRole('button',{name:'Conferir profissional',exact:true}).click();
   const printReview=page.getByRole('dialog',{name:'Conferência do profissional',exact:true});
   await printReview.getByRole('button',{name:'Aprovar profissional',exact:true}).click();
@@ -1393,7 +1394,7 @@ try {
     tipo:'comissao',profissional:printStaff.id,evento:registration.event_id,escola:registration.school_id,
   }));
   await printReview.getByText('Aprovado',{exact:true}).waitFor();
-  assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
+  assert.equal(await page.getByRole('group',{name:'Tipo de conferência',exact:true}).count(),0);
   assert.equal(await printReview.getByRole('button',{name:'Aprovar profissional',exact:true}).count(),0);
   await printReview.getByRole('button',{name:'Fechar conferência técnica',exact:true}).click();
   await page.getByRole('button',{name:'Nova inscrição neste evento',exact:true}).waitFor();

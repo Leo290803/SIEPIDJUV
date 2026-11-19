@@ -247,11 +247,9 @@
 @media(max-width:600px){.notification-popover {position:fixed;top:64px;right:12px;width:calc(100vw - 24px);}}
 .notification-popover {overflow:hidden;}
 .notification-popover header .text-btn {color:white;}
-.conference-type {display:flex;justify-content:flex-end;margin:0 0 18px;}
-.conference-type label {display:flex;align-items:center;gap:12px;font-weight:600;}
-.conference-type select {min-width:190px;}
+.conference-type {display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px;}
 .staff-review-count {display:block;margin-top:6px;color:#657b93;}
-@media(max-width:600px){.conference-type label {width:100%;flex-wrap:wrap;}.conference-type select {flex:1;min-width:150px;}}
+
 .badge-template-editor {max-width:1050px;}
 .badge-template-toolbar {display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:18px 0;}
 .badge-template-toolbar label {display:grid;gap:6px;}
@@ -294,3 +292,6 @@
 .school-registration-groups button:hover {background:#f3f7fc;}
 .school-registration-groups small {display:block;margin-top:4px;color:#586d82;font-size:.85rem;}
 .school-registration-drill {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+
+.badge-empty-review {display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:8px;}
+.badge-empty-review a {color:#285c94;}

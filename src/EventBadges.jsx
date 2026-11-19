@@ -1,6 +1,7 @@
 import BadgeTemplateEditor from "./BadgeTemplateEditor.jsx";
 import ServerPagination from "./ServerPagination.jsx";
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Printer, RefreshCw } from "lucide-react";
 import { readableError } from "./data/client.js";
 import { showBadgePrint } from "./BadgePrint.jsx";
@@ -11,6 +12,8 @@ export default function EventBadges({events,schools,api,tenant}) {
  const [configuring,setConfiguring]=useState(null);
  const [offset,setOffset]=useState(0),[total,setTotal]=useState(0);
  const event=events.find(e=>e.id===eventId);
+ const registrationsPath=`/secretaria/${tenant}/inscricoes`;
+ const staffReviewParams=new URLSearchParams({tipo:"comissao",evento:eventId,escola:schoolId});
  useEffect(()=>{
   let active=true;const controller=new AbortController();
   setRows([]);setHistory([]);setSelected([]);setError("");setMessage("");
@@ -51,7 +54,7 @@ export default function EventBadges({events,schools,api,tenant}) {
   finally{setBusy(false);}
  }
  return <section className="panel event-badges">
-  <h2>Crachás do evento</h2><p className="panel-desc">Atletas com inscrição aprovada, profissionais com conferência própria aprovada e atual, vinculados a inscrições aprovadas, e responsáveis autorizados das escolas participantes. A foto de identificação é obrigatória para emitir.</p>
+  <h2>Crachás do evento</h2><p className="panel-desc">Atletas precisam de inscrição aprovada. A comissão técnica passa por aprovação separada. A foto é obrigatória para emitir.</p>
   <div className="badge-filters">
    <label>Evento<select aria-label="Evento dos crachás" value={eventId} disabled={busy} onChange={e=>{setEventId(e.target.value);setOffset(0);}}><option value="">Selecione o evento</option>{events.map(e=><option key={e.id} value={e.id}>{e.name} · {e.year}{e.status==='Arquivado'?' · Arquivado':''}</option>)}</select></label>
    <label>Escola<select aria-label="Escola dos crachás" value={schoolId} disabled={busy} onChange={e=>{setSchoolId(e.target.value);setOffset(0);}}><option value="">Todas as escolas</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
@@ -69,7 +72,10 @@ export default function EventBadges({events,schools,api,tenant}) {
    <div className="badge-toolbar"><label>Pesquisar pessoa ou escola<input aria-label="Pesquisar crachá" type="search" value={query} onChange={e=>{setQuery(e.target.value);setOffset(0);}} /></label><button type="button" className="secondary" disabled={busy||loading} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={15}/>Atualizar lista</button></div>
    {loading?<p role="status">Consultando participantes e emissões…</p>:<>
     <div className="badge-selection-actions"><span>{chosen.length} selecionado(s) · máximo de 50 por lote</span><div className="staff-actions"><button className="secondary" disabled={busy||!available.length||event?.status==='Arquivado'} onClick={selectAll}>Selecionar com foto</button><button className="text-btn" disabled={busy||!selected.length} onClick={()=>setSelected([])}>Limpar seleção</button></div></div>
-    <div className="table-scroll"><table><thead><tr><th>Selecionar</th><th>Pessoa</th><th>Escola</th><th>Perfil</th><th>Foto</th></tr></thead><tbody>{visible.map(r=><tr key={keyOf(r)}><td><input type="checkbox" aria-label={`Selecionar ${r.person_name} · ${r.role_label}`} checked={selected.includes(keyOf(r))} disabled={busy||!r.photo_id||event?.status==='Arquivado'||(!selected.includes(keyOf(r))&&selected.length>=50)} onChange={e=>setSelected(e.target.checked?[...selected,keyOf(r)]:selected.filter(k=>k!==keyOf(r)))} /></td><td><strong>{r.person_name}</strong></td><td>{r.school_name}</td><td>{r.role_label}</td><td><span className={'tag '+(r.photo_id?'live':'warning')}>{r.photo_id?'Com foto':'Completar foto'}</span></td></tr>)}{!visible.length&&<tr><td colSpan={5} className="table-empty">Nenhum participante aprovado encontrado para estes filtros.</td></tr>}</tbody></table></div>
+    <div className="table-scroll"><table><thead><tr><th>Selecionar</th><th>Pessoa</th><th>Escola</th><th>Perfil</th><th>Foto</th></tr></thead><tbody>{visible.map(r=><tr key={keyOf(r)}><td><input type="checkbox" aria-label={`Selecionar ${r.person_name} · ${r.role_label}`} checked={selected.includes(keyOf(r))} disabled={busy||!r.photo_id||event?.status==='Arquivado'||(!selected.includes(keyOf(r))&&selected.length>=50)} onChange={e=>setSelected(e.target.checked?[...selected,keyOf(r)]:selected.filter(k=>k!==keyOf(r)))} /></td><td><strong>{r.person_name}</strong></td><td>{r.school_name}</td><td>{r.role_label}</td><td><span className={'tag '+(r.photo_id?'live':'warning')}>{r.photo_id?'Com foto':'Completar foto'}</span></td></tr>)}{!visible.length&&<tr><td colSpan={5} className="table-empty"><span>Nenhum participante aprovado encontrado para estes filtros.</span><div className="badge-empty-review">
+       {role!=="staff"&&role!=="responsible"&&<Link to={registrationsPath}>Conferir inscrições de atletas</Link>}
+       {role!=="athlete"&&role!=="responsible"&&<Link to={`${registrationsPath}?${staffReviewParams}`}>Conferir comissão técnica</Link>}
+    </div></td></tr>}</tbody></table></div>
     <ServerPagination total={total} offset={offset} loading={loading||busy} onPage={setOffset} />
     <p className="form-note">A seleção é feita por página. Emita este lote antes de mudar de página ou de filtros.</p>
     {rows.some(r=>!r.photo_id)&&<p className="form-note">Cadastros sem foto aparecem para conferência. Complete a foto antes de emitir o crachá.</p>}
