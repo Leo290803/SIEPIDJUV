@@ -280,3 +280,8 @@
 .badge-sample-photo {width:75%;height:75%;color:#506a86;}
 .badge-template-editor .badge-design-settings {margin-top:18px;}
 @media(max-width:520px){.badge-designer-grid {grid-template-columns:minmax(0,1fr);}}
+
+.badge-face-preview {display:grid;grid-template-columns:minmax(0,1fr);width:min(100%,86mm);justify-items:center;}
+.badge-face-preview.badge-face-pair {grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:4px;}
+.badge-design-preview .designer-field[data-field] {border-color:transparent;}
+.badge-design-preview .designer-field[data-field]:hover,.badge-design-preview .designer-field[data-field]:focus-visible {border-color:#215888;}

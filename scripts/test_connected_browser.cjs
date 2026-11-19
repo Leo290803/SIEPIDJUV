@@ -1128,6 +1128,8 @@ try {
   const templateDialog=page.getByRole('dialog',{name:'Configurar arte do crachá',exact:true});
   await templateDialog.getByLabel('Campo do crachá',{exact:true}).waitFor();
   await templateDialog.locator('.badge-qr').waitFor();
+  assert.equal(await templateDialog.getByLabel('Verso do crachá').count(),2);
+  await templateDialog.screenshot({path:'/tmp/siep-credencial-frente-verso.png'});
   const guidePdf=page.waitForEvent('download');await templateDialog.getByRole('button',{name:'Baixar gabarito PDF',exact:true}).click();await (await guidePdf).saveAs('/tmp/gabarito-cracha-atleta.pdf');
   assert.equal(fs.readFileSync('/tmp/gabarito-cracha-atleta.pdf').subarray(0,4).toString(),'%PDF');
   const guidePng=page.waitForEvent('download');await templateDialog.getByRole('button',{name:'Baixar imagem-guia PNG',exact:true}).click();await (await guidePng).saveAs('/tmp/gabarito-cracha-atleta.png');
@@ -1147,15 +1149,16 @@ try {
   const badgePopupPromise=page.waitForEvent('popup');
   await page.getByRole("button",{name:"Emitir e abrir impressão",exact:true}).click();
   const badgePopup=await badgePopupPromise;
-  await badgePopup.locator('.event-badge').waitFor();
-  assert.equal(await badgePopup.locator('.event-badge').count(),1);
+  await badgePopup.locator('.badge-credential').waitFor();
+  assert.equal(await badgePopup.locator('.event-badge').count(),2);
+  await badgePopup.getByLabel('Verso do crachá').waitFor();
   await badgePopup.getByText('Atleta conectado',{exact:true}).waitFor();
   await badgePopup.getByText('Escola conectada',{exact:true}).waitFor();
   await badgePopup.getByRole('img',{name:'Arte personalizada do crachá',exact:true}).waitFor();
   await badgePopup.getByText('Futsal',{exact:true}).waitFor();
   const qrPath=await badgePopup.getByRole('img',{name:'QR Code da emissão'}).locator('path').getAttribute('d');
   assert.ok(qrPath.length>500);
-  assert.equal(await badgePopup.locator('.art-badge').getAttribute('data-template-version'),'1');
+  assert.equal(await badgePopup.locator('.badge-credential').getAttribute('data-template-version'),'1');
   assert.equal((await badgePopup.locator('body').innerText()).includes('52998224725'),false);
   await badgePopup.waitForFunction(()=>[...document.images].every(img=>img.complete&&img.naturalWidth>0));
   await badgePopup.evaluate(()=>{window.print=()=>{window.printInvoked=true;};});
@@ -1180,7 +1183,7 @@ try {
   const reprintPopupPromise=page.waitForEvent('popup');
   await page.getByRole('button',{name:'Reimprimir',exact:true}).click();
   const reprintPopup=await reprintPopupPromise;
-  await reprintPopup.locator('.event-badge').waitFor();assert.equal(await reprintPopup.locator('.art-badge').getAttribute('data-template-version'),'1');
+  await reprintPopup.locator('.badge-credential').waitFor();assert.equal(await reprintPopup.locator('.badge-credential').getAttribute('data-template-version'),'1');
   assert.equal(await reprintPopup.getByRole('img',{name:'QR Code da emissão'}).locator('path').getAttribute('d'),qrPath);
   await reprintPopup.close();
   assert.equal(tables.event_badges.length,1,'Reimprimir criou nova emissão');

@@ -3,12 +3,24 @@ export const badgeRoles={athlete:'Atleta',staff:'Comissão técnica',responsible
 export function allowedFields(role){return Object.keys(badgeFields).filter(key=>role==='athlete'?key!=='functions':role==='staff'?key!=='proofs':!['modalities','categories','proofs'].includes(key));}
 export function requiredFields(role){return ['photo','person_name','school_name',role==='athlete'?'modalities':role==='staff'?'functions':'role_label'];}
 const field=(key,x,y,w,h,fontSize=11)=>({key,x,y,w,h,fontSize,color:'#163453',align:'center'});
-export function defaultBadgeLayout(role){return {width:86,height:130,fit:'contain',fields:[field('event_name',5,7,90,12,12),field('photo',31,24,38,33),field('person_name',5,60,90,12,14),...(role==='responsible'?[]:[field('role_label',5,71,90,3,7)]),field('school_name',5,75,90,9,10),field(role==='athlete'?'modalities':role==='staff'?'functions':'role_label',5,86,90,8,11),field('code',5,96,90,3,6),newBadgeField('qr_code')]};}
+export const credentialTheme = 'credential-v1';
+export function defaultBadgeLayout(role){
+ return {width:86,height:130,fit:'contain',theme:credentialTheme,fields:[
+  field('event_name',45,5,49,15,12),
+  field('photo',33,18,34,22.49),
+  field('person_name',7,43,86,7,12),
+  field('school_name',7,50.6,86,5.4,9),
+  ...(role==='responsible'?[]:[field(role==='athlete'?'modalities':'functions',7,56.6,86,6,9)]),
+  field('qr_code',37,64,26,17.2),
+  field('code',37,82,26,3,7),
+  field('role_label',0,87,100,6,13)
+ ]};
+}
 export function newBadgeField(key){
  return key==='qr_code'?field(key,72,40,22,14.55):field(key,5,5,90,8,10);
 }
 export function validateBadgeLayout(role,layout){
- if(!badgeRoles[role]||layout?.width!==86||layout?.height!==130||!['contain','cover'].includes(layout?.fit)||!Array.isArray(layout?.fields)||layout.fields.length>12)return 'Modelo de crachá inválido.';
+ if(!badgeRoles[role]||layout?.width!==86||layout?.height!==130||(layout.theme!==undefined&&layout.theme!==credentialTheme)||!['contain','cover'].includes(layout?.fit)||!Array.isArray(layout?.fields)||layout.fields.length>12)return 'Modelo de crachá inválido.';
  const keys=new Set();for(const f of layout.fields){if(!allowedFields(role).includes(f.key)||keys.has(f.key))return 'Campo repetido ou incompatível com o perfil.';keys.add(f.key);if(![f.x,f.y,f.w,f.h,f.fontSize].every(Number.isFinite)||f.x<0||f.y<0||f.w<2||f.h<2||f.x+f.w>100.001||f.y+f.h>100.001||f.fontSize<6||f.fontSize>28||!/^#[0-9a-f]{6}$/i.test(f.color)||!['left','center','right'].includes(f.align))return 'Ajuste as medidas, fonte e cor: todos os campos devem caber no crachá.';}
  if(layout.fields.some(f=>f.key==='qr_code'&&(Math.round(f.w*8.6)<150||Math.round(f.h*13)<150)))return 'O QR Code precisa de pelo menos 15 mm de largura e altura.';
  return requiredFields(role).every(key=>keys.has(key))?'':'Mantenha os campos obrigatórios deste perfil.';

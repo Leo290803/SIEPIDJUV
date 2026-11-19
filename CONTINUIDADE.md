@@ -34,6 +34,12 @@ A arte enviada e a prévia preenchida aparecem lado a lado em telas largas. Mode
 
 A migração `20261119150000_optional_badge_qr` foi validada com rollback e aplicada no Supabase. O projeto tem 31 migrações. A comparação antes e depois confirmou que emissões, modelos, versões e artes existentes foram preservados. Os testes SQL passaram e o Chromium com API simulada conferiu que o QR aparece na impressão e é mantido na reimpressão da mesma emissão após sua remoção do modelo.
 
+### Modelo frente e verso
+
+O modelo inicial passou a usar uma frente verde com foto circular, faixas de dados, QR Code e identificação do perfil. O verso claro usa a marca SIEP e a identificação do evento. O editor e o PDF exibem as duas faces de 86 × 130 mm. Em modelos existentes, **Usar modelo frente e verso** ajusta o layout em edição; salvar cria uma nova versão. Emissões antigas mantêm o visual da versão registrada.
+
+A migração `20261119160000_badge_credential_theme` foi validada com rollback e aplicada com as asserções remotas aprovadas. O banco tem 32 migrações. Os 113 testes JavaScript, o build e o fluxo Chromium com API simulada passaram, incluindo impressão e reimpressão.
+
 ### Evidências e limites desta entrega
 
 Aprovados localmente: **113 testes JS**, build, **19 suítes SQL + 3 cenários de concorrência** e fluxo Chromium com API simulada. SQL novo cobre permissões, isolamento, arte inválida/ausente, obrigatoriedade de campos, limites, versão concorrente, preservação histórica e aprovação. Chromium cobre download dos gabaritos, configuração da arte, posição numérica, campos mínimos, celular, emissão com arte/dados, versão nova e reimpressão antiga, além do fallback sem RPC. O fluxo completo anterior também passou. Build mantém aviso de chunks grandes; não é falha de compilação.
