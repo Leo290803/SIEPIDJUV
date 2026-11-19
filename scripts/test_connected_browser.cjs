@@ -1000,6 +1000,31 @@ try {
   assert.equal(await page.getByLabel('Tipo de conferência',{exact:true}).count(),0);
   assert.equal(await page.getByRole('region',{name:'Conferência da comissão técnica'}).count(),0);
   assert.equal(await page.getByRole('button',{name:'Aprovar',exact:true}).count(),0);
+  const schoolPdfFixture=tables.registrations[0], originalRegistrationCount=tables.registrations.length;
+  tables.registrations.push(
+    ...Array.from({length:100},()=>({...schoolPdfFixture,id:randomUUID()})),
+    {...schoolPdfFixture,id:randomUUID(),school_id:randomUUID()},
+    {...schoolPdfFixture,id:randomUUID(),event_id:randomUUID()},
+    {...schoolPdfFixture,id:randomUUID(),status:'draft'},
+  );
+  await page.getByLabel('Situação das inscrições',{exact:true}).selectOption('correction_requested');
+  const schoolPdfDownload=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Baixar relatório em PDF',exact:true}).click();
+  const schoolPdfPath='/tmp/siep-inscricoes-da-escola.pdf';
+  await (await schoolPdfDownload).saveAs(schoolPdfPath);
+  tables.registrations.splice(originalRegistrationCount);
+  await page.getByLabel('Situação das inscrições',{exact:true}).selectOption('all');
+  assert.equal(fs.readFileSync(schoolPdfPath).subarray(0,4).toString(),'%PDF');
+  const schoolPdfRequests=queryCalls.filter(call=>call.table==='siep_portal_page'&&call.body.p_mode==='registrations'&&call.body.p_limit===100);
+  assert.deepEqual(schoolPdfRequests.map(call=>call.body.p_offset),[0,100]);
+  assert.ok(schoolPdfRequests.every(({body})=>body.p_school_id===schoolPdfFixture.school_id&&body.p_filters.eventId===schoolPdfFixture.event_id&&body.p_filters.status==='correction_requested'));
+  const schoolPdfText=require('node:child_process').spawnSync('pdftotext',[schoolPdfPath,'-'],{encoding:'utf8'});
+  if(!schoolPdfText.error){
+    assert.equal(schoolPdfText.status,0);
+    for(const expected of ['Atleta conectado','Escola conectada','Futsal','Correção solicitada','Inscrições: 101'])assert.ok(schoolPdfText.stdout.includes(expected),expected);
+    assert.ok(!schoolPdfText.stdout.includes('52998224725'));
+  }
+
   await page.getByRole('button',{name:'Notificações',exact:true}).click();
   const schoolBell=page.getByRole('region',{name:'Avisos recentes',exact:true});
   await schoolBell.getByText('Correção solicitada pela Secretaria',{exact:true}).waitFor();

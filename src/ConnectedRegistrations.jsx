@@ -3,7 +3,7 @@ import RegistrationReview from "./RegistrationReview.jsx";
 import ServerPagination from "./ServerPagination.jsx";
 import { useServerFilters } from "./data/useServerFilters.js";
 import React, { useEffect, useState, useRef } from "react";
-import { X, Plus, ClipboardList } from "lucide-react";
+import { X, Plus, ClipboardList, FileDown } from "lucide-react";
 import {
   registrationStatusLabel,
   issueMessages,
@@ -407,6 +407,27 @@ export default function ConnectedRegistrations({
     [successMessage,setSuccessMessage] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const pdfRequest = useRef(null);
+  const [generatingPdf,setGeneratingPdf] = useState(false), [pdfError,setPdfError] = useState("");
+  useEffect(() => () => pdfRequest.current?.abort(), []);
+  async function downloadRegistrationsPdf() {
+    if (!school || !event || pdfRequest.current) return;
+    const controller = new AbortController();
+    pdfRequest.current = controller;
+    setGeneratingPdf(true);setPdfError("");
+    try {
+      const {createSchoolRegistrationsPdf} = await import("./reports/schoolRegistrations.js");
+      const pdf = await createSchoolRegistrationsPdf({api,tenant,school,event,status,query,signal:controller.signal});
+      controller.signal.throwIfAborted();
+      if (pdf) pdf.save("siep-inscricoes-da-escola.pdf");
+      else setPdfError("Nenhuma inscrição corresponde aos filtros selecionados.");
+    } catch (error) {
+      if (!controller.signal.aborted) setPdfError(readableError(error));
+    } finally {
+      pdfRequest.current = null;
+      if (!controller.signal.aborted) setGeneratingPdf(false);
+    }
+  }
   useEffect(() => {
     if (!onRoute) return;
     let active = true;
@@ -607,6 +628,13 @@ export default function ConnectedRegistrations({
                 </option>
               ))}
             </select>
+            {school && event && !manager && !routeAction && (
+              <button type="button" className="secondary" disabled={generatingPdf}
+                aria-busy={generatingPdf} onClick={downloadRegistrationsPdf}>
+                <FileDown size={16}/>
+                {generatingPdf ? "Gerando PDF…" : "Baixar relatório em PDF"}
+              </button>
+            )}
             {school && event && (
               <button
                 className="primary"
@@ -618,6 +646,7 @@ export default function ConnectedRegistrations({
             )}
           </div>
         </div>
+        {pdfError && <p className="school-error" role="alert">{pdfError}</p>}
         <div className="table-scroll">
           <table>
             <thead>
