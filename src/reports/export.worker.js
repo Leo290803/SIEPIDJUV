@@ -1,4 +1,3 @@
-import {serializeCsv} from './csv.js';
 let settings, rows=[];
 self.onmessage=async ({data})=>{
  try {
@@ -6,7 +5,10 @@ self.onmessage=async ({data})=>{
   if(data.action==='append'){rows.push(...data.rows);return;}
   if(data.action!=='finish')return;
   let blob;
-  if(settings.format==='csv') blob=new Blob([serializeCsv(settings.columns,rows)],{type:'text/csv;charset=utf-8;'});
+  if(settings.format==='xlsx') {
+   const {createReportXlsx}=await import('./exportXlsx.js');
+   blob=await createReportXlsx({...settings,rows});
+  }
   else {
    const {createReportPdf}=await import('./exportPdf.js');
    const doc=await createReportPdf({...settings,rows});

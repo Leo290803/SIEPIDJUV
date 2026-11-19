@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildReport,groupRows,filterOptions,DEFAULT_FILTERS,describeFilters,sortRows} from '../src/reports/model.js';
-import {serializeCsv} from '../src/reports/csv.js';
+import {createReportXlsx} from '../src/reports/exportXlsx.js';
 import {createReportPdf} from '../src/reports/exportPdf.js';
 const person=(id,name,gender,schoolId,extra={})=>({id:`link-${id}`,personId:id,name,gender,schoolId,status:'Aprovado',birth:'2012-02-03',cpf:'12345678900',...extra});
 const source={schools:[{id:'s1',name:'Escola Árvore',city:'Boa Vista'},{id:'s2',name:'Escola Norte',city:'Pacaraima'},{id:'s3',name:'Sem inscrições',city:'Boa Vista'}],events:[{id:'e1',name:'Jogos escolares',year:2026,status:'Inscrições abertas',modalities:[{id:'m1',name:'Atletismo'}],categories:[{id:'c1',name:'Sub-14',modality:'Atletismo',modalityId:'m1',proofs:[{id:'p1',name:'100 m'}]},{id:'c2',name:'Sub-16',modality:'Atletismo',modalityId:'m1',proofs:[]}]},{id:'e2',name:'Outro evento',year:2026,status:'Rascunho',modalities:[],categories:[]}],data:{athletes:[person('a','Ana','Feminino','s1',{photo:{id:'foto'}}),person('b','Bruno','Masculino','s1'),person('c','Carla','Feminino','s2'),person('d','Arquivado','Masculino','s2',{archived:true,status:'Encerrado'})],staff:[person('t','Técnico','Masculino','s1')],responsibles:[person('r','Diretora','Feminino','s1'),person('r2','Responsável sem evento','Masculino','s3')],registrations:[{id:'r1',school_id:'s1',event_id:'e1',category_id:'c1',proof_id:'p1',status:'approved',created_at:'2026-11-16T02:00:00Z'},{id:'r2',school_id:'s1',event_id:'e1',category_id:'c2',status:'submitted',created_at:'2026-11-16T15:00:00Z'},{id:'r3',school_id:'s2',event_id:'e1',category_id:'c1',proof_id:'p1',status:'cancelled',created_at:'2026-11-17T15:00:00Z'}],allocations:[{id:'x1',registration_id:'r1',person_id:'a',active:true},{id:'x2',registration_id:'r1',person_id:'b',active:true},{id:'x3',registration_id:'r2',person_id:'a',active:true},{id:'x4',registration_id:'r3',person_id:'c',active:false}],registrationStaff:[{registration_id:'r1',person_id:'t'}]}};
@@ -39,9 +39,12 @@ test('opções dependem do evento e categoria; pesquisa ignora acentos',()=>{
  const labels=describeFilters(source.events,source.schools,{...DEFAULT_FILTERS,schoolId:'s1',gender:'Feminino',categoryId:'c1'});assert.ok(labels.includes('Escola: Escola Árvore'));assert.ok(labels.some(l=>l.includes('Sub-14')));
  const original=report().rows;sortRows(original,'name','desc');assert.equal(original[0].cells.name,'Ana');
 });
-test('CSV preserva acentos, aspas, zeros do CPF e neutraliza fórmulas',()=>{
- const csv=serializeCsv([{key:'x',label:'Nome'}],[{cells:{x:'=HYPERLINK("x")'}},{cells:{x:'Árvore; "Sul"'}},{cells:{x:'04182530217'}}]);
- assert.ok(csv.startsWith('\ufeff'));assert.ok(csv.includes('"\'=HYPERLINK(""x"")"'));assert.ok(csv.includes('"Árvore; ""Sul"""'));assert.ok(csv.includes('04182530217'));
+test('exportação Excel gera um arquivo XLSX com dados de relatório',async()=>{
+ const columns=[{key:'name',label:'Nome'},{key:'cpf',label:'CPF'}];
+ const rows=[{cells:{name:'=HYPERLINK("x")',cpf:'04182530217'}}];
+ const file=await createReportXlsx({columns,rows});
+ assert.equal(file.type,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+ assert.equal(Buffer.from(await file.arrayBuffer()).subarray(0,4).toString('hex'),'504b0304');
 });
 test('PDF real com filtros e paginação exporta todas as linhas e omite CPF por padrão',async()=>{
  const r=report({gender:'Feminino'}),columns=r.columns.filter(c=>c.visible);assert.ok(!columns.some(c=>c.key==='cpf'));

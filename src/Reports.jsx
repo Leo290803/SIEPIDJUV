@@ -8,6 +8,7 @@ export default function Reports({ api, events, schools, institution }) {
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS }), [groupBy, setGroupBy] = useState(""), [sortKey, setSortKey] = useState("name"), [direction, setDirection] = useState("asc"), [selected, setSelected] = useState(columnsFor(DEFAULT_FILTERS.type).filter(c => c.visible).map(c => c.key)), [orientation, setOrientation] = useState("auto"), [exporting, setExporting] = useState(false), [exportError, setExportError] = useState("");
   const [lastExport,setLastExport]=useState(null),[progress,setProgress]=useState("");
   const exportTask=useRef(null);
+  const workerLoadMessage="Não foi possível carregar a exportação. Atualize a página e tente novamente.";
   const report = {type:filters.type,title:REPORT_TYPES[filters.type].label,hint:REPORT_TYPES[filters.type].hint,
     columns:columnsFor(filters.type,!!(filters.gender||filters.yearFrom||filters.yearTo||filters.photo)),error:validateFilters(filters)};
   const options = useMemo(() => filterOptions(events, schools, filters), [events, schools, filters]);
@@ -20,7 +21,7 @@ export default function Reports({ api, events, schools, institution }) {
   const requestKey=JSON.stringify(request);
   // Alterar filtros é local: nenhuma listagem ou contagem é consultada aqui.
   useEffect(()=>{setExportError("");setLastExport(null);},[requestKey]);
-  useEffect(()=>()=>{exportTask.current?.controller.abort();exportTask.current?.worker.terminate();},[]);
+  useEffect(()=>()=>{exportTask.current?.controller.abort();exportTask.current?.worker?.terminate();},[]);
   const filterLabels = describeFilters(events, schools, filters);
   const title = report.title + (groupColumn ? ` — resumo por ${groupColumn.label.toLocaleLowerCase("pt-BR")}` : "");
   const canExport = !report.error && columns.length > 0 && !exporting;
@@ -36,13 +37,19 @@ export default function Reports({ api, events, schools, institution }) {
     if(!canExport || exportTask.current)return;
     setExporting(true);setExportError("");setLastExport(null);setProgress("Consultando os dados do arquivo…");
     const controller=new AbortController();
-    const worker=new Worker(new URL('./reports/export.worker.js',import.meta.url),{type:'module'});
-    exportTask.current={controller,worker};
+    let worker;
+    exportTask.current={controller};
     const timeout=setTimeout(()=>controller.abort(Error('A exportação demorou demais. Use mais filtros ou tente novamente.')),120000);
     try {
+      try {
+        worker=new Worker(new URL('./reports/export.worker.js',import.meta.url),{type:'module'});
+        exportTask.current.worker=worker;
+      } catch {
+        throw Error(workerLoadMessage);
+      }
       const generated=new Promise((resolve,reject)=>{
         worker.onmessage=({data})=>data.error?reject(Error(data.error)):resolve(data.blob);
-        worker.onerror=()=>reject(Error('Não foi possível gerar o arquivo. Tente uma seleção menor.'));
+        worker.onerror=()=>controller.abort(Error(workerLoadMessage));
         controller.signal.addEventListener('abort',()=>reject(new DOMException('Cancelado','AbortError')),{once:true});
       });
       // A rejeição pode ocorrer enquanto o próximo lote ainda está sendo consultado.
@@ -59,15 +66,15 @@ export default function Reports({ api, events, schools, institution }) {
       controller.signal.throwIfAborted();setProgress("Gerando arquivo…");worker.postMessage({action:'finish'});
       const blob=await generated;controller.signal.throwIfAborted();
       const url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download=`siep-${filters.type}${groupColumn?'-resumo':''}.${format}`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-      setLastExport({format:format.toUpperCase(),total:completed.total});
+      setLastExport({format:format==="xlsx"?"Excel":"PDF",total:completed.total});
     }catch(error){if(controller.signal.aborted && controller.signal.reason?.name!=='AbortError')setExportError(controller.signal.reason.message);else if(!controller.signal.aborted)setExportError(error.code==='40001'?'Os dados mudaram durante a geração. Tente gerar o arquivo novamente.':readableError(error));}
-    finally{clearTimeout(timeout);controller.abort();worker.terminate();exportTask.current=null;setExporting(false);setProgress("");}
+    finally{clearTimeout(timeout);controller.abort();worker?.terminate();exportTask.current=null;setExporting(false);setProgress("");}
   }
   const select = (key, label, values, all, disabled = false) => <label>{label}<select aria-label={label} value={filters[key]} disabled={disabled || exporting} onChange={e => change(key, e.target.value)}><option value="">{all}</option>{values.map(value => <option key={value.id} value={value.id}>{value.label}</option>)}</select></label>;
   const advancedCount = [filters.from, filters.to, filters.yearFrom, filters.yearTo, filters.photo, filters.profileStatus, filters.includeArchived && [...PROFILE_TYPES, "schools", "events"].includes(filters.type)].filter(Boolean).length;
   return <section className="reports-workspace">
     <div className="panel report-filters">
-      <div className="section-title"><div><h2><Filter size={18} aria-hidden="true" /> Relatórios e filtros</h2><p className="panel-desc">Escolha o tipo de relatório, combine os filtros e gere o arquivo em PDF ou CSV.</p></div><button type="button" className="secondary" disabled={exporting} onClick={clear}><RotateCcw size={14} />Limpar filtros</button></div>
+      <div className="section-title"><div><h2><Filter size={18} aria-hidden="true" /> Relatórios e filtros</h2><p className="panel-desc">Escolha o tipo de relatório, combine os filtros e gere o arquivo em PDF ou Excel.</p></div><button type="button" className="secondary" disabled={exporting} onClick={clear}><RotateCcw size={14} />Limpar filtros</button></div>
       <div className="report-kind"><label>Tipo de relatório<select aria-label="Tipo de relatório" value={filters.type} disabled={exporting} onChange={e => changeType(e.target.value)}>{Object.entries(REPORT_TYPES).map(([key, type]) => <option key={key} value={key}>{type.label}</option>)}</select></label><p className="form-note">{report.hint}</p></div>
       <div className="report-filter-grid">
         {select("eventId", "Evento do relatório", events.map(e => ({ id: e.id, label: `${e.name} · ${e.year}` })), "Todos os eventos")}
@@ -91,7 +98,7 @@ export default function Reports({ api, events, schools, institution }) {
       </div></details>
     </div>
     <div className="panel report-results">
-      <div className="section-title"><div><h2>{report.title}</h2><p className="panel-desc">O arquivo inclui todos os registros filtrados e as colunas selecionadas. Os nomes aparecem somente no arquivo gerado.</p></div><div className="report-export-actions"><button className="secondary" disabled={!canExport} onClick={() => exportFile("csv")}><Download size={15} />Exportar CSV</button><button className="primary" disabled={!canExport} onClick={() => exportFile("pdf")}><FileText size={15} />Exportar PDF</button></div></div>
+      <div className="section-title"><div><h2>{report.title}</h2><p className="panel-desc">O arquivo inclui todos os registros filtrados e as colunas selecionadas. Os nomes aparecem somente no arquivo gerado.</p></div><div className="report-export-actions"><button className="secondary" disabled={!canExport} onClick={() => exportFile("xlsx")}><Download size={15} />Exportar Excel</button><button className="primary" disabled={!canExport} onClick={() => exportFile("pdf")}><FileText size={15} />Exportar PDF</button></div></div>
       <div className="report-filter-grid report-view-options">
         <label>Apresentação<select aria-label="Apresentação do relatório" value={groupBy} disabled={exporting} onChange={e => { setGroupBy(e.target.value); setSortKey(e.target.value ? "name" : report.columns[0].key); }}><option value="">Listagem detalhada</option>{groupOptions.map(c => <option key={c.key} value={c.key}>Resumo por {c.label.toLocaleLowerCase("pt-BR")}</option>)}</select></label>
         <label>Ordenar por<select aria-label="Ordenar relatório por" value={activeSort} disabled={exporting} onChange={e => { setSortKey(e.target.value); }}>{sortColumns.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></label>
@@ -101,7 +108,7 @@ export default function Reports({ api, events, schools, institution }) {
       {!groupColumn && <details className="report-columns"><summary>Personalizar colunas · {columns.length} selecionada(s)</summary><div className="report-column-grid">{report.columns.map(c => <label key={c.key} className="report-checkbox"><input type="checkbox" aria-label={`Coluna ${c.label}`} checked={selected.includes(c.key)} disabled={exporting || selected.length === 1 && selected.includes(c.key)} onChange={e => setSelected(e.target.checked ? [...selected, c.key] : selected.filter(key => key !== c.key))} />{c.label}</label>)}</div></details>}
       <div className="report-applied" aria-label="Filtros aplicados">{filterLabels.map(label => <span key={label}>{label}</span>)}</div>
       {lastExport && <p className="school-success" role="status">Arquivo {lastExport.format} gerado com {lastExport.total.toLocaleString("pt-BR")} linha(s).</p>}
-      {exporting && <div className="report-progress" role="status"><span>{progress}</span><button className="secondary" onClick={()=>{exportTask.current?.controller.abort();exportTask.current?.worker.terminate();}}>Cancelar exportação</button></div>}
+      {exporting && <div className="report-progress" role="status"><span>{progress}</span><button className="secondary" onClick={()=>{exportTask.current?.controller.abort();exportTask.current?.worker?.terminate();}}>Cancelar exportação</button></div>}
       {(report.error || exportError) && <p className="school-error" role="alert">{report.error || exportError}</p>}
 
     </div>

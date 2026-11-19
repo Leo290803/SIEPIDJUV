@@ -1376,11 +1376,12 @@ try {
   assert.equal(await page.getByRole('checkbox',{name:'Coluna CPF',exact:true}).isChecked(),false);
   await page.waitForTimeout(450);
   assert.equal(reportCalls().length,beforeReports+1);
-  const csvDownload=page.waitForEvent('download');
-  await page.getByRole('button',{name:'Exportar CSV',exact:true}).click();
-  await (await csvDownload).saveAs('/tmp/siep-relatorio.csv');
-  assert.ok(fs.readFileSync('/tmp/siep-relatorio.csv','utf8').includes('Atleta conectado'));
-  assert.equal(fs.readFileSync('/tmp/siep-relatorio.csv','utf8').includes('52998224725'),false);
+  const readWorkbook=file=>require('node:child_process').execFileSync('unzip',['-p',file,'xl/*.xml'],{encoding:'utf8'});
+  const excelDownload=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Exportar Excel',exact:true}).click();
+  await (await excelDownload).saveAs('/tmp/siep-relatorio.xlsx');
+  assert.ok(readWorkbook('/tmp/siep-relatorio.xlsx').includes('Atleta conectado'));
+  assert.equal(readWorkbook('/tmp/siep-relatorio.xlsx').includes('52998224725'),false);
   assert.equal(reportCalls().length,beforeReports+2,'Primeiro lote foi consultado duas vezes');
   assert.equal(reportCalls().at(-1).body.p_limit,500);
   assert.equal(reportCalls().at(-1).body.p_filters.gender,'Feminino');
@@ -1394,15 +1395,21 @@ try {
   if(!pdfText.error){assert.equal(pdfText.status,0);assert.ok(pdfText.stdout.includes('Atleta conectado'));assert.ok(pdfText.stdout.includes('Escola conectada'));}
   await page.getByLabel('Apresentação do relatório',{exact:true}).selectOption('gender');
   const genderDownload=page.waitForEvent('download');
-  await page.getByRole('button',{name:'Exportar CSV',exact:true}).click();
-  await (await genderDownload).saveAs('/tmp/siep-relatorio-sexo.csv');
-  assert.ok(fs.readFileSync('/tmp/siep-relatorio-sexo.csv','utf8').includes('Feminino'));
-  assert.equal(fs.readFileSync('/tmp/siep-relatorio-sexo.csv','utf8').includes('Atleta conectado'),false);
+  await page.getByRole('button',{name:'Exportar Excel',exact:true}).click();
+  await (await genderDownload).saveAs('/tmp/siep-relatorio-sexo.xlsx');
+  assert.ok(readWorkbook('/tmp/siep-relatorio-sexo.xlsx').includes('Feminino'));
+  assert.equal(readWorkbook('/tmp/siep-relatorio-sexo.xlsx').includes('Atleta conectado'),false);
   await page.getByLabel('Apresentação do relatório',{exact:true}).selectOption('school');
   const schoolDownload=page.waitForEvent('download');
-  await page.getByRole('button',{name:'Exportar CSV',exact:true}).click();
-  await (await schoolDownload).saveAs('/tmp/siep-relatorio-escola.csv');
-  assert.ok(fs.readFileSync('/tmp/siep-relatorio-escola.csv','utf8').includes('Escola conectada'));
+  await page.getByRole('button',{name:'Exportar Excel',exact:true}).click();
+  await (await schoolDownload).saveAs('/tmp/siep-relatorio-escola.xlsx');
+  assert.ok(readWorkbook('/tmp/siep-relatorio-escola.xlsx').includes('Escola conectada'));
+  const isReportWorker=url=>url.pathname.includes('/export.worker');
+  await page.route(isReportWorker,route=>route.fulfill({contentType:'text/html',body:'<!doctype html>'}),{times:1});
+  await page.getByRole('button',{name:'Exportar Excel',exact:true}).click();
+  await page.getByText('Não foi possível carregar a exportação. Atualize a página e tente novamente.',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Exportar Excel',exact:true}).isEnabled(),true);
+
   await page.getByLabel('Apresentação do relatório',{exact:true}).selectOption('');
   await page.getByText(/^Personalizar colunas/).click();
   await page.screenshot({path:'/tmp/siep-reports-desktop.png',fullPage:true});

@@ -43,7 +43,7 @@ module.exports=async function({page,tables,tenant,queryCalls}){
   const ticks=await page.evaluate(()=>{clearInterval(window.scaleTimer);return window.scaleTicks;});
   assert.ok(ticks>10,'A interface deixou de responder durante o PDF');
   // Cancelar um segundo arquivo encerra consultas adicionais e não produz download.
-  await page.getByRole('button',{name:'Exportar CSV',exact:true}).click();
+  await page.getByRole('button',{name:'Exportar Excel',exact:true}).click();
   await page.getByRole('button',{name:'Cancelar exportação',exact:true}).click();
   await page.getByRole('button',{name:'Cancelar exportação',exact:true}).waitFor({state:'detached'});
   await page.setViewportSize({width:390,height:844});
