@@ -39,6 +39,9 @@ export function readStaff() {
 }
 export default function TechnicalStaff({
   remote,
+  conferenceApi,
+  tenant,
+  event,
   schoolId,
   records: providedRecords,
   schools: providedSchools,
@@ -61,6 +64,27 @@ export default function TechnicalStaff({
   const [archiving, setArchiving] = useState(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [eventStatuses,setEventStatuses]=useState({});
+  const [statusRefresh,setStatusRefresh]=useState(0);
+  const eventStatusLabel={pending:"Aguardando conferência",approved:"Aprovado no evento",correction_requested:"Correção solicitada",rejected:"Indeferido"};
+  const eventId=event?.id;
+  const staffIds=records.map(record=>record.personId).filter(Boolean).join(",");
+  useEffect(()=>{
+    if(!conferenceApi||!eventId||!schoolId||!staffIds)return;
+    const controller=new AbortController();
+    conferenceApi.staffEventStatus(tenant,eventId,schoolId,staffIds.split(","),controller.signal)
+      .then(result=>{if(!controller.signal.aborted)setEventStatuses(result);})
+      .catch(error=>{if(!controller.signal.aborted)setError(error.message);});
+    return ()=>controller.abort();
+  },[conferenceApi,tenant,eventId,schoolId,staffIds,statusRefresh]);
+  async function sendToConference(record) {
+    setBusy(true);setError("");setMessage("");
+    try {
+      const result=await conferenceApi.submitStaffEvent(tenant,eventId,schoolId,record.personId);
+      setEventStatuses(current=>({...current,[record.personId]:result.status}));
+      setMessage(eventStatusLabel[result.status]);
+    } catch(error){setError(error.message);} finally{setBusy(false);}
+  }
   let schools;
   try {
     const saved = JSON.parse(localStorage.getItem("siep-schools"));
@@ -102,11 +126,11 @@ export default function TechnicalStaff({
   );
   async function persist(next, entry, options) {
     try {
-      if (onPersist) await onPersist(entry, options);
-      else localStorage.setItem("siep-staff", JSON.stringify(next));
+      const result=onPersist ? await onPersist(entry, options) : null;
+      if (!onPersist) localStorage.setItem("siep-staff", JSON.stringify(next));
       setRecords(next);
       setError("");
-      return true;
+      return result || {};
     } catch (error) {
       setError(
         onPersist
@@ -173,21 +197,16 @@ export default function TechnicalStaff({
       archived: editing.archived || false,
     };
     setBusy(true);
-    if (
-      await persist(
-        editing.id
-          ? records.map((r) => (r.id === editing.id ? entry : r))
-          : [...records, entry],
-        entry,
-        { photo: photoChange },
-      )
-    ) {
+    const result = await persist(
+      editing.id ? records.map((r) => (r.id === editing.id ? entry : r)) : [...records, entry],
+      entry,
+      {photo:photoChange,enrollInEvent:!!eventId&&!entry.archived},
+    );
+    if(result){
       closeRecord();
-      setMessage(
-        connected
-          ? "Profissional salvo no banco."
-          : "Profissional salvo neste navegador.",
-      );
+      setStatusRefresh(value=>value+1);
+      setMessage(result.eventError || (result.eventStatus ? eventStatusLabel[result.eventStatus]
+        : connected ? "Profissional salvo no banco." : "Profissional salvo neste navegador."));
     }
     setBusy(false);
   }
@@ -287,6 +306,7 @@ export default function TechnicalStaff({
                 <th>Registro</th>
                 <th>Contato</th>
                 <th>Situação</th>
+                {eventId&&<th>Conferência no evento</th>}
                 <th>Ações</th>
               </tr>
             </thead>
@@ -321,8 +341,13 @@ export default function TechnicalStaff({
                           : "Ativo"}
                     </span>
                   </td>
+                  {eventId&&<td>{eventStatusLabel[eventStatuses[r.personId]] || "Ainda sem envio"}</td>}
                   <td>
                     <div className="staff-actions">
+                      {eventId&&!r.archived&&r.personId&&![ "pending","approved" ].includes(eventStatuses[r.personId])&&
+                        <button type="button" className="secondary" disabled={busy} onClick={()=>sendToConference(r)}>
+                          {eventStatuses[r.personId] ? "Reenviar para conferência" : "Enviar para conferência"}
+                        </button>}
                       <button
                         className="secondary"
                         aria-label={`Editar ${r.name}`}
@@ -352,7 +377,7 @@ export default function TechnicalStaff({
               ))}
               {!shown.length && (
                 <tr>
-                  <td colSpan={schoolId ? 6 : 7} className="table-empty">
+                  <td colSpan={schoolId && !eventId ? 6 : 7} className="table-empty">
                     Nenhum profissional encontrado. Cadastre um profissional ou
                     altere os filtros.
                   </td>
@@ -381,6 +406,7 @@ export default function TechnicalStaff({
             <h2 id="staff-title">
               {editing.id ? "Editar profissional" : "Cadastrar profissional"}
             </h2>
+            {eventId&&!editing.archived&&<p>Ao salvar, o profissional será enviado para conferência em {event.name}.</p>}
             <p>Campos com * são obrigatórios.</p>
             <form onSubmit={save}>
               {connected && <PersonPhoto photo={editing.photo} value={photoChange} onChange={setPhotoChange} disabled={busy} />}

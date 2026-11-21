@@ -203,8 +203,18 @@ export default function InstitutionPortal({
     setBusy(true);
     setError("");
     try {
-      await api.savePerson(tenant, role, entry, options);
-      await refresh();
+      const result = await api.savePerson(tenant, role, entry, options);
+      let eventStatus;
+      if (role === "staff" && options?.enrollInEvent && schoolArea && activeEvent) {
+        try {
+          eventStatus = (await api.submitStaffEvent(tenant,activeEvent.id,entry.schoolId,result.person_id)).status;
+        } catch (error) {
+          return {eventError:"Cadastro salvo. O envio para conferência ficou pendente. "+readableError(error)};
+        } finally {
+          await refresh();
+        }
+      } else await refresh();
+      return {eventStatus};
     } catch (error) {
       await refresh().catch(() => {});
       throw Error(readableError(error));
@@ -792,7 +802,10 @@ export default function InstitutionPortal({
                   {page === "Comissão técnica" && (
                     <TechnicalStaff
                       remote={remote}
-                      key={roleFormSchool || "all"}
+                      conferenceApi={schoolArea ? api : undefined}
+                      tenant={tenant}
+                      event={schoolArea ? activeEvent : undefined}
+                      key={(roleFormSchool || "all")+":"+(schoolArea ? activeEvent?.id || "" : "")}
                       connected
                       schoolId={roleFormSchool}
                       records={data.staff}

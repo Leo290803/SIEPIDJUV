@@ -17,7 +17,7 @@ try {
   const {fromEvent}=await import('../src/data/eventMapping.js');
   const {buildReport,groupRows,sortRows,normalize}=await import('../src/reports/model.js');
   const queryCalls=[];
-  const staffReviews=new Map(),developmentImages=new Map();
+  const staffReviews=new Map(),staffEventEntries=new Map(),developmentImages=new Map();
   let notificationFailure=false,completionIssues=[],loseCompletionResponse=false;
   const completionReceipts=new Map(),badgeTemplates=new Map(),defaultBadgeTemplates=new Map(),artAssets=new Map();
   const persistedBadgeArt=new Map();
@@ -97,10 +97,11 @@ try {
   };
   function staffBadgeAllowed(event,school,person){
     const assignments=tables.registration_staff.filter(a=>a.event_id===event&&a.school_id===school&&a.person_id===person.id);
-    const roles=[...new Set(assignments.map(a=>a.staff_role_id))].map(id=>({id,name:tables.event_staff_roles.find(r=>r.id===id)?.name||'Técnico'}));
+    const direct=staffEventEntries.get([event,school,person.id].join(':'));
+    const roles=[...new Set(direct?[direct.staff_role_id]:assignments.map(a=>a.staff_role_id))].map(id=>({id,name:tables.event_staff_roles.find(r=>r.id===id)?.name||'Técnico'}));
     const f=tables.person_photos.find(f=>f.person_id===person.id&&f.is_current),photo=f?{id:f.id,bucket:f.bucket_id,objectPath:f.object_path,name:f.original_name}:null;
     const review=staffReviews.get([event,school,person.id].join(':'));
-    return review?.status==='approved'&&review.fingerprint===JSON.stringify([person,photo,roles]);
+    return review?.status==='approved'&&review.fingerprint===JSON.stringify([person,photo,roles,direct?.submission_revision]);
   }
   function recordTransition(r,status,reason,deadline){
     registrationTransitions.push({from:r.status,to:status,actor:isAdmin||isManager?'secretaria':'escola'});
@@ -220,23 +221,41 @@ try {
         const model={id:old?.id||randomUUID(),version_id:randomUUID(),version:(old?.version||0)+1,role:body.p_role,layout:structuredClone(body.p_layout),background:attachment(body.p_background_id),reverse_background:attachment(body.p_reverse_background_id)};
         badgeTemplates.set(key,model);return response(route,model);
       }
+      if(table==='siep_submit_staff_event'){
+        const {p_event_id:event_id,p_school_id:school_id,p_person_id:person_id}=body;
+        const key=[event_id,school_id,person_id].join(':');
+        const link=tables.school_people.find(l=>l.school_id===school_id&&l.person_id===person_id&&l.role==='staff');
+        const role=tables.event_staff_roles.find(r=>r.event_id===event_id&&r.name===link?.position);
+        assert.ok(role);
+        if(!staffEventEntries.has(key))staffEventEntries.set(key,{event_id,school_id,person_id,staff_role_id:role.id,submission_revision:1});
+        return response(route,{status:'pending'});
+      }
+      if(table==='siep_staff_event_status'){
+        const statuses={};
+        for(const person of body.p_people){
+          const key=[body.p_event_id,body.p_school_id,person].join(':');
+          if(staffEventEntries.has(key))statuses[person]=staffReviews.get(key)?.status||'pending';
+        }
+        return response(route,statuses);
+      }
       if(['siep_staff_conference_page','siep_staff_conference_detail','siep_review_staff'].includes(table)){
         queryCalls.push({table,body});
         if(body.p_institution_id!==tenant)return response(route,{message:'Acesso negado'},403);
         const candidates=new Map();
-        for(const a of tables.registration_staff){
+        for(const a of [...staffEventEntries.values(),...tables.registration_staff]){
           const key=[a.event_id,a.school_id,a.person_id].join(':');
           if(candidates.has(key))continue;
           const p=tables.people.find(p=>p.id===a.person_id),link=tables.school_people.find(l=>l.person_id===a.person_id&&l.school_id===a.school_id&&l.role==='staff');
           if(!p||!link)continue;
           const assignments=tables.registration_staff.filter(x=>x.person_id===a.person_id&&x.school_id===a.school_id&&x.event_id===a.event_id);
-          const roles=[...new Set(assignments.map(x=>x.staff_role_id))].map(id=>({id,name:tables.event_staff_roles.find(r=>r.id===id)?.name||'Técnico'}));
+          const direct=staffEventEntries.get(key);
+          const roles=[...new Set(direct?[direct.staff_role_id]:assignments.map(x=>x.staff_role_id))].map(id=>({id,name:tables.event_staff_roles.find(r=>r.id===id)?.name||'Técnico'}));
           const f=tables.person_photos.find(f=>f.person_id===p.id&&f.is_current),photo=f?{id:f.id,bucket:f.bucket_id,objectPath:f.object_path,name:f.original_name}:null;
-          const fingerprint=JSON.stringify([p,photo,roles]),review=staffReviews.get(key);
-          candidates.set(key,{event_id:a.event_id,school_id:a.school_id,person_id:p.id,link_id:link.id,person:p,roles,photo,fingerprint,event_name:tables.events.find(e=>e.id===a.event_id)?.name,school_name:tables.schools.find(s=>s.id===a.school_id)?.name,registration_count:new Set(assignments.map(x=>x.registration_id)).size,active:!p.archived&&!link.archived&&link.status==='approved',revision:review?.revision||0,status:review?.fingerprint===fingerprint?review.status:'pending',outdated:!!review&&review.fingerprint!==fingerprint,last_reason:review?.last_reason,history:review?.history||[]});
+          const fingerprint=JSON.stringify([p,photo,roles,direct?.submission_revision]),review=staffReviews.get(key);
+          candidates.set(key,{direct_entry:!!direct,event_id:a.event_id,school_id:a.school_id,person_id:p.id,link_id:link.id,person:p,roles,photo,fingerprint,event_name:tables.events.find(e=>e.id===a.event_id)?.name,school_name:tables.schools.find(s=>s.id===a.school_id)?.name,registration_count:new Set(assignments.map(x=>x.registration_id)).size,active:!p.archived&&!link.archived&&link.status==='approved',revision:review?.revision||0,status:review?.fingerprint===fingerprint?review.status:'pending',outdated:!!review&&review.fingerprint!==fingerprint,last_reason:review?.last_reason,history:review?.history||[]});
         }
         if(table==='siep_staff_conference_page'){
-          const f=body.p_filters||{};let rows=[...candidates.values()].filter(r=>(!body.p_school_id||r.school_id===body.p_school_id)&&(!f.eventId||r.event_id===f.eventId)&&(!f.schoolId||r.school_id===f.schoolId)&&(!f.status||f.status==='all'||r.status===f.status)&&(!f.query||[r.person.full_name,r.person.cpf,r.school_name].join(' ').toLowerCase().includes(f.query.toLowerCase())));
+          const f=body.p_filters||{};let rows=[...candidates.values()].filter(r=>(!f.directOnly||r.direct_entry)&&(!body.p_school_id||r.school_id===body.p_school_id)&&(!f.eventId||r.event_id===f.eventId)&&(!f.schoolId||r.school_id===f.schoolId)&&(!f.status||f.status==='all'||r.status===f.status)&&(!f.query||[r.person.full_name,r.person.cpf,r.school_name].join(' ').toLowerCase().includes(f.query.toLowerCase())));
           return response(route,{total:rows.length,rows:rows.slice(body.p_offset,body.p_offset+body.p_limit)});
         }
         const key=[body.p_event_id,body.p_school_id,body.p_person_id].join(':'),row=candidates.get(key);
@@ -342,6 +361,13 @@ try {
             const row={person_id:person.id,school_id:school.id,role,role_label:role==='athlete'?'Atleta':'Comissão técnica',person_name:person.full_name,school_name:school.name,photo_id:photo?.id||null,photo_bucket:photo?.bucket_id,photo_path:photo?.object_path};
             eligible.set([school.id,person.id,role].join(':'),row);
           }
+        }
+        if(!body.p_role||body.p_role==='staff')for(const entry of staffEventEntries.values()){
+          if(entry.event_id!==body.p_event_id||(body.p_school_id&&entry.school_id!==body.p_school_id))continue;
+          const person=tables.people.find(p=>p.id===entry.person_id),school=tables.schools.find(s=>s.id===entry.school_id);
+          if(!staffBadgeAllowed(entry.event_id,school.id,person))continue;
+          const photo=tables.person_photos.find(p=>p.person_id===person.id&&p.is_current);
+          eligible.set([school.id,person.id,'staff'].join(':'),{person_id:person.id,school_id:school.id,role:'staff',role_label:'Comissão técnica',person_name:person.full_name,school_name:school.name,photo_id:photo?.id||null,photo_bucket:photo?.bucket_id,photo_path:photo?.object_path});
         }
         const all=[...eligible.values()].filter(r=>normalize(r.person_name+' '+r.school_name).includes(normalize(body.p_query||'')));
         return response(route,{rows:all.slice(body.p_offset,body.p_offset+body.p_limit),total:all.length});
@@ -1263,7 +1289,7 @@ try {
   await page.getByLabel('Situação da conferência técnica',{exact:true}).selectOption('approved');
   await page.getByRole('button',{name:'Conferir profissional',exact:true}).waitFor();
   await page.getByLabel('Buscar profissional na conferência',{exact:true}).fill('ninguém com esse nome');
-  await page.getByText('Nenhum profissional vinculado a inscrições com estes filtros.',{exact:true}).waitFor();
+  await page.getByText('Nenhum profissional enviado para conferência com estes filtros.',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Inscrições de atletas',exact:true}).click();
   tables.registration_staff=originalAssignments;tables.registrations=tables.registrations.filter(r=>r.id!==extraStaffRegistration.id);
   const examplePhoto=tables.person_photos.find(p=>p.is_current&&p.person_id===tables.people[0].id);
@@ -1372,14 +1398,26 @@ try {
   const printStaff={id:randomUUID(),institution_id:tenant,full_name:'Técnico do crachá de teste',cpf:'12345678909',birth_date:'1990-02-03',gender:'Masculino',archived:false,contact:{},updated_at:new Date().toISOString()};
   tables.people.push(printStaff);
   tables.school_people.push({id:randomUUID(),institution_id:tenant,person_id:printStaff.id,school_id:registration.school_id,role:'staff',position:'Técnico',professional_registration:'123456-G/RR',status:'approved',version:1,archived:false});
-  tables.registration_staff.push({id:randomUUID(),institution_id:tenant,event_id:registration.event_id,school_id:registration.school_id,registration_id:registration.id,person_id:printStaff.id,staff_role_id:staffRole.id});
+
   const printPhoto={id:randomUUID(),institution_id:tenant,person_id:printStaff.id,bucket_id:'siep-development-photos',object_path:'development/print-staff-test.png',original_name:'tecnico.png',status:'uploaded',is_current:true};
   tables.person_photos.push(printPhoto);
   const redImage=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=4;c.height=4;const context=c.getContext('2d');context.fillStyle='rgb(190,30,30)';context.fillRect(0,0,4,4);return c.toDataURL('image/png').split(',')[1];});
   developmentImages.set(printPhoto.object_path,Buffer.from(redImage,'base64'));
   await page.getByLabel('Perfil dos crachás',{exact:true}).selectOption('staff');
   await page.getByText('Nenhum participante aprovado encontrado para estes filtros.',{exact:true}).waitFor();
-  await page.getByRole('link',{name:'Conferir comissão técnica',exact:true}).click();
+  isAdmin=false;
+  await page.goto(origin+'/escola/'+tenant+'/escolas/'+registration.school_id+'/comissao-tecnica');
+  const privateStaff=page.getByRole('row',{name:/Técnico do crachá de teste/});
+  await privateStaff.getByRole('button',{name:'Enviar para conferência',exact:true}).click();
+  await privateStaff.getByText('Aguardando conferência',{exact:true}).waitFor();
+  await privateStaff.getByRole('button',{name:'Editar Técnico do crachá de teste',exact:true}).click();
+  await page.getByRole('button',{name:'Salvar profissional',exact:true}).click();
+  await privateStaff.getByText('Aguardando conferência',{exact:true}).waitFor();
+  assert.equal(staffEventEntries.size,1);
+  assert.equal(tables.registration_staff.filter(row=>row.person_id===printStaff.id).length,0);
+  isAdmin=true;
+  await page.goto(origin+'/secretaria/'+tenant+'/inscricoes?tipo=comissao&evento='+registration.event_id);
+
   assert.equal(await page.getByLabel('Evento da comissão técnica',{exact:true}).inputValue(),registration.event_id);
   await page.getByRole('button',{name:'Conferir profissional',exact:true}).click();
   const printReview=page.getByRole('dialog',{name:'Conferência do profissional',exact:true});

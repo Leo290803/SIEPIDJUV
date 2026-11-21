@@ -280,6 +280,8 @@ export function RegistrationEditor({
                     completo no evento, nascimento, sexo, documentos e regras.
                   </p>
                 )}
+                {schoolWorkflow&&<p className="form-note">Inscreva os profissionais na aba Comissão técnica da escola, uma vez por evento.</p>}
+                {(!schoolWorkflow||data.registrationStaff.some(item=>item.registration_id===registration?.id))&&<>
                 <h3>Comissão técnica</h3>
                 <p className="form-note">Marque os profissionais que vão acompanhar esta inscrição.</p>
                 {professionals.length > 0 && <p className="form-note" role="status">
@@ -327,6 +329,7 @@ export function RegistrationEditor({
                     Para selecionar um profissional, cadastre-o em Comissão técnica da escola com uma função habilitada no evento.
                   </p>
                 )}
+                </>}
               </>
             )}
             {!schoolWorkflow && issues.length > 0 && (

@@ -58,6 +58,10 @@ Em **Crachás → Modelo padrão da instituição**, a Secretaria pode configura
 
 A migração `20261119200000_institution_badge_defaults` mantém modelos, versões e artes existentes e usa a estrutura versionada também para os padrões. Foram validados o uso automático em um segundo evento, a prioridade do modelo específico, o isolamento entre instituições e a preservação das emissões antigas.
 
+### Inscrição independente da comissão técnica
+
+Com um evento aberto selecionado, salvar um profissional na área da escola o envia para conferência no evento. Cadastros anteriores podem ser enviados pela ação **Enviar para conferência**. O vínculo é único por profissional, escola e evento. O crachá da comissão exige conferência própria aprovada e foto. O relatório escolar reúne as inscrições da comissão em uma lista geral. Os vínculos antigos com inscrições de atletas continuam disponíveis no histórico.
+
 ### Evidências e limites desta entrega
 
 Aprovados localmente: **113 testes JS**, build, **19 suítes SQL + 3 cenários de concorrência** e fluxo Chromium com API simulada. SQL novo cobre permissões, isolamento, arte inválida/ausente, obrigatoriedade de campos, limites, versão concorrente, preservação histórica e aprovação. Chromium cobre download dos gabaritos, configuração da arte, posição numérica, campos mínimos, celular, emissão com arte/dados, versão nova e reimpressão antiga, além do fallback sem RPC. O fluxo completo anterior também passou. Build mantém aviso de chunks grandes; não é falha de compilação.

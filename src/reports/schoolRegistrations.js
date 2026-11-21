@@ -111,7 +111,20 @@ export async function createSchoolRegistrationsPdf({api, tenant, school, event, 
     }
   } while (seen.size < total);
 
-  if (!registrations) return null;
+  let offset=0;
+  while (true) {
+    signal.throwIfAborted();
+    const page=await api.staffPage(tenant,school.id,{eventId:event.id,directOnly:true},offset,signal);
+    for (const row of page.rows) {
+      people.add(row.person_id);
+      commission.set(row.person_id,{name:row.person.full_name,roles:new Set(row.roles.map(role=>role.name))});
+    }
+    offset+=page.rows.length;
+    if (offset>=page.total) break;
+    if (!page.rows.length) throw Error("A lista da comissão técnica mudou. Tente baixar o PDF novamente.");
+  }
+
+  if (!registrations && (modalityId || !commission.size)) return null;
   const compare = (a,b) => a.localeCompare(b,"pt-BR");
   const byCategory = (a,b) => compare(a.cells.category,b.cells.category) || compare(a.cells.proof,b.cells.proof);
   const sections = [...modalities.values()].sort((a,b) => compare(a.title,b.title)).map(group => ({
