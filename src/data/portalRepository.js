@@ -158,6 +158,9 @@ export function portalRepository(client) {
       p_direction:options.direction || "asc",p_offset:options.offset || 0,p_limit:options.limit || 25,p_snapshot:options.snapshot || null,
     },signal),
     savePerson,
+    badgeReadiness: (event,school,role,query,offset,signal) => queryPage("siep_badge_readiness_page",{
+      p_event_id:event,p_school_id:school,p_role:role||null,p_query:query,p_offset:offset,p_limit:25,
+    },signal),
     badgeCandidates: async (event, school, role, query = "", offset = 0, signal) => queryPage("siep_badge_page", { p_event_id:event, p_school_id:school, p_role:role, p_query:query, p_offset:offset, p_limit:25 },signal),
     defaultBadgeTemplate: (tenant,role,signal) => queryPage("siep_default_badge_template",{p_institution_id:tenant,p_role:role},signal),
     prepareDefaultBadgeArt: (tenant,file) => queryPage("siep_prepare_default_badge_art",{p_institution_id:tenant,p_name:file.name,p_mime_type:file.type,p_size_bytes:file.size}),

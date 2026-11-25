@@ -355,6 +355,12 @@ try {
       if (table === "siep_remove_person_photo") {
         const photo=tables.person_photos.find(p=>p.person_id===body.p_person_id&&p.is_current);assert.equal(body.p_expected_photo_id,photo?.id||null);if(photo){photo.is_current=false;photo.status="superseded";}return response(route,null);
       }
+      if (table === "siep_badge_readiness_page") {
+        queryCalls.push({table,body});
+        return response(route,{total:1,rows:[{
+          person_id: "pending-staff", person_name:"Técnico com pendências", role:"staff", reasons:["staff_review","photo"],
+        }]});
+      }
       if (table === "siep_badge_page") {
         const eligible=new Map();
         for(const registration of tables.registrations.filter(r=>r.event_id===body.p_event_id&&r.status==='approved'&&(!body.p_school_id||r.school_id===body.p_school_id))){
@@ -1481,6 +1487,16 @@ try {
   await page.getByRole('button',{name:'Crachás',exact:true}).click();
   await page.getByLabel('Evento dos crachás',{exact:true}).selectOption(registration.event_id);
   await page.getByLabel('Escola dos crachás',{exact:true}).selectOption(registration.school_id);
+  assert.equal(queryCalls.filter(call=>call.table==='siep_badge_readiness_page').length,0);
+  await page.getByRole('button',{name:'Ver pendências',exact:true}).click();
+  const readiness=page.getByRole('dialog',{name:'Pendências dos crachás'});
+  await readiness.getByText('Aguardando conferência do técnico',{exact:true}).waitFor();
+  await readiness.getByText('Adicionar foto de identificação',{exact:true}).waitFor();
+  const readinessCall=queryCalls.find(call=>call.table==='siep_badge_readiness_page');
+  assert.equal(readinessCall.body.p_event_id,registration.event_id);
+  assert.equal(readinessCall.body.p_school_id,registration.school_id);
+  assert.equal(readinessCall.body.p_limit,25);
+  await readiness.getByRole('button',{name:'Fechar pendências',exact:true}).click();
   await page.getByRole('checkbox',{name:'Selecionar Atleta conectado · Atleta',exact:true}).check();
   await page.getByRole('checkbox',{name:'Selecionar Técnico do crachá de teste · Comissão técnica',exact:true}).check();
   const mixedPrintPromise=page.waitForEvent('popup');

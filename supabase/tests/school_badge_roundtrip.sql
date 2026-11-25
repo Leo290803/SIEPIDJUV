@@ -76,6 +76,8 @@ begin
  denied:=false;begin perform public.siep_submit_staff_event(tenant,other_event,other_school,professional);exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Escola inscreveu técnico de outro vínculo';end if;
  result:=public.siep_staff_event_status(tenant,other_event,school,array[professional]);
  if result->>professional::text is distinct from 'pending' then raise exception 'Escola não recebeu o andamento da própria inscrição';end if;
+ denied:=false;begin perform public.siep_badge_readiness_page(other_event,school,'staff');exception when insufficient_privilege then denied:=true;end;
+ if not denied then raise exception 'Escola acessou as pendências da Secretaria';end if;
  execute 'reset role';
  perform set_config('request.jwt.claim.sub',admin_user::text,true);
  execute 'set local role authenticated';
@@ -83,10 +85,14 @@ begin
  if result->>'total' is distinct from '1' or result#>>'{rows,0,registration_count}' is distinct from '0' then raise exception 'Conferência direta dependeu de atleta';end if;
  result:=public.siep_badge_page(other_event,school,'staff');
  if result->>'total' is distinct from '0' then raise exception 'Crachá liberado antes da conferência';end if;
+ result:=public.siep_badge_readiness_page(other_event,school,'staff');
+ if result->>'total' is distinct from '1' or result#>'{rows,0,reasons}' is distinct from '["staff_review"]'::jsonb then raise exception 'Pendências não identificaram a conferência independente';end if;
  detail:=public.siep_staff_conference_detail(tenant,other_event,school,professional);
  perform public.siep_review_staff(tenant,other_event,school,professional,(detail->>'revision')::int,detail->>'fingerprint','approved','Conferência independente');
  result:=public.siep_submit_staff_event(tenant,other_event,school,professional);
  if result->>'status' is distinct from 'approved' then raise exception 'Envio repetido reiniciou aprovação';end if;
+ result:=public.siep_badge_readiness_page(other_event,school,'staff');
+ if result#>'{rows,0,reasons}' is distinct from '[]'::jsonb then raise exception 'Aprovação não liberou o crachá nas pendências';end if;
  issued:=public.siep_issue_event_badges(other_event,jsonb_build_array(batch->0));
  if issued#>>'{0,snapshot,functions}' is distinct from 'Técnico' then raise exception 'Crachá independente perdeu a função';end if;
  execute 'reset role';

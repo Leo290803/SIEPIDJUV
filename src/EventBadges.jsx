@@ -1,3 +1,4 @@
+import BadgeReadiness from "./BadgeReadiness.jsx";
 import BadgeTemplateEditor from "./BadgeTemplateEditor.jsx";
 import ServerPagination from "./ServerPagination.jsx";
 import React, { useEffect, useState } from "react";
@@ -9,9 +10,9 @@ const previewEvent={name:"Evento de exemplo"};
 const keyOf = row => [row.school_id,row.person_id,row.role].join(":");
 export default function EventBadges({events,schools,api,tenant}) {
  const [eventId,setEventId]=useState(""),[schoolId,setSchoolId]=useState(""),[role,setRole]=useState(""),[query,setQuery]=useState(""),[rows,setRows]=useState([]),[history,setHistory]=useState([]),[selected,setSelected]=useState([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[refresh,setRefresh]=useState(0);
- const [configuring,setConfiguring]=useState(null);
+ const [configuring,setConfiguring]=useState(null),[readinessOpen,setReadinessOpen]=useState(false);
  const [offset,setOffset]=useState(0),[total,setTotal]=useState(0);
- const event=events.find(e=>e.id===eventId);
+ const event=events.find(e=>e.id===eventId),school=schools.find(s=>s.id===schoolId);
  const registrationsPath=`/secretaria/${tenant}/inscricoes`;
  const staffReviewParams=new URLSearchParams({tipo:"comissao",evento:eventId,escola:schoolId});
  useEffect(()=>{
@@ -63,7 +64,10 @@ export default function EventBadges({events,schools,api,tenant}) {
   <div className="school-form-footer">
    <button className="secondary" disabled={busy} onClick={()=>setConfiguring("default")}>Modelo padrão da instituição</button>
    {event&&<button className="secondary" disabled={busy} onClick={()=>setConfiguring("event")}>Configurar arte e campos</button>}
+   {event&&school&&<button type="button" className="secondary" disabled={busy} onClick={()=>setReadinessOpen(true)}>Ver pendências</button>}
+
   </div>
+  {readinessOpen&&event&&school&&<BadgeReadiness api={api} event={event} school={school} role={role} query={query} onClose={()=>setReadinessOpen(false)}/>}
   {configuring&&<BadgeTemplateEditor key={configuring+":"+eventId} api={api} tenant={tenant}
     event={event||previewEvent} institutionWide={configuring==="default"}
     initialRole={role||"athlete"} onClose={()=>setConfiguring(null)}/>}
