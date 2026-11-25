@@ -971,11 +971,10 @@ try {
   await page
     .getByRole("button", { name: "Nova inscrição neste evento", exact: true })
     .click();
-  await page
-    .getByRole("dialog")
-    .getByRole("combobox")
-    .first()
-    .selectOption(tables.event_categories[0].id);
+  const newRegistrationDialog=page.getByRole("dialog",{name:"Inscrição no evento"});
+  assert.equal(await newRegistrationDialog.getByLabel("Categoria *",{exact:true}).count(),0);
+  await newRegistrationDialog.getByLabel("Modalidade *",{exact:true}).selectOption(tables.event_categories[0].modality_id);
+  await newRegistrationDialog.getByLabel("Categoria *",{exact:true}).selectOption(tables.event_categories[0].id);
   await page
     .getByLabel("Atleta 1", { exact: true })
     .selectOption(tables.event_participations[0].id);
@@ -1049,10 +1048,22 @@ try {
   await page.screenshot({path:'/tmp/siep-escola-modalidades.png',fullPage:true});
   assert.equal(await page.getByRole('cell',{name:'100 metros'}).count(),0);
   await page.getByRole('button',{name:'Ver inscrições de Atletismo',exact:true}).click();
+  await page.getByRole('button',{name:'Nova inscrição neste evento',exact:true}).click();
+  await newRegistrationDialog.getByRole('heading',{name:'Nova inscrição · Atletismo',exact:true}).waitFor();
+  assert.equal(await newRegistrationDialog.getByLabel('Modalidade *',{exact:true}).count(),0);
+  assert.deepEqual(await newRegistrationDialog.getByLabel('Categoria *',{exact:true}).locator('option').evaluateAll(options=>options.map(o=>o.value)),['',pdfCategory.id]);
+  await newRegistrationDialog.getByRole('button',{name:'Fechar inscrição',exact:true}).click();
+
   const categoryButton=page.getByRole('button',{name:'Ver inscrições de '+pdfCategory.name,exact:true});
   await categoryButton.waitFor();
   assert.equal(await page.getByRole('cell',{name:'100 metros'}).count(),0);
   await categoryButton.click();
+  await page.getByRole('button',{name:'Nova inscrição neste evento',exact:true}).click();
+  await newRegistrationDialog.getByRole('heading',{name:'Nova inscrição · Atletismo · '+pdfCategory.name,exact:true}).waitFor();
+  assert.equal(await newRegistrationDialog.getByLabel('Categoria *',{exact:true}).count(),0);
+  await newRegistrationDialog.getByLabel('Prova *',{exact:true}).selectOption(proofFixtures[0].id);
+  await newRegistrationDialog.getByRole('button',{name:'Fechar inscrição',exact:true}).click();
+
   await page.getByText('100 metros',{exact:true}).waitFor();
   await page.getByText('Salto em distância',{exact:true}).waitFor();
   await page.screenshot({path:'/tmp/siep-escola-provas.png',fullPage:true});

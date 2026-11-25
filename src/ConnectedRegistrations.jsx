@@ -19,11 +19,18 @@ export function RegistrationEditor({
   onSaved,
   onClose,
   schoolWorkflow = false,
+  initialModality,
+  initialCategory,
 }) {
   const [savedRegistration,setSavedRegistration]=useState(registration ? {id:registration.id,revision:registration.revision} : null);
   const completionRequest=useRef(null),schoolIssues=useRef(null);
   const currentId=savedRegistration?.id;
-  const [categoryId, setCategoryId] = useState(registration?.category_id || ""),
+  const newSchoolEntry = schoolWorkflow && !registration;
+  const fixedModality = newSchoolEntry && initialModality?.enabled !== false ? initialModality : undefined;
+  const fixedCategory = fixedModality && initialCategory?.modalityId === fixedModality.id && initialCategory.enabled !== false
+    ? initialCategory : undefined;
+  const [selectedModalityId,setSelectedModalityId] = useState(fixedModality?.id || "");
+  const [categoryId, setCategoryId] = useState(registration?.category_id || fixedCategory?.id || ""),
     [proofId, setProofId] = useState(registration?.proof_id || ""),
     [slots, setSlots] = useState(() =>
       Object.fromEntries(
@@ -49,6 +56,16 @@ export function RegistrationEditor({
   },[schoolWorkflow,issues,error]);
   const category = event.categories.find((c) => c.id === categoryId),
     proof = category?.proofs?.find((p) => p.id === proofId);
+  const selectableCategories = event.categories.filter(item => item.enabled !== false || item.id === categoryId);
+  const selectableModalities = (event.modalities || []).filter(item =>
+    item.enabled !== false && selectableCategories.some(category => category.modalityId === item.id));
+  const selectedModality = fixedModality || selectableModalities.find(item=>item.id===selectedModalityId);
+  function chooseCategory(id) {
+    setCategoryId(id);
+    setProofId("");
+    setSlots({});
+    setIssues([]);
+  }
   const capacity = proof ? proof.slotsPerSchool : category?.max || 1;
   const n = Number.isInteger(capacity) ? Math.min(capacity, 1000) : 0;
   const other = data.allocations.filter(
@@ -69,7 +86,10 @@ export function RegistrationEditor({
     let active = true;
     setError("");
     setEligible([]);
-    if (!categoryId || ((category?.proofs || []).length && !proofId)) return;
+    if (!categoryId || ((category?.proofs || []).length && !proofId)) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     api
       .eligible(event.id, school.id, categoryId, proofId, currentId)
@@ -138,7 +158,7 @@ export function RegistrationEditor({
         >
           <X />
         </button>
-        <h2>Inscrição · {event.name}</h2>
+        <h2>{newSchoolEntry ? ["Nova inscrição",selectedModality?.name,fixedCategory?.name].filter(Boolean).join(" · ") : `Inscrição · ${event.name}`}</h2>
         <p>
           {school.name} ·{" "}
           {currentId ? "Continuar inscrição" : "Novo rascunho"}
@@ -147,33 +167,30 @@ export function RegistrationEditor({
         {schoolWorkflow && (issues.length>0 || error) && <div className="participation-issues" role="alert" tabIndex={-1} ref={schoolIssues}><strong>{issues.length ? "A inscrição ainda não foi enviada" : "Não foi possível confirmar a conclusão"}</strong>{issues.length>0 && <ul>{issueMessages(issues,event).map(message=><li key={message}>{message}</li>)}</ul>}{error&&<p>{error}</p>}<p>{issues.length ? "Os dados preenchidos foram mantidos. Resolva as pendências antes de concluir." : "Os dados preenchidos continuam na tela. Tente novamente; a operação evita inscrições duplicadas."}</p></div>}
         <form onSubmit={submit}>
           <fieldset className="form-fields" disabled={busy}>
-            <label>
-              Modalidade e categoria *
-              <select
-                required
-                value={categoryId}
-                disabled={!!currentId}
-                onChange={(e) => {
-                  setCategoryId(e.target.value);
-                  setProofId("");
-                  setSlots({});
-                  setIssues([]);
-                }}
-              >
-                <option value="">Selecione</option>
-                {event.categories
-                  .filter((c) => c.enabled !== false || c.id === categoryId)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.modality} · {c.name}
-                    </option>
-                  ))}
+            {newSchoolEntry && !fixedModality && <label>
+              Modalidade *
+              <select aria-label="Modalidade *" required value={selectedModalityId} disabled={!!currentId} onChange={e=>{
+                setSelectedModalityId(e.target.value);
+                chooseCategory("");
+              }}>
+                <option value="">Selecione a modalidade</option>
+                {selectableModalities.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
-            </label>
+            </label>}
+            {!fixedCategory && (!newSchoolEntry || selectedModality) && <label>
+              {newSchoolEntry ? "Categoria *" : "Modalidade e categoria *"}
+              <select aria-label={newSchoolEntry ? "Categoria *" : "Modalidade e categoria *"} required value={categoryId} disabled={!!currentId} onChange={e=>chooseCategory(e.target.value)}>
+                <option value="">Selecione</option>
+                {selectableCategories.filter(item=>!newSchoolEntry||item.modalityId===selectedModality?.id).map(item=>(
+                  <option key={item.id} value={item.id}>{newSchoolEntry ? item.name : `${item.modality} · ${item.name}`}</option>
+                ))}
+              </select>
+            </label>}
             {category?.proofs?.length > 0 && (
               <label>
                 Prova *
                 <select
+                  aria-label="Prova *"
                   required
                   value={proofId}
                   disabled={!!currentId}
@@ -793,6 +810,8 @@ export default function ConnectedRegistrations({
           event={editing ? ev(editing) : event}
           school={editing ? sc(editing) : school}
           registration={editing}
+          initialModality={modality || undefined}
+          initialCategory={selectedCategory || undefined}
           data={data}
           api={api}
           schoolWorkflow={!manager}
