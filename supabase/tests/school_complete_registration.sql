@@ -38,6 +38,7 @@ begin
  update public.registrations set correction_deadline=now()-interval '1 minute' where id=r;
  perform set_config('request.jwt.claim.sub',school_user::text,true);execute 'set local role authenticated';denied:=false;begin perform public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,payload2,'[]',r,rev);exception when check_violation then denied:=true;end;if not denied then raise exception 'Prazo vencido contornado';end if;execute 'reset role';
  if (select revision from public.registrations where id=r)<>rev or (select count(*) from public.registration_athletes where registration_id=r)<>2 then raise exception 'Falha de prazo alterou inscrição';end if;
+ insert into public.event_rules(institution_id,event_id,category_id,kind,parameters) values(tenant,ev,cat,'schoolEntries','{"max":2}');
  update public.events set status='closed' where id=ev;
  execute 'set local role authenticated';result:=public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,payload2,'[]');execute 'reset role';
  if (result->>'saved')::boolean is not true or (result->>'submitted')::boolean or result->>'status'<>'draft' or result->>'submission_error' is null then raise exception 'Evento fechado perdeu rascunho ou informou envio: %',result;end if;

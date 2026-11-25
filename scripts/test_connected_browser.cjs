@@ -528,6 +528,12 @@ try {
         d.status = "uploaded";
         return response(route, null);
       }
+      if(table==='siep_registration_openings'){
+        const category=tables.event_categories.find(item=>item.id===body.p_category_id);
+        const matching=tables.registrations.filter(r=>r.event_id===body.p_event_id&&r.school_id===body.p_school_id&&r.category_id===body.p_category_id&&(!body.p_proof_id||r.proof_id===body.p_proof_id)&&!['cancelled','rejected'].includes(r.status));
+        const blocked=category?.participation==='team'&&matching.length>0;
+        return response(route,{blocked,registrations:blocked?matching:[]});
+      }
       if (table === "siep_eligible_athletes")
         return response(
           route,
@@ -992,7 +998,14 @@ try {
   await page.getByRole('button',{name:'Ver inscrições de Futsal',exact:true}).click();
   await page.getByText('Ainda não enviado à Secretaria',{exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Enviar para análise',exact:true}).count(),0);
-  await page.getByRole('table').getByRole('button',{name:'Concluir inscrição',exact:true}).click();
+  await page.getByRole('button',{name:'Nova inscrição neste evento',exact:true}).click();
+  await schoolRegistrationForm.getByLabel('Categoria *',{exact:true}).selectOption(tables.event_categories[0].id);
+  await schoolRegistrationForm.getByText('O limite de inscrições foi atingido.',{exact:true}).waitFor();
+  assert.equal(await schoolRegistrationForm.getByRole('button',{name:'Salvar rascunho',exact:true}).isDisabled(),true);
+  await schoolRegistrationForm.getByRole('button',{name:'Continuar rascunho',exact:true}).click();
+  await schoolRegistrationForm.getByLabel('Atleta 1',{exact:true}).waitFor();
+  assert.equal(tables.registrations.length,1);
+
   loseCompletionResponse=true;
   await schoolRegistrationForm.getByRole('button',{name:'Concluir inscrição',exact:true}).click();
   await schoolRegistrationForm.getByRole('alert').waitFor();

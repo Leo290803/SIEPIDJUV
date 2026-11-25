@@ -198,6 +198,9 @@ export function portalRepository(client) {
           p_event_id: event,
         }),
       ),
+    registrationOpenings: (event,school,category,proof,signal) => queryPage("siep_registration_openings",{
+      p_event_id:event,p_school_id:school,p_category_id:category,p_proof_id:proof||null,
+    },signal),
     eligible: async (event, school, category, proof, registration) =>
       checked(
         await client.rpc("siep_eligible_athletes", {

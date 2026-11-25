@@ -21,10 +21,12 @@ export function RegistrationEditor({
   schoolWorkflow = false,
   initialModality,
   initialCategory,
+  onExistingRegistration,
 }) {
   const [savedRegistration,setSavedRegistration]=useState(registration ? {id:registration.id,revision:registration.revision} : null);
   const completionRequest=useRef(null),schoolIssues=useRef(null);
   const currentId=savedRegistration?.id;
+  const [opening,setOpening]=useState(null);
   const newSchoolEntry = schoolWorkflow && !registration;
   const fixedModality = newSchoolEntry && initialModality?.enabled !== false ? initialModality : undefined;
   const fixedCategory = fixedModality && initialCategory?.modalityId === fixedModality.id && initialCategory.enabled !== false
@@ -61,6 +63,7 @@ export function RegistrationEditor({
     item.enabled !== false && selectableCategories.some(category => category.modalityId === item.id));
   const selectedModality = fixedModality || selectableModalities.find(item=>item.id===selectedModalityId);
   function chooseCategory(id) {
+    setOpening(null);
     setCategoryId(id);
     setProofId("");
     setSlots({});
@@ -83,29 +86,34 @@ export function RegistrationEditor({
       event.staffFunctions.includes(p.position),
   );
   useEffect(() => {
-    let active = true;
+    const controller=new AbortController();
     setError("");
     setEligible([]);
+    setOpening(null);
     if (!categoryId || ((category?.proofs || []).length && !proofId)) {
       setLoading(false);
       return;
     }
     setLoading(true);
-    api
-      .eligible(event.id, school.id, categoryId, proofId, currentId)
-      .then((rows) => {
-        if (active) setEligible(rows);
-      })
-      .catch((error) => {
-        if (active) setError(readableError(error));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [api, event.id, school.id, categoryId, proofId, currentId]);
+    async function loadOptions() {
+      if (newSchoolEntry && !currentId) {
+        const result=await api.registrationOpenings(event.id,school.id,categoryId,proofId,controller.signal);
+        if (controller.signal.aborted) return;
+        setOpening(result);
+        if (result.blocked) return;
+      }
+      const rows=await api.eligible(event.id,school.id,categoryId,proofId,currentId);
+      if(!controller.signal.aborted)setEligible(rows);
+    }
+    loadOptions().catch(error=>{
+      if(!controller.signal.aborted)setError(readableError(error));
+    }).finally(()=>{
+      if(!controller.signal.aborted)setLoading(false);
+    });
+    return ()=>controller.abort();
+  }, [api,event.id,school.id,categoryId,proofId,currentId,newSchoolEntry,category?.proofs?.length]);
+  const checkingOpening = newSchoolEntry && !currentId && !opening;
+  const cannotSave = !categoryId || loading || checkingOpening || opening?.blocked;
   const input = () => ({
     p_event_id: event.id,
     p_school_id: school.id,
@@ -125,7 +133,7 @@ export function RegistrationEditor({
   });
   async function submit(e) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || cannotSave) return;
     setBusy(true);setError("");if(schoolWorkflow)setIssues([]);
     const complete=schoolWorkflow && e.nativeEvent.submitter?.value!=='draft';
     const payload=input(),signature=JSON.stringify(payload);
@@ -195,6 +203,7 @@ export function RegistrationEditor({
                   value={proofId}
                   disabled={!!currentId}
                   onChange={(e) => {
+                    setOpening(null);
                     setProofId(e.target.value);
                     setSlots({});
                     setIssues([]);
@@ -211,7 +220,17 @@ export function RegistrationEditor({
                 </select>
               </label>
             )}
-            {category && (!category.proofs.length || proofId) && (
+            {opening?.blocked && <div className="participation-issues">
+              <strong>{opening.registrations.length ? "O limite de inscrições foi atingido." : "Esta categoria ou prova está sem vagas para novas inscrições."}</strong>
+              {!!opening.registrations.length && <div className="staff-actions">
+                {opening.registrations.map(item=><button key={item.id} type="button" className="secondary"
+                  onClick={()=>onExistingRegistration(item)}>
+                  {item.status==="draft" ? "Continuar rascunho" : "Ver inscrição"}
+                  {opening.registrations.length > 1 && ` · ${new Date(item.created_at).toLocaleString("pt-BR",{timeZone:"America/Manaus"})}`}
+                </button>)}
+              </div>}
+            </div>}
+            {category && (!category.proofs.length || proofId) && !checkingOpening && !opening?.blocked && (
               <>
                 <h3>Atletas da escola</h3>
                 {loading && <p role="status">Consultando atletas elegíveis…</p>}
@@ -371,7 +390,7 @@ export function RegistrationEditor({
               <button
                 type="button"
                 className="secondary"
-                disabled={!categoryId || loading}
+                disabled={cannotSave}
                 onClick={async () => {
                   setBusy(true);
                   setError("");
@@ -386,12 +405,12 @@ export function RegistrationEditor({
               >
                 Verificar pendências
               </button>
-              {schoolWorkflow && <button className="primary" type="submit" value="complete" disabled={!categoryId || loading}>{registration?.status==='correction_requested' ? "Salvar correções e reenviar" : "Concluir inscrição"}</button>}
+              {schoolWorkflow && <button className="primary" type="submit" value="complete" disabled={cannotSave}>{registration?.status==='correction_requested' ? "Salvar correções e reenviar" : "Concluir inscrição"}</button>}
               <button
                 className={schoolWorkflow ? "secondary" : "primary"}
                 type="submit"
                 value="draft"
-                disabled={!categoryId || loading}
+                disabled={cannotSave}
               >
                 {schoolWorkflow ? "Salvar rascunho" : "Salvar rascunho no banco"}
               </button>
@@ -812,6 +831,7 @@ export default function ConnectedRegistrations({
           registration={editing}
           initialModality={modality || undefined}
           initialCategory={selectedCategory || undefined}
+          onExistingRegistration={item=>onRoute({id:item.id,history:item.status!=="draft"})}
           data={data}
           api={api}
           schoolWorkflow={!manager}

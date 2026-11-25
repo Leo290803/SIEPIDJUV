@@ -1,6 +1,6 @@
 -- Fixtures pequenas e reversíveis. Também executadas na validação de migrações.
 do $$
-declare t uuid:=gen_random_uuid();u uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();s uuid:=gen_random_uuid();s2 uuid:=gen_random_uuid();e uuid:=gen_random_uuid();m uuid:=gen_random_uuid();c uuid:=gen_random_uuid();p uuid:=gen_random_uuid();p2 uuid:=gen_random_uuid();link uuid:=gen_random_uuid();part uuid:=gen_random_uuid();r uuid:=gen_random_uuid();a uuid:=gen_random_uuid(); result jsonb;snapshot text;k text;denied boolean;
+declare t uuid:=gen_random_uuid();u uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();s uuid:=gen_random_uuid();s2 uuid:=gen_random_uuid();e uuid:=gen_random_uuid();m uuid:=gen_random_uuid();c uuid:=gen_random_uuid();p uuid:=gen_random_uuid();p2 uuid:=gen_random_uuid();link uuid:=gen_random_uuid();part uuid:=gen_random_uuid();r uuid:=gen_random_uuid();a uuid:=gen_random_uuid(); team uuid:=gen_random_uuid();result jsonb;snapshot text;k text;denied boolean;
 begin
  begin
  insert into auth.users(id) values(u),(outsider);
@@ -64,6 +64,16 @@ begin
  result:=public.siep_portal_page(t,'people',s,'athlete','{"status":"all"}');if result->>'total'<>'1' or jsonb_array_length(result#>'{tables,event_participations}')<>1 or result#>>'{tables,people,0,full_name}'<>'Ana atualizada' then raise exception 'Escopo da escola incorreto';end if;
  denied:=false;begin perform public.siep_portal_page(t,'people',s2,'athlete');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Outra escola exposta';end if;
  denied:=false;begin perform public.siep_portal_page(t,'people',null,'athlete');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Escola acessou toda a instituição';end if;
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ insert into public.event_categories(id,institution_id,event_id,modality_id,name,participation) values(team,t,e,m,'Equipe','team');
+ perform public.siep_save_registration(e,s,team,null,'[]','[]');
+ result:=public.siep_registration_openings(e,s,team);
+ if result->>'blocked' is distinct from 'true' or jsonb_array_length(result->'registrations')<>1 then raise exception 'Rascunho coletivo não ocupou a vaga';end if;
+ denied:=false;begin perform public.siep_save_registration(e,s,team,null,'[]','[]');exception when check_violation then denied:=true;end;if not denied then raise exception 'Criou segundo rascunho coletivo';end if;
+ insert into public.event_rules(institution_id,event_id,category_id,kind,parameters) values(t,e,team,'schoolEntries','{"max":2}');
+ perform public.siep_save_registration(e,s,team,null,'[]','[]');
+ result:=public.siep_registration_openings(e,s,team);
+ if result->>'blocked' is distinct from 'true' or jsonb_array_length(result->'registrations')<>2 then raise exception 'Limite configurado não foi respeitado';end if;
  perform set_config('request.jwt.claim.sub','',true);
  denied:=false;begin perform public.siep_report_page(t);exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Anônimo acessou relatório';end if;
  if has_function_privilege('anon','public.siep_report_page(uuid,jsonb,text,text,text,integer,integer,text)','execute') or has_function_privilege('anon','public.siep_portal_page(uuid,text,uuid,text,jsonb,integer,integer,uuid,boolean)','execute') or has_function_privilege('authenticated','siep_private.report_rows(uuid,jsonb)','execute') then raise exception 'Privilégios indevidos';end if;
