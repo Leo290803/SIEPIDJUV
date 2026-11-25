@@ -291,7 +291,7 @@ try {
         const scope=body.p_school_id,filters=body.p_filters||{},mode=body.p_mode;
         const event=filters.eventId||tables.school_event_contexts.find(c=>c.school_id===scope)?.event_id;
         const pmap=new Map(tables.people.map(p=>[p.id,p])),smap=new Map(tables.schools.map(s=>[s.id,s]));
-        let links=[],registrations=[],total=0,registrationGroups=[];
+        let links=[],registrations=[],total=0,registrationGroups=[],schoolPending;
         if(mode==='people'){
           links=tables.school_people.filter(l=>l.role===body.p_role&&(!scope||l.school_id===scope)&&(!filters.schoolId||l.school_id===filters.schoolId)).filter(l=>{
             const p=pmap.get(l.person_id),archived=p.archived||l.archived||(['athlete','staff'].includes(l.role)&&l.status!=='approved');
@@ -302,7 +302,11 @@ try {
           if(body.p_detail_id&&!links.some(l=>l.id===body.p_detail_id)){const l=tables.school_people.find(l=>l.id===body.p_detail_id);if(l)links.push(l);}
         }
         if(mode==='registrations'){
-          registrations=tables.registrations.filter(r=>(!scope||r.school_id===scope)&&(!event||r.event_id===event)&&(!filters.excludeCancelled||r.status!=='cancelled')&&(!filters.status||filters.status==='all'||r.status===filters.status)&&normalize([tables.events.find(e=>e.id===r.event_id)?.name,smap.get(r.school_id)?.name].join(' ')).includes(normalize(filters.query||'')));
+          registrations=tables.registrations.filter(r=>(!scope||r.school_id===scope)&&(!event||r.event_id===event)&&(!filters.excludeCancelled||r.status!=='cancelled')&&normalize([tables.events.find(e=>e.id===r.event_id)?.name,smap.get(r.school_id)?.name].join(' ')).includes(normalize(filters.query||'')));
+          if(filters.browseRegistrations){
+            schoolPending=Object.fromEntries(['draft','correction_requested','submitted'].map(status=>[status,registrations.filter(r=>r.status===status).length]));
+          }
+          registrations=registrations.filter(r=>!filters.status||filters.status==='all'||r.status===filters.status);
           if(filters.browseRegistrations){
             const categories=new Map(tables.event_categories.map(c=>[c.id,c])),groups=new Map();
             for(const r of registrations){
@@ -317,7 +321,7 @@ try {
             registrations=registrations.filter(r=>(!filters.modalityId||categories.get(r.category_id)?.modality_id===filters.modalityId)&&(!filters.categoryId||r.category_id===filters.categoryId));
           }
           total=registrations.length;
-          registrations=filters.browseRegistrations&&!filters.modalityId?[]:registrations.slice(body.p_offset,body.p_offset+body.p_limit);
+          registrations=filters.browseRegistrations&&!filters.modalityId&&(!filters.status||filters.status==="all")?[]:registrations.slice(body.p_offset,body.p_offset+body.p_limit);
           if(body.p_detail_id&&!registrations.some(r=>r.id===body.p_detail_id)){const r=tables.registrations.find(r=>r.id===body.p_detail_id);if(r)registrations.push(r);}
         }
         const rids=new Set(registrations.map(r=>r.id));
@@ -330,7 +334,7 @@ try {
         }
         const parts=tables.event_participations.filter(p=>pids.has(p.person_id)&&(!scope||p.school_id===scope)),partids=new Set(parts.map(p=>p.id));
         const selected={...tables,people:tables.people.filter(p=>pids.has(p.id)),school_people:links,person_photos:tables.person_photos.filter(p=>pids.has(p.person_id)),event_participations:parts,participation_categories:tables.participation_categories.filter(p=>partids.has(p.participation_id)),participant_documents:tables.participant_documents.filter(p=>partids.has(p.participation_id)),membership_decisions:[],registrations,registration_athletes:allocations,registration_staff:assigned,school_event_contexts:tables.school_event_contexts.filter(c=>c.school_id===scope),notifications:mode==='notifications'?tables.notifications:[]};
-        return response(route,{tables:selected,total,summary:{registrationGroups,pendingLinks:tables.school_people.filter(l=>l.role==='responsible'&&l.status==='pending').length,submitted:tables.registrations.filter(r=>r.status==='submitted').length,unread:tables.notifications.filter(n=>!n.read_at).length}});
+        return response(route,{tables:selected,total,summary:{registrationGroups,schoolPending,pendingLinks:tables.school_people.filter(l=>l.role==='responsible'&&l.status==='pending').length,submitted:tables.registrations.filter(r=>r.status==='submitted').length,unread:tables.notifications.filter(n=>!n.read_at).length}});
       }
       if(table==='siep_read_development_photo'){
         assert.ok(tables.person_photos.some(p=>p.bucket_id==='siep-development-photos'&&p.object_path===body.p_path));
@@ -1099,6 +1103,15 @@ try {
   assert.equal(await page.getByRole('cell',{name:'Cancelada',exact:true}).count(),0);
   assert.equal(await page.getByText('1 inscrição',{exact:true}).count(),1);
   assert.ok(queryCalls.some(({table,body})=>table==='siep_portal_page'&&body.p_mode==='registrations'&&body.p_filters.excludeCancelled));
+  const quickScope=page.getByRole('group',{name:'Resumo das inscrições',exact:true});
+  const correctionsShortcut=quickScope.getByRole('button',{name:'A corrigir · 1',exact:true});
+  await correctionsShortcut.click();
+  await page.getByRole('cell',{name:/^Correção solicitada/}).waitFor();
+  assert.equal(await page.getByLabel('Situação das inscrições',{exact:true}).inputValue(),'correction_requested');
+  assert.equal(await quickScope.getByRole('button',{name:'Aguardando análise · 0',exact:true}).count(),1);
+  await correctionsShortcut.click();
+  await page.getByRole('button',{name:'Ver inscrições de Futsal',exact:true}).waitFor();
+
   tables.registrations.pop();
   assert.equal(await page.getByRole('button',{name:'Aprovar inscrição',exact:true}).count(),0);
   const athleticsRegistration={...schoolPdfFixture,id:randomUUID(),category_id:pdfCategory.id,proof_id:null};

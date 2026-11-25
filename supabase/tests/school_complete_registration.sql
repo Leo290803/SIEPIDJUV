@@ -24,6 +24,12 @@ begin
  execute 'set local role authenticated';
  result:=public.siep_complete_registration(request2,ev,school,cat,null,payload2,'[]',r,1);rev:=(result->>'revision')::integer;
  if (result->>'submitted')::boolean is not true or result->>'status'<>'submitted' then raise exception 'Conclusão válida não enviou: %',result;end if;
+ result:=public.siep_portal_page(tenant,'registrations',school,null,'{"browseRegistrations":true,"status":"draft"}');
+ if result->>'total'<>'0' or result#>>'{summary,schoolPending,submitted}' is distinct from '1' then raise exception 'Filtro alterou contagem de pendências';end if;
+ result:=public.siep_portal_page(tenant,'registrations',school,null,'{"browseRegistrations":true,"status":"submitted"}');
+ if result#>>'{tables,registrations,0,id}' is distinct from r::text then raise exception 'Atalho não abriu inscrição enviada';end if;
+ result:=public.siep_complete_registration(request2,ev,school,cat,null,payload2,'[]',r,1);
+
  replay:=public.siep_complete_registration(request2,ev,school,cat,null,payload2,'[]',r,1);if replay<>result then raise exception 'Retry após sucesso não foi idempotente';end if;
  denied:=false;begin perform public.siep_complete_registration(gen_random_uuid(),ev,school,cat,null,payload2,'[]',r,1);exception when serialization_failure then denied:=true;end;if not denied then raise exception 'Revisão antiga aceita';end if;
  denied:=false;begin perform public.siep_complete_registration(gen_random_uuid(),ev,other_school,cat,null,payload2,'[]');exception when insufficient_privilege then denied:=true;end;if not denied then raise exception 'Inscrição enviada para outra escola';end if;

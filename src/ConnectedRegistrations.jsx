@@ -521,8 +521,9 @@ export default function ConnectedRegistrations({
   const schoolList = !!school && !!event && !manager;
   const modality = schoolList ? event.modalities.find(item=>item.id===modalityId) : null;
   const selectedCategory = modality ? event.categories.find(item=>item.id===categoryId) : null;
-  const showGroups = schoolList && (!modality || (modality.classification !== "Coletiva" && !selectedCategory));
-  const scopeLoading = !!(schoolList && remote && (remote.loading ||
+  const schoolPending = remote?.summary?.schoolPending;
+  const showGroups = schoolList && (modality ? modality.classification !== "Coletiva" && !selectedCategory : !schoolPending || status === "all");
+  const scopeLoading = !!(schoolList && remote && (remote.loading || status !== (remote.filters.status || "all") ||
     modalityId !== (remote.filters.modalityId || "") || categoryId !== (remote.filters.categoryId || "")));
   useServerFilters(remote, {
     query,status,eventId:eventFilter,schoolId:schoolFilter,
@@ -649,6 +650,16 @@ export default function ConnectedRegistrations({
       {manager && <div className="registration-queue-toolbar">
         <div><strong>Fila de conferência</strong><p>Filtre as inscrições enviadas e avance pela fila dentro da análise.</p></div>
         <div className="staff-actions">{[["submitted","Aguardando análise"],["correction_requested","Em correção"],["all","Todas as inscrições"]].map(([value,label]) => <button key={value} className={status === value ? "primary" : "secondary"} aria-pressed={status === value} onClick={() => setStatus(value)}>{label}</button>)}</div>
+      </div>}
+      {schoolList && schoolPending && <div className="registration-queue-toolbar" role="group" aria-label="Resumo das inscrições">
+        <div className="staff-actions">
+          {[["draft","A concluir"],["correction_requested","A corrigir"],["submitted","Aguardando análise"]].map(([key,label])=>(
+            <button key={key} type="button" className={status===key ? "primary" : "secondary"} aria-pressed={status===key}
+              onClick={()=>{setStatus(status===key ? "all" : key);setModalityId("");setCategoryId("");setPdfError("");}}>
+              {label} · {schoolPending[key]}
+            </button>
+          ))}
+        </div>
       </div>}
       <div className="panel registration-compact-list">
         <div className="table-toolbar">
