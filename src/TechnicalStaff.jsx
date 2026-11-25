@@ -77,14 +77,6 @@ export default function TechnicalStaff({
       .catch(error=>{if(!controller.signal.aborted)setError(error.message);});
     return ()=>controller.abort();
   },[conferenceApi,tenant,eventId,schoolId,staffIds,statusRefresh]);
-  async function sendToConference(record) {
-    setBusy(true);setError("");setMessage("");
-    try {
-      const result=await conferenceApi.submitStaffEvent(tenant,eventId,schoolId,record.personId);
-      setEventStatuses(current=>({...current,[record.personId]:result.status}));
-      setMessage(eventStatusLabel[result.status]);
-    } catch(error){setError(error.message);} finally{setBusy(false);}
-  }
   let schools;
   try {
     const saved = JSON.parse(localStorage.getItem("siep-schools"));
@@ -341,13 +333,11 @@ export default function TechnicalStaff({
                           : "Ativo"}
                     </span>
                   </td>
-                  {eventId&&<td>{eventStatusLabel[eventStatuses[r.personId]] || "Ainda sem envio"}</td>}
+                  {eventId&&<td>
+                    {eventStatusLabel[eventStatuses[r.personId]] || (r.archived ? "—" : "Salvar cadastro para inscrever")}
+                  </td>}
                   <td>
                     <div className="staff-actions">
-                      {eventId&&!r.archived&&r.personId&&![ "pending","approved" ].includes(eventStatuses[r.personId])&&
-                        <button type="button" className="secondary" disabled={busy} onClick={()=>sendToConference(r)}>
-                          {eventStatuses[r.personId] ? "Reenviar para conferência" : "Enviar para conferência"}
-                        </button>}
                       <button
                         className="secondary"
                         aria-label={`Editar ${r.name}`}
@@ -406,7 +396,7 @@ export default function TechnicalStaff({
             <h2 id="staff-title">
               {editing.id ? "Editar profissional" : "Cadastrar profissional"}
             </h2>
-            {eventId&&!editing.archived&&<p>Ao salvar, o profissional será enviado para conferência em {event.name}.</p>}
+            {eventId&&!editing.archived&&<p>Ao salvar, o SIEP inscreve o profissional em {event.name} e encaminha o cadastro para conferência.</p>}
             <p>Campos com * são obrigatórios.</p>
             <form onSubmit={save}>
               {connected && <PersonPhoto photo={editing.photo} value={photoChange} onChange={setPhotoChange} disabled={busy} />}

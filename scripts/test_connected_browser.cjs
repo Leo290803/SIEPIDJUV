@@ -1408,10 +1408,12 @@ try {
   isAdmin=false;
   await page.goto(origin+'/escola/'+tenant+'/escolas/'+registration.school_id+'/comissao-tecnica');
   const privateStaff=page.getByRole('row',{name:/Técnico do crachá de teste/});
-  await privateStaff.getByRole('button',{name:'Enviar para conferência',exact:true}).click();
-  await privateStaff.getByText('Aguardando conferência',{exact:true}).waitFor();
+  await privateStaff.getByText('Salvar cadastro para inscrever',{exact:true}).waitFor();
+  assert.equal(await privateStaff.getByRole('button',{name:/enviar para conferência/i}).count(),0);
+  assert.equal(staffEventEntries.size,0);
   await privateStaff.getByRole('button',{name:'Editar Técnico do crachá de teste',exact:true}).click();
   await page.getByRole('button',{name:'Salvar profissional',exact:true}).click();
+  await page.getByRole('dialog',{name:'Editar profissional'}).waitFor({state:'detached'});
   await privateStaff.getByText('Aguardando conferência',{exact:true}).waitFor();
   assert.equal(staffEventEntries.size,1);
   assert.equal(tables.registration_staff.filter(row=>row.person_id===printStaff.id).length,0);

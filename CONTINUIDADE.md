@@ -60,7 +60,7 @@ A migração `20261119200000_institution_badge_defaults` mantém modelos, versõ
 
 ### Inscrição independente da comissão técnica
 
-Com um evento aberto selecionado, salvar um profissional na área da escola o envia para conferência no evento. Cadastros anteriores podem ser enviados pela ação **Enviar para conferência**. O vínculo é único por profissional, escola e evento. O crachá da comissão exige conferência própria aprovada e foto. O relatório escolar reúne as inscrições da comissão em uma lista geral. Os vínculos antigos com inscrições de atletas continuam disponíveis no histórico.
+Com um evento aberto selecionado, salvar um profissional na área da escola o envia para conferência no evento. Para inscrever um profissional já cadastrado, abra **Editar** e salve com o evento selecionado. O vínculo é único por profissional, escola e evento. O crachá da comissão exige conferência própria aprovada e foto. O relatório escolar reúne as inscrições da comissão em uma lista geral. Os vínculos antigos com inscrições de atletas continuam disponíveis no histórico.
 
 ### Evidências e limites desta entrega
 
